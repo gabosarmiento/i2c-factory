@@ -1,99 +1,191 @@
 # /workflow.py
-# Clean Workflow: Pure Application Logic, No Colors, No Visuals
+# Manages the overall user session, interaction loop, and coordinates calls
+# to generation cycles and post-processing agents.
 
+import os
+import sys
 from pathlib import Path
-import json
+import re
+import json # Needed for processing agent output
 
-from agents.core_agents import (
-    input_processor_agent,
-    planner_agent,
-    code_builder_agent,
-    write_files,
+# Import the generation cycle function
+from generation_cycle import run_generation_cycle
+
+# Import necessary agent INSTANCES
+from agents.core_agents import input_processor_agent # Need processor here now
+from agents.sre_team import (
+    version_controller,
+    dependency_verifier,
+    sandbox_executor
 )
-from cli.controller import canvas
+# Import CLI controller
+from cli.controller import canvas # Handles user interaction
 
-DEFAULT_OUTPUT_DIR = Path("./output/generated_project")
+# --- Configuration ---
+DEFAULT_OUTPUT_DIR_BASE = Path("./output") # Base directory for projects
 
-def run_workflow():
-    canvas.start_process("Idea-to-Code Factory Workflow")
+def sanitize_filename(name: str) -> str:
+    """Removes or replaces characters unsafe for filenames/directory names."""
+    name = name.strip()
+    name = re.sub(r'[\\/*?:"<>|\s]+', '_', name)
+    name = re.sub(r'[^\w\-_]', '', name)
+    return name[:50] or "untitled_project"
 
-    # Step 1: Get User Idea
-    canvas.step("Describe your project idea")
-    user_idea = canvas.get_user_input("Enter your project idea:")
-    if not user_idea.strip():
-        canvas.error("No idea provided. Exiting.")
-        return
 
-    output_directory = DEFAULT_OUTPUT_DIR
-    canvas.info(f"Output directory set to: {output_directory}")
+def run_session():
+    """Manages the overall user session and interaction loop."""
+    canvas.info("Initializing Session...")
 
-    # Step 2: Clarify Idea
-    canvas.step("Clarifying idea...")
-    try:
-        response = input_processor_agent.run(user_idea)
-        structured_goal = json.loads(response.content)
-        canvas.success(f"Objective: {structured_goal['objective']}")
-        canvas.success(f"Language: {structured_goal['language']}")
-    except Exception as e:
-        canvas.error(f"Error clarifying idea: {e}")
-        return
+    # Agents are imported instances, instantiation happens in their respective modules
 
-    # Step 3: Plan Files
-    canvas.step("Planning minimal file structure...")
-    try:
-        plan_prompt = (
-            f"Objective: {structured_goal['objective']}\n"
-            f"Language: {structured_goal['language']}"
-        )
-        response = planner_agent.run(plan_prompt)
-        file_plan = json.loads(response.content)
-        canvas.success(f"Planned files: {file_plan}")
-    except Exception as e:
-        canvas.error(f"Error planning files: {e}")
-        return
+    # Session state variables
+    current_project_path: Path | None = None
+    last_idea: str | None = None
+    # Store the structured goal (objective & language) for the current project context
+    current_structured_goal: dict | None = None
 
-    # Step 4: Generate Code
-    canvas.step("Generating code files...")
-    generated_code = {}
-    try:
-        for file_path in file_plan:
-            build_prompt = (
-                f"Objective: {structured_goal['objective']}\n"
-                f"Language: {structured_goal['language']}\n"
-                f"Generate complete, runnable code for the file '{file_path}'."
-            )
-            response = code_builder_agent.run(build_prompt)
-            raw = response.content
-            # Strip markdown code fences if present
-            if raw.strip().startswith("```"):
-                lines = raw.splitlines()
-                # remove opening fence
-                if lines and lines[0].strip().startswith("```"):
-                    lines = lines[1:]
-                # remove closing fence
-                if lines and lines[-1].strip().startswith("```"):
-                    lines = lines[:-1]
-                code = "\n".join(lines)
-            else:
-                code = raw
-            code = code.strip()
-            generated_code[file_path] = code
-            canvas.success(f"Generated: {file_path}")
-    except Exception as e:
-        canvas.error(f"Error generating code: {e}")
-        return
+    while True: # Main interaction loop
+        canvas.step("Ready for next action")
 
-    # Step 5: Write Files
-    canvas.step("Writing files to disk...")
-    try:
-        write_files(generated_code, output_directory)
-        canvas.success("Project generation complete!")
-        canvas.info(f"Files saved at: {output_directory}")
-    except Exception as e:
-        canvas.error(f"Error writing files: {e}")
-        return
+        # Determine the prompt based on whether a project context exists
+        if current_project_path:
+             action_prompt = f"Project: '{current_project_path.name}'. Next action ('f <feature_idea>', 'r' to refine last, 'q' to quit):"
+        else:
+             action_prompt = "Enter project idea (or 'q' to quit):"
 
-    canvas.end_process("Workflow completed successfully.")
+        user_input = canvas.get_user_input(action_prompt).strip()
+        command = user_input.lower()
+        idea_for_cycle = None
+        structured_goal_for_cycle = None # Goal to pass to generation cycle
+        perform_generation = False
 
-if __name__ == "__main__":
-    run_workflow()
+        # --- Parse User Command ---
+        if command == 'q':
+            canvas.info("Exiting session.")
+            break
+        elif command == 'r' and last_idea:
+            if not current_project_path or not current_structured_goal:
+                canvas.warning("Cannot refine without an active project context (idea and language). Please start a new idea.")
+                continue
+            # For refinement, reuse the last structured goal
+            structured_goal_for_cycle = current_structured_goal
+            perform_generation = True
+            canvas.info(f"Refining project '{current_project_path.name}' based on last objective.")
+            # TODO: Implement actual refinement logic (might need different prompts/agents)
+
+        elif command.startswith('f ') and current_project_path:
+             feature_idea = user_input[2:].strip()
+             if not feature_idea:
+                 canvas.warning("Please provide a description for the feature.")
+                 continue
+             if not current_structured_goal:
+                  canvas.warning("Cannot add feature without project context (language unknown).")
+                  continue
+
+             # Create a new objective for the feature, keeping the language
+             # This might need more sophisticated handling (e.g., asking LLM to integrate objectives)
+             objective_for_feature = f"Add feature to existing project: {feature_idea}"
+             structured_goal_for_cycle = {
+                 "objective": objective_for_feature,
+                 "language": current_structured_goal["language"] # Reuse language
+             }
+             perform_generation = True
+             canvas.info(f"Adding feature to project '{current_project_path.name}'.")
+             # TODO: Feature addition logic needs context handling (reading files etc.)
+
+        elif not current_project_path and command == 'r':
+             canvas.warning("No previous idea to refine. Please enter a new project idea.")
+             continue
+        elif not current_project_path and command.startswith('f '):
+             canvas.warning("No active project to add features to. Please start a new project idea.")
+             continue
+        elif command: # Treat any other non-empty input as a new idea
+            raw_idea = user_input
+            last_idea = raw_idea # Store raw idea
+
+            # --- Call Input Processor for New Idea --- <<< MOVED HERE >>>
+            canvas.step("Clarifying new idea...")
+            try:
+                response = input_processor_agent.run(raw_idea)
+                processed_goal = json.loads(response.content)
+                if not isinstance(processed_goal, dict) or "objective" not in processed_goal or "language" not in processed_goal:
+                     canvas.error("Failed to get valid structured goal from Input Processor.")
+                     continue # Ask for input again
+                current_structured_goal = processed_goal # Store for session
+                structured_goal_for_cycle = current_structured_goal
+                canvas.success(f"Objective: {current_structured_goal['objective']}")
+                canvas.success(f"Language: {current_structured_goal['language']}")
+            except Exception as e:
+                canvas.error(f"Error clarifying idea: {e}")
+                continue # Ask for input again
+            # --- End Input Processor Call ---
+
+            # --- Project Naming Logic ---
+            suggested_name = sanitize_filename(current_structured_goal['objective'])
+            name_prompt = f"Enter directory name (suggestion: '{suggested_name}'): "
+            project_name_input = canvas.get_user_input(name_prompt).strip()
+            final_project_name = sanitize_filename(project_name_input or suggested_name)
+
+            current_project_path = DEFAULT_OUTPUT_DIR_BASE / final_project_name
+            perform_generation = True
+            canvas.info(f"Starting new project in: {current_project_path}")
+
+        else:
+            # Empty input, just re-prompt
+            continue
+
+
+        # --- Execute Generation & Post-Processing ---
+        if perform_generation and structured_goal_for_cycle and current_project_path:
+            # --- Run Generation Cycle ---
+            # Pass the specific goal for this cycle
+            generation_result = run_generation_cycle(structured_goal_for_cycle, current_project_path)
+            generation_success = generation_result.get("success", False)
+            # Use the language returned by the cycle (originally from the structured goal)
+            language = generation_result.get("language")
+
+            # --- Post-Generation SRE Checks & Actions (only if generation succeeded) ---
+            if generation_success and language: # Ensure language is available
+                # --- Dependency Check ---
+                canvas.step("Performing SRE Dependency Check...")
+                dep_issues = dependency_verifier.check_dependencies(current_project_path)
+                if dep_issues:
+                    canvas.warning("Dependency issues found:")
+                    for issue in dep_issues: canvas.warning(f"  - {issue}")
+                else:
+                    canvas.success("Dependency checks passed.")
+
+                # --- Sandbox Execution Check (Syntax/Compile Check) ---
+                canvas.step("Performing SRE Syntax/Compile Check...")
+                # Pass the CORRECT language retrieved from the cycle result
+                exec_success, exec_msg = sandbox_executor.execute(current_project_path, language)
+                if exec_success:
+                    canvas.success("Syntax/Compile check passed.")
+                else:
+                    canvas.error("Syntax/Compile check failed.")
+                    canvas.error(f"Details:\n{exec_msg}")
+
+                # --- Version Control ---
+                canvas.step("Performing Version Control...")
+                # Use the objective from the cycle's goal for the commit message
+                commit_msg = f"Completed cycle for objective: {structured_goal_for_cycle['objective'][:60]}"
+                version_controller.initialize_and_commit(current_project_path, commit_msg)
+
+            elif not generation_success:
+                canvas.error("Generation cycle failed. Please review errors. Skipping post-generation steps.")
+            elif not language:
+                 canvas.error("Could not determine language after generation cycle. Skipping post-generation steps.")
+
+
+        elif not perform_generation:
+             canvas.warning("No generation action taken in this cycle.")
+
+
+        print("-" * 30) # Separator for the loop
+
+    canvas.end_process("Session ended.")
+
+
+# This function is called by main.py
+def start_factory_session():
+    run_session()

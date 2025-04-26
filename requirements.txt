@@ -2,3 +2,6 @@ agno
 python-dotenv
 prompt_toolkit
 groq
+ruff
+pip-audit
+# Add other dependencies like 'requests' if needed later

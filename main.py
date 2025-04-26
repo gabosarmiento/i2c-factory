@@ -7,8 +7,7 @@ from dotenv import load_dotenv
 
 from config.config import load_groq_api_key
 from cli.ascii import show_banner
-from workflow import run_workflow
-
+from workflow import start_factory_session
 
 def main():
     """
@@ -24,7 +23,7 @@ def main():
 
     # 2. Show banner and start workflow
     show_banner()
-    run_workflow()
+    start_factory_session()
 
 
 if __name__ == "__main__":
