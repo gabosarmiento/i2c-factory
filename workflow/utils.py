@@ -3,7 +3,10 @@
 
 import re
 from pathlib import Path
-import tiktoken # For token counting
+try:
+    import tiktoken  # For token counting
+except ImportError:
+    tiktoken = None  # No tiktoken, usaremos fallback
 import typing
 
 # Import CLI controller for logging within the helper
@@ -33,7 +36,12 @@ DEFAULT_PRICE_PER_1K = 0.00007 # Default fallback price
 # Verify if Groq models align with a specific tiktoken encoding or provide their own count method.
 try:
     # Attempt to get the encoding used by many modern models
-    encoding = tiktoken.get_encoding("cl100k_base")
+    # encoding = tiktoken.get_encoding("cl100k_base")
+    # Attempt to get the encoding used by many modern models (if tiktoken is available)
+    if tiktoken is not None:
+        encoding = tiktoken.get_encoding("cl100k_base")
+    else:
+        encoding = None
 except Exception:
     # Fallback to a default if the preferred one isn't available
     try:
