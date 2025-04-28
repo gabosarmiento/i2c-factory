@@ -130,7 +130,7 @@ class SandboxExecutorAgent:
             # Use sys.executable to ensure using the correct python interpreter
             command = [
                 sys.executable, "-m", "unittest", "discover",
-                "-s", str(project_path), # Start discovery in project root
+                "-s", ".", # Discover in current directory
                 "-p", "test*.py"         # Pattern for test files
             ]
             canvas.info(f"      Running command: {' '.join(command)}")
