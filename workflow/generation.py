@@ -15,7 +15,7 @@ from agents.sre_team import (
     code_quality_sentinel
 )
 # Import file operations
-from .modification.file_operations import write_files_to_disk as write_files, ensure_init_py
+from .modification.file_operations import write_files_to_disk as write_files
 # Import CLI controller
 from cli.controller import canvas
 
