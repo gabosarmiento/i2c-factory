@@ -4,4 +4,9 @@ prompt_toolkit
 groq
 ruff
 pip-audit
+tiktoken
+lancedb>=0.5.5
+sentence-transformers>=2.2.0
+numpy>=1.26,<2
+pandas
 # Add other dependencies like 'requests' if needed later

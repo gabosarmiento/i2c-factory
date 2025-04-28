@@ -8,14 +8,19 @@ console = Console()
 
 # Example simple banner for startup
 def show_banner():
-    ascii_art = """
-       ___ ____ ___ 
-      |_ _|_  _|_ _|
-       | |  | |  | | 
-       | |  | |  | | 
-      |___| |_| |___|
-      Idea 2 Code Engine
-   
+    ascii_art = """                                         .-.----------.                                                                
+                                    .-.                  --.                                                           
+                               . .-.       ..........       --                                                         
+                                ..   .  .......-.......  ..   ..                                                       
+                               .   .--.........-.....-....--   ..                                                      
+                               .    ........-------.......      .                                                      
+                               .     .......--I2C--.......      .                                                      
+                               .       ..................      .                                                       
+                                ..       ..............       .                                                        
+                                  --        . .....   .     -.                                                         
+                                    .--.                .-.                                                            
+                                          ...------...                                                                 
+                  .  .  .  . ......... .. Idea 2 Code  .. .......... .  .  .  .                                        
     """
     console.print(Panel(ascii_art, style="bold cyan", title="[bright_blue]Idea-to-Code Factory[/]", border_style="bright_blue"))
 

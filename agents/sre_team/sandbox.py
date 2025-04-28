@@ -2,7 +2,7 @@
 # Agent for performing syntax checks (basic sandbox execution).
 
 import subprocess
-import py_compile
+import py_compile # <<< Import py_compile >>>
 import sys
 from pathlib import Path
 
@@ -31,9 +31,11 @@ class SandboxExecutorAgent:
             msg = f"Syntax check only implemented for Python, not {language}."
             print(f"   ⚪ Skipping: {msg}")
             # Return True because we didn't *fail* the check, just skipped it.
+            # Alternatively, return False if non-python should be considered a failure here.
             return True, msg
 
-        python_files = list(project_path.rglob('*.py')) # Use rglob to check recursively
+        # Use rglob to find all python files recursively
+        python_files = list(project_path.rglob('*.py'))
         if not python_files:
             msg = "No Python files found in project to check."
             print(f"   ⚪ {msg}")
@@ -43,6 +45,11 @@ class SandboxExecutorAgent:
         success_count = 0
         print(f"   ▶️ Checking syntax for {len(python_files)} Python file(s)...")
         for py_file in python_files:
+            # Skip files in common hidden/metadata directories
+            if any(part.startswith('.') for part in py_file.relative_to(project_path).parts) or \
+               "__pycache__" in py_file.relative_to(project_path).parts:
+                continue
+
             relative_path = py_file.relative_to(project_path)
             print(f"      Checking: {relative_path}")
             try:
@@ -52,7 +59,9 @@ class SandboxExecutorAgent:
                 success_count += 1
             except py_compile.PyCompileError as e:
                 # Provide more context from the exception if possible
-                error_msg = f"Syntax Error in {relative_path}: {e.msg} (Line: {e.lineno})"
+                # Check if lineno is available, otherwise provide msg only
+                line_info = f"(Line: {e.lineno})" if hasattr(e, 'lineno') and e.lineno else ""
+                error_msg = f"Syntax Error in {relative_path}{line_info}: {e.msg}"
                 errors_found.append(error_msg)
                 print(f"      ❌ {error_msg}")
             except Exception as e:
@@ -62,7 +71,7 @@ class SandboxExecutorAgent:
                 print(f"      ❌ {error_msg}")
 
         if not errors_found:
-            msg = f"Syntax check successful for all {success_count} Python file(s)."
+            msg = f"Syntax check successful for all {success_count} checked Python file(s)."
             print(f"   ✅ {msg}")
             return True, msg
         else:

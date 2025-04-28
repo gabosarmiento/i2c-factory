@@ -1,30 +1,40 @@
 # /main.py
-# Main entry point for the i2c Alive Factory CLI
+# Main entry point for the Idea-to-Code Factory application.
 
 import os
-import sys
+# --- <<< Set Tokenizer Parallelism Env Var >>> ---
+# Set before other imports that might use tokenizers (like sentence-transformers via agents)
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+# --- <<< End Setting Env Var >>> ---
+
+import sys # Keep sys import if needed elsewhere, though not used directly here now
 from dotenv import load_dotenv
 
-from config.config import load_groq_api_key
-from cli.ascii import show_banner
-from workflow import start_factory_session
+# Import the main session execution function FROM THE WORKFLOW PACKAGE
+from workflow import start_factory_session # Should work due to __init__.py
+from cli.ascii import show_banner # Keep the banner if desired
+from config.config import load_groq_api_key # Keep API key loading
 
-def main():
-    """
-    Bootstraps the environment and launches the Alive Factory workflow.
-    """
-    # 1. Load environment variables
+def load_environment():
+    """Loads environment variables from a .env file."""
     load_dotenv()
+    print("🔑 Environment variables loaded (if .env file exists).")
     try:
-        load_groq_api_key()  # Validate GROQ_API_KEY presence
+        load_groq_api_key() # Validate GROQ_API_KEY presence
+        print("   ✅ GROQ_API_KEY found.")
+        return True
     except ValueError as e:
-        print(f"[ERROR]: {e}")
-        sys.exit(1)
+        print(f"   {e}") # Print the error message from config
+        return False # Stop if key is missing
 
-    # 2. Show banner and start workflow
-    show_banner()
-    start_factory_session()
-
-
+# --- Main Execution Block ---
 if __name__ == "__main__":
-    main()
+    print("--- Application Start ---")
+    show_banner() # Show banner at the start
+    if load_environment():
+        # Call the primary session function from the workflow package
+        start_factory_session()
+    else:
+        print("❌ Workflow aborted due to missing environment configuration.")
+    print("--- Application End ---")
+
