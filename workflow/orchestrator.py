@@ -1,39 +1,34 @@
 # /workflow/orchestrator.py
-# Routes actions and handles post-cycle SRE checks, review, guardrails, integration checks, and version control.
-# Refined and final version based on user input.
+# Routes actions and handles post-cycle SRE checks, review, guardrails, and version control using SRE Workflow.
 
 from pathlib import Path
 import json
-import traceback # For detailed error logging
+import traceback
 
 # Cycle execution functions
 from .generation import execute_generation_cycle
 from .modification import execute_modification_cycle
 
-# SRE agents
-from agents.sre_team import dependency_verifier, sandbox_executor, version_controller
+# --- <<< Import SRE Workflow >>> ---
+from .sre_team_workflow import SRETeamWorkflow
 
-# Quality & integration agents
+# Import only agents needed AFTER SRE workflow (Quality, Version Control)
+from agents.sre_team import version_controller # Keep VC here
 from agents.quality_team import (
-    static_analysis_agent,
-    integration_checker_agent,
     reviewer_agent,
     guardrail_agent,
 )
-# Guardrail decision constants
+# Import Guardrail decision constants
 from agents.quality_team.guardrail_agent import GUARDRAIL_BLOCK, GUARDRAIL_WARN, GUARDRAIL_CONTINUE
 
 # CLI controller
 from cli.controller import canvas
 
-# Review-storage helper (optional)
+# Review-storage helper
 try:
     from utils.review_storage import save_review_to_file
 except ImportError:
-    # Define dummy function if util not found
-    def save_review_to_file(*args, **kwargs):
-        canvas.warning("[Orchestrator] save_review_to_file utility not found.")
-        return None
+    def save_review_to_file(*args, **kwargs): return None
 
 
 def route_and_execute(
@@ -43,21 +38,12 @@ def route_and_execute(
     current_structured_goal: dict | None
 ) -> bool:
     """
-    Routes the user's action to the correct execution cycle, then runs:
-      1. Static analysis summary query
-      2. Dependency check
-      3. Syntax/compile check
-      4. Integration AST check
-      5. AI code review
-      6. Guardrail evaluation
-      7. Version control commit (if not blocked)
-
-    Returns True only if the cycle succeeded and was not blocked by guardrails.
+    Routes the user's action to the correct execution cycle, runs the SRE Workflow,
+    then runs Review, Guardrail, and Version Control.
     """
     cycle_success = False
-    # Determine language, default to python if not specified in goal
     language = current_structured_goal.get("language") if current_structured_goal else "python"
-    final_code_map = None # Will hold the generated/modified code
+    final_code_map = None
 
     # --- 0. Execute main generation or modification cycle ---
     canvas.info(f"--- Starting {action_type.capitalize()} Cycle ---")
@@ -66,144 +52,140 @@ def route_and_execute(
             if isinstance(action_detail, dict):
                 result = execute_generation_cycle(action_detail, current_project_path)
                 cycle_success = result.get("success", False)
-                language = result.get("language") or language # Update language if cycle returns it
+                language = result.get("language") or language
                 final_code_map = result.get("code_map")
-            else:
-                raise ValueError("Missing structured goal for generation.")
-
+            else: raise ValueError("Missing structured goal for generation.")
         elif action_type == "modify":
             if isinstance(action_detail, str) and language:
                 result = execute_modification_cycle(action_detail, current_project_path, language)
                 cycle_success = result.get("success", False)
-                language = result.get("language") or language # Update language
+                language = result.get("language") or language
                 final_code_map = result.get("code_map")
-            else:
-                raise ValueError("Invalid detail or missing language for modification.")
+            else: raise ValueError("Invalid detail or missing language for modification.")
+        else: raise ValueError(f"Unknown action type: {action_type}")
+    except Exception as e:
+         canvas.error(f"Error during '{action_type}' cycle: {e}")
+         return False
+
+    # --- 1. Check Cycle Success ---
+    if not (cycle_success and isinstance(language, str) and final_code_map is not None):
+        canvas.error("Main cycle failed or prerequisites missing for post-cycle checks.")
+        return False
+
+    # --- 2. Run SRE Workflow --- <<< MODIFIED BLOCK >>>
+    canvas.info(f"--- Running SRE Workflow ---")
+    sre_success = False
+    analysis_summary = None # Initialize
+    dep_issues = [] # Initialize
+    syntax_test_ok = (True, "") # Initialize
+    integration_issues = [] # Initialize
+
+    try:
+        sre_workflow = SRETeamWorkflow(session_id=f"sre-{current_project_path.name}") # Give it a session ID
+        # Iterate through the workflow responses
+        final_sre_response = None
+        for response in sre_workflow.run(project_path=current_project_path, language=language):
+             canvas.info(f"   [SRE_WF] {response.content}") # Log workflow progress
+             # Collect results from extra_data if needed (optional)
+             if response.extra_data:
+                  if "dependency_issues" in response.extra_data:
+                       dep_issues = response.extra_data["dependency_issues"]
+                  if "integration_issues" in response.extra_data:
+                       integration_issues = response.extra_data["integration_issues"]
+                  # We get analysis_summary from the final response
+             final_sre_response = response # Keep track of the last response
+
+        # Check final status (assuming last response indicates completion)
+        if final_sre_response and "completed successfully" in final_sre_response.content:
+             sre_success = True
+             analysis_summary = final_sre_response.extra_data.get("analysis_summary", {})
+             # Extract other results if needed (e.g., syntax status)
+             # Note: This relies on the workflow yielding results correctly.
+             # A more robust way might be to store results in workflow state.
+             # For now, we assume success if no exception was raised.
+             # We still need syntax_ok for the guardrail - get it from sandbox directly?
+             # Let's call sandbox again here just for the status - slightly redundant but simpler for now
+             syntax_test_ok = sandbox_executor.execute(current_project_path, language)
+
         else:
-            raise ValueError(f"Unknown action type: {action_type}")
+             # Workflow might have finished but not reported success clearly
+             canvas.warning("SRE Workflow finished, but final success message not detected.")
+             # Attempt to get summary anyway if it exists
+             analysis_summary = final_sre_response.extra_data.get("analysis_summary", {}) if final_sre_response else {}
+
 
     except Exception as e:
-        canvas.error(f"Error during '{action_type}' cycle: {e}")
-        return False # Cycle itself failed
+         canvas.error(f"SRE Workflow failed with exception: {e}")
+         # Attempt to get any partial analysis summary if possible
+         # analysis_summary = getattr(sre_workflow, 'last_analysis_summary', {}) # Requires modification to SREWorkflow
+         sre_success = False # Mark as failed
 
-    # --- 1. Post-cycle checks ---
-    if not (cycle_success and isinstance(language, str) and final_code_map is not None):
-        canvas.error("Cycle failed or prerequisites missing for post-cycle checks.")
-        return False # Cannot proceed
+    if not sre_success:
+         canvas.error("SRE Workflow did not complete successfully. Aborting post-cycle actions.")
+         return False
+    # --- <<< END SRE Workflow Block >>> ---
 
-    canvas.info(f"--- Running Post-{action_type.capitalize()} Checks ---")
 
-    # Initialize results from checks
-    analysis_summary = {}
-    dep_issues: list = []
-    syntax_ok: tuple[bool, str] = (True, "") # Default to success
-    integration_issues: list[str] = []
+    # --- 3. Post-SRE Workflow Steps (Review, Guardrail, Commit) ---
+    canvas.info(f"--- Running Post-SRE Checks ---")
     review_feedback: str | None = None
-    guardrail_decision = GUARDRAIL_CONTINUE # Default
-    guardrail_reasons: list[str] = []
 
-    try: # Wrap all post-cycle steps
-        # Step 1: Static Analysis Summary
-        canvas.step("Performing SRE Static Analysis Summary...")
-        analysis_summary = static_analysis_agent.get_analysis_summary(current_project_path)
-        if analysis_summary.get("errors"):
-            canvas.warning(f"Static analysis summary errors: {analysis_summary['errors']}")
-        else:
-            canvas.success("Static analysis summary retrieved.")
-
-        # Step 2: Dependency Check
-        canvas.step("Performing SRE Dependency Check...")
-        dep_issues = dependency_verifier.check_dependencies(current_project_path)
-        if dep_issues:
-            canvas.warning(f"Dependency issues found: {len(dep_issues)}")
-        else:
-            canvas.success("Dependency checks passed.")
-
-        # Step 3: Syntax/Compile Check (using SandboxExecutor)
-        canvas.step("Performing SRE Syntax/Compile & Test Check...") # Renamed step slightly
-        syntax_ok = sandbox_executor.execute(current_project_path, language) # sandbox now includes tests
-        if syntax_ok[0]:
-            canvas.success("Syntax/Compile & Tests check passed (or no tests found).")
-        else:
-            canvas.error(f"Syntax/Compile or Tests check failed: {syntax_ok[1]}")
-
-        # Step 4: Integration AST Check
-        canvas.step("Performing SRE Integration Check...")
-        integration_issues = integration_checker_agent.check_integrations(current_project_path)
-        if integration_issues:
-            canvas.warning("Potential integration issues found:")
-            for issue in integration_issues:
-                canvas.warning(f"  - {issue}")
-        else:
-            canvas.success("Basic integration checks passed.")
-
-        # Step 5: AI Code Review
+    try:
+        # Step 3.1: AI Code Review
         canvas.step("Performing AI Code Review...")
-        if current_structured_goal: # Review needs goal context
+        if current_structured_goal:
             review_feedback = reviewer_agent.review_code(
                 structured_goal=current_structured_goal,
                 code_map=final_code_map,
-                analysis_summary=analysis_summary
-                # TODO: Pass other check results (syntax_ok, dep_issues, integration_issues) to reviewer?
+                analysis_summary=analysis_summary # Use summary from SRE workflow
             )
             if review_feedback:
                 canvas.info("[AI Review Feedback]:")
                 for line in review_feedback.splitlines(): canvas.info(f"  {line}")
-                # Save the review
                 save_review_to_file(current_project_path, review_feedback)
-            else:
-                canvas.warning("AI Review Agent failed or produced no feedback.")
-        else:
-            canvas.warning("Skipping AI Review: Project goal context missing.")
+            else: canvas.warning("AI Review Agent failed or produced no feedback.")
+        else: canvas.warning("Skipping AI Review: Project goal context missing.")
 
-        # Step 6: Guardrail Evaluation
+        # Step 3.2: Guardrail Evaluation
         canvas.step("Performing Guardrail Evaluation...")
         guardrail_decision, guardrail_reasons = guardrail_agent.evaluate_results(
-            static_analysis_summary=analysis_summary,
-            dependency_summary=dep_issues,
-            syntax_check_result=syntax_ok, # Pass tuple from sandbox_executor
+            static_analysis_summary=analysis_summary, # Use summary from SRE workflow
+            dependency_summary=dep_issues, # Use issues collected during SRE workflow (if yielded correctly)
+            syntax_check_result=syntax_test_ok, # Use result from SRE workflow (or re-run)
             review_feedback=review_feedback
-            # TODO: Pass integration_issues to guardrail?
+            # TODO: Pass integration_issues if yielded by SRE workflow
         )
         if guardrail_decision == GUARDRAIL_BLOCK:
             canvas.error("🚦 Guardrails blocked further action:")
             for reason in guardrail_reasons: canvas.error(f"  - {reason}")
             canvas.end_process(f"Action '{action_type}' aborted by guardrails.")
-            return False # Overall action failed due to block
+            return False
         if guardrail_decision == GUARDRAIL_WARN:
             canvas.warning("🚦 Guardrails issued warnings:")
             for reason in guardrail_reasons: canvas.warning(f"  - {reason}")
 
-        # Step 7: Version Control Commit (Only if not blocked)
+        # Step 3.3: Version Control Commit (Only if not blocked)
         canvas.step("Performing Version Control...")
-        # Determine objective for commit message
-        objective_summary = "Unknown Objective"
-        if isinstance(action_detail, str): # For 'r' or 'f ...'
-            objective_summary = action_detail
-        elif isinstance(action_detail, dict): # For 'generate'
-            objective_summary = action_detail.get("objective", "Unknown Objective")
-
-        # Construct detailed commit message
+        objective_summary = action_detail if isinstance(action_detail, str) else action_detail.get("objective", "Unknown Objective")
+        # Construct detailed commit message (same as before)
         commit_lines = [f"Completed {action_type} cycle for: {objective_summary[:50]}"]
         if review_feedback: commit_lines.append("[AI Review included]")
         if guardrail_decision != GUARDRAIL_CONTINUE: commit_lines.append(f"[Guardrail Status: {guardrail_decision}]")
+        # Add SRE results to commit message if available
         if integration_issues: commit_lines.append(f"[Integration Issues: {len(integration_issues)} found]")
         if dep_issues: commit_lines.append(f"[Dependency Issues: {len(dep_issues)} found]")
-        if not syntax_ok[0]: commit_lines.append("[Syntax/Test Check Failed]") # Updated check name
+        if not syntax_test_ok[0]: commit_lines.append("[Syntax/Test Check Failed]")
 
         commit_msg = "\n\n".join(commit_lines)
         version_controller.initialize_and_commit(current_project_path, commit_msg)
 
         canvas.info(f"--- Post-Cycle Checks Completed ---")
-        # Use a clearer success message here
-        if guardrail_decision == GUARDRAIL_WARN:
-            canvas.success(f"{action_type.capitalize()} cycle completed with warnings.")
-        else:
-            canvas.success(f"{action_type.capitalize()} cycle completed successfully.")
-        return True # Overall action considered successful (even with warnings)
+        if guardrail_decision == GUARDRAIL_WARN: canvas.success(f"{action_type.capitalize()} cycle completed with warnings.")
+        else: canvas.success(f"{action_type.capitalize()} cycle completed successfully.")
+        return True # Overall action succeeded
 
     except Exception as e:
-        canvas.error(f"Error during post-cycle steps: {e}")
-        canvas.error(traceback.format_exc()) # Log full traceback
+        canvas.error(f"Error during post-SRE steps (Review/Guardrail/Commit): {e}")
+        canvas.error(traceback.format_exc())
         return False # Post-cycle failed critically
 
