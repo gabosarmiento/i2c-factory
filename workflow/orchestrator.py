@@ -1,9 +1,10 @@
 # /workflow/orchestrator.py
 # Routes actions and handles post-cycle SRE checks, review, guardrails, integration checks, and version control.
-# Refined version based on user suggestion.
+# Refined and final version based on user input.
 
 from pathlib import Path
 import json
+import traceback # For detailed error logging
 
 # Cycle execution functions
 from .generation import execute_generation_cycle
@@ -19,7 +20,7 @@ from agents.quality_team import (
     reviewer_agent,
     guardrail_agent,
 )
-# Import Guardrail decision constants
+# Guardrail decision constants
 from agents.quality_team.guardrail_agent import GUARDRAIL_BLOCK, GUARDRAIL_WARN, GUARDRAIL_CONTINUE
 
 # CLI controller
@@ -50,6 +51,7 @@ def route_and_execute(
       5. AI code review
       6. Guardrail evaluation
       7. Version control commit (if not blocked)
+
     Returns True only if the cycle succeeded and was not blocked by guardrails.
     """
     cycle_success = False
@@ -84,7 +86,7 @@ def route_and_execute(
         canvas.error(f"Error during '{action_type}' cycle: {e}")
         return False # Cycle itself failed
 
-    # --- 1. Post-cycle checks & actions ---
+    # --- 1. Post-cycle checks ---
     if not (cycle_success and isinstance(language, str) and final_code_map is not None):
         canvas.error("Cycle failed or prerequisites missing for post-cycle checks.")
         return False # Cannot proceed
@@ -100,7 +102,7 @@ def route_and_execute(
     guardrail_decision = GUARDRAIL_CONTINUE # Default
     guardrail_reasons: list[str] = []
 
-    try:
+    try: # Wrap all post-cycle steps
         # Step 1: Static Analysis Summary
         canvas.step("Performing SRE Static Analysis Summary...")
         analysis_summary = static_analysis_agent.get_analysis_summary(current_project_path)
@@ -117,13 +119,13 @@ def route_and_execute(
         else:
             canvas.success("Dependency checks passed.")
 
-        # Step 3: Syntax/Compile Check
-        canvas.step("Performing SRE Syntax/Compile Check...")
-        syntax_ok = sandbox_executor.execute(current_project_path, language)
+        # Step 3: Syntax/Compile Check (using SandboxExecutor)
+        canvas.step("Performing SRE Syntax/Compile & Test Check...") # Renamed step slightly
+        syntax_ok = sandbox_executor.execute(current_project_path, language) # sandbox now includes tests
         if syntax_ok[0]:
-            canvas.success("Syntax/Compile check passed.")
+            canvas.success("Syntax/Compile & Tests check passed (or no tests found).")
         else:
-            canvas.error(f"Syntax/Compile check failed: {syntax_ok[1]}")
+            canvas.error(f"Syntax/Compile or Tests check failed: {syntax_ok[1]}")
 
         # Step 4: Integration AST Check
         canvas.step("Performing SRE Integration Check...")
@@ -142,6 +144,7 @@ def route_and_execute(
                 structured_goal=current_structured_goal,
                 code_map=final_code_map,
                 analysis_summary=analysis_summary
+                # TODO: Pass other check results (syntax_ok, dep_issues, integration_issues) to reviewer?
             )
             if review_feedback:
                 canvas.info("[AI Review Feedback]:")
@@ -158,7 +161,7 @@ def route_and_execute(
         guardrail_decision, guardrail_reasons = guardrail_agent.evaluate_results(
             static_analysis_summary=analysis_summary,
             dependency_summary=dep_issues,
-            syntax_check_result=syntax_ok,
+            syntax_check_result=syntax_ok, # Pass tuple from sandbox_executor
             review_feedback=review_feedback
             # TODO: Pass integration_issues to guardrail?
         )
@@ -173,24 +176,34 @@ def route_and_execute(
 
         # Step 7: Version Control Commit (Only if not blocked)
         canvas.step("Performing Version Control...")
-        objective_summary = action_detail if isinstance(action_detail, str) else action_detail.get("objective", "Unknown Objective")
-        # Construct commit message with details
+        # Determine objective for commit message
+        objective_summary = "Unknown Objective"
+        if isinstance(action_detail, str): # For 'r' or 'f ...'
+            objective_summary = action_detail
+        elif isinstance(action_detail, dict): # For 'generate'
+            objective_summary = action_detail.get("objective", "Unknown Objective")
+
+        # Construct detailed commit message
         commit_lines = [f"Completed {action_type} cycle for: {objective_summary[:50]}"]
         if review_feedback: commit_lines.append("[AI Review included]")
         if guardrail_decision != GUARDRAIL_CONTINUE: commit_lines.append(f"[Guardrail Status: {guardrail_decision}]")
         if integration_issues: commit_lines.append(f"[Integration Issues: {len(integration_issues)} found]")
         if dep_issues: commit_lines.append(f"[Dependency Issues: {len(dep_issues)} found]")
-        if not syntax_ok[0]: commit_lines.append("[Syntax Check Failed]")
+        if not syntax_ok[0]: commit_lines.append("[Syntax/Test Check Failed]") # Updated check name
 
         commit_msg = "\n\n".join(commit_lines)
         version_controller.initialize_and_commit(current_project_path, commit_msg)
 
         canvas.info(f"--- Post-Cycle Checks Completed ---")
-        return True # Overall action succeeded (might have warnings)
+        # Use a clearer success message here
+        if guardrail_decision == GUARDRAIL_WARN:
+            canvas.success(f"{action_type.capitalize()} cycle completed with warnings.")
+        else:
+            canvas.success(f"{action_type.capitalize()} cycle completed successfully.")
+        return True # Overall action considered successful (even with warnings)
 
     except Exception as e:
         canvas.error(f"Error during post-cycle steps: {e}")
-        import traceback
-        canvas.error(traceback.format_exc()) # Log full traceback for post-cycle errors
+        canvas.error(traceback.format_exc()) # Log full traceback
         return False # Post-cycle failed critically
 
