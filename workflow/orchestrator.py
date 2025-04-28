@@ -9,7 +9,7 @@ import traceback
 from .generation import execute_generation_cycle
 from .modification import execute_modification_cycle
 
-# --- <<< Import SRE Workflow >>> ---
+# --- <<< Import SRE Workflow from correct filename >>> ---
 from .sre_team_workflow import SRETeamWorkflow
 
 # Import only agents needed AFTER SRE workflow (Quality, Version Control)
@@ -29,6 +29,10 @@ try:
     from utils.review_storage import save_review_to_file
 except ImportError:
     def save_review_to_file(*args, **kwargs): return None
+
+# Import sandbox executor to re-run for status if needed (simplification)
+# Alternatively, SRE Workflow could return the status tuple
+from agents.sre_team import sandbox_executor
 
 
 def route_and_execute(
@@ -69,61 +73,52 @@ def route_and_execute(
 
     # --- 1. Check Cycle Success ---
     if not (cycle_success and isinstance(language, str) and final_code_map is not None):
-        canvas.error("Main cycle failed or prerequisites missing for post-cycle checks.")
+        canvas.error("Cycle failed or prerequisites missing for post-cycle checks.")
         return False
 
-    # --- 2. Run SRE Workflow --- <<< MODIFIED BLOCK >>>
+    # --- 2. Run SRE Workflow ---
     canvas.info(f"--- Running SRE Workflow ---")
     sre_success = False
-    analysis_summary = None # Initialize
-    dep_issues = [] # Initialize
-    syntax_test_ok = (True, "") # Initialize
-    integration_issues = [] # Initialize
+    analysis_summary = None
+    dep_issues = []
+    syntax_test_ok = (True, "") # Default to success
+    integration_issues = []
 
     try:
-        sre_workflow = SRETeamWorkflow(session_id=f"sre-{current_project_path.name}") # Give it a session ID
-        # Iterate through the workflow responses
+        # Instantiate the SRE Workflow
+        sre_workflow = SRETeamWorkflow(session_id=f"sre-{current_project_path.name}-{action_type}")
         final_sre_response = None
+        # Iterate through the workflow responses to execute it
         for response in sre_workflow.run(project_path=current_project_path, language=language):
-             canvas.info(f"   [SRE_WF] {response.content}") # Log workflow progress
-             # Collect results from extra_data if needed (optional)
-             if response.extra_data:
-                  if "dependency_issues" in response.extra_data:
-                       dep_issues = response.extra_data["dependency_issues"]
-                  if "integration_issues" in response.extra_data:
-                       integration_issues = response.extra_data["integration_issues"]
-                  # We get analysis_summary from the final response
+             canvas.info(f"   [SRE_WF] {response.content}") # Log progress
              final_sre_response = response # Keep track of the last response
 
-        # Check final status (assuming last response indicates completion)
+        # Check final status
         if final_sre_response and "completed successfully" in final_sre_response.content:
              sre_success = True
              analysis_summary = final_sre_response.extra_data.get("analysis_summary", {})
-             # Extract other results if needed (e.g., syntax status)
-             # Note: This relies on the workflow yielding results correctly.
-             # A more robust way might be to store results in workflow state.
-             # For now, we assume success if no exception was raised.
-             # We still need syntax_ok for the guardrail - get it from sandbox directly?
-             # Let's call sandbox again here just for the status - slightly redundant but simpler for now
-             syntax_test_ok = sandbox_executor.execute(current_project_path, language)
+             # Retrieve other results from session state if needed
+             sre_memory = sre_workflow.session_state.get("sre_memory", [])
+             dep_issues = next((item['issues'] for item in sre_memory if item['phase'] == 'dependency_check'), [])
+             integration_issues = next((item['issues'] for item in sre_memory if item['phase'] == 'integration_check'), [])
+             syntax_test_record = next((item for item in sre_memory if item['phase'] == 'syntax_and_tests'), None)
+             if syntax_test_record:
+                  syntax_test_ok = (syntax_test_record['status'] == 'ok', syntax_test_record['message'])
 
         else:
-             # Workflow might have finished but not reported success clearly
              canvas.warning("SRE Workflow finished, but final success message not detected.")
-             # Attempt to get summary anyway if it exists
-             analysis_summary = final_sre_response.extra_data.get("analysis_summary", {}) if final_sre_response else {}
-
+             analysis_summary = sre_workflow.session_state.get("last_analysis_summary", {})
 
     except Exception as e:
          canvas.error(f"SRE Workflow failed with exception: {e}")
-         # Attempt to get any partial analysis summary if possible
-         # analysis_summary = getattr(sre_workflow, 'last_analysis_summary', {}) # Requires modification to SREWorkflow
-         sre_success = False # Mark as failed
+         analysis_summary = sre_workflow.session_state.get("last_analysis_summary", {}) # Try to get summary anyway
+         sre_success = False
 
-    if not sre_success:
-         canvas.error("SRE Workflow did not complete successfully. Aborting post-cycle actions.")
+    # We might want to proceed to Review/Guardrail even if SRE workflow had non-critical errors
+    # Let's proceed if analysis_summary was retrieved, otherwise fail.
+    if analysis_summary is None:
+         canvas.error("SRE Workflow failed critically before analysis summary could be retrieved.")
          return False
-    # --- <<< END SRE Workflow Block >>> ---
 
 
     # --- 3. Post-SRE Workflow Steps (Review, Guardrail, Commit) ---
@@ -137,7 +132,7 @@ def route_and_execute(
             review_feedback = reviewer_agent.review_code(
                 structured_goal=current_structured_goal,
                 code_map=final_code_map,
-                analysis_summary=analysis_summary # Use summary from SRE workflow
+                analysis_summary=analysis_summary # Use summary from SRE workflow state
             )
             if review_feedback:
                 canvas.info("[AI Review Feedback]:")
@@ -149,17 +144,17 @@ def route_and_execute(
         # Step 3.2: Guardrail Evaluation
         canvas.step("Performing Guardrail Evaluation...")
         guardrail_decision, guardrail_reasons = guardrail_agent.evaluate_results(
-            static_analysis_summary=analysis_summary, # Use summary from SRE workflow
-            dependency_summary=dep_issues, # Use issues collected during SRE workflow (if yielded correctly)
-            syntax_check_result=syntax_test_ok, # Use result from SRE workflow (or re-run)
+            static_analysis_summary=analysis_summary,
+            dependency_summary=dep_issues,
+            syntax_check_result=syntax_test_ok,
             review_feedback=review_feedback
-            # TODO: Pass integration_issues if yielded by SRE workflow
+            # TODO: Pass integration_issues if needed
         )
         if guardrail_decision == GUARDRAIL_BLOCK:
             canvas.error("🚦 Guardrails blocked further action:")
             for reason in guardrail_reasons: canvas.error(f"  - {reason}")
             canvas.end_process(f"Action '{action_type}' aborted by guardrails.")
-            return False
+            return False # Overall action failed due to block
         if guardrail_decision == GUARDRAIL_WARN:
             canvas.warning("🚦 Guardrails issued warnings:")
             for reason in guardrail_reasons: canvas.warning(f"  - {reason}")
@@ -171,7 +166,6 @@ def route_and_execute(
         commit_lines = [f"Completed {action_type} cycle for: {objective_summary[:50]}"]
         if review_feedback: commit_lines.append("[AI Review included]")
         if guardrail_decision != GUARDRAIL_CONTINUE: commit_lines.append(f"[Guardrail Status: {guardrail_decision}]")
-        # Add SRE results to commit message if available
         if integration_issues: commit_lines.append(f"[Integration Issues: {len(integration_issues)} found]")
         if dep_issues: commit_lines.append(f"[Dependency Issues: {len(dep_issues)} found]")
         if not syntax_test_ok[0]: commit_lines.append("[Syntax/Test Check Failed]")
@@ -182,7 +176,7 @@ def route_and_execute(
         canvas.info(f"--- Post-Cycle Checks Completed ---")
         if guardrail_decision == GUARDRAIL_WARN: canvas.success(f"{action_type.capitalize()} cycle completed with warnings.")
         else: canvas.success(f"{action_type.capitalize()} cycle completed successfully.")
-        return True # Overall action succeeded
+        return True # Overall action considered successful
 
     except Exception as e:
         canvas.error(f"Error during post-SRE steps (Review/Guardrail/Commit): {e}")
