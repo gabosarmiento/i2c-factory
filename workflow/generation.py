@@ -128,6 +128,8 @@ def execute_generation_cycle(structured_goal: dict, project_path: Path) -> dict:
     canvas.step("Writing files to disk...")
     try:
         write_files(code_map_with_tests, project_path)
+        # make both 'output/' and 'output/helloworld/' importable packages
+        ensure_init_py(project_path.parent)
         ensure_init_py(project_path)  # <<< PATCH: Ensure __init__.py exists
     except Exception as e:
         canvas.error(f"Error during file writing step: {e}")
