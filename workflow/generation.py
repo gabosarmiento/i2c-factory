@@ -19,6 +19,13 @@ from .modification.file_operations import write_files_to_disk as write_files
 # Import CLI controller
 from cli.controller import canvas
 
+def ensure_init_py(project_path: Path):
+    """Ensure __init__.py exists in the project root to make it a Python package."""
+    init_file = project_path / "__init__.py"
+    if not init_file.exists():
+        init_file.touch()
+        canvas.success(f"✅ [AutoPatch] Created missing __init__.py at {init_file}")
+        
 def execute_generation_cycle(structured_goal: dict, project_path: Path) -> dict:
     """
     Runs a single cycle of planning, generation, unit test generation,
@@ -121,6 +128,9 @@ def execute_generation_cycle(structured_goal: dict, project_path: Path) -> dict:
     canvas.step("Writing files to disk...")
     try:
         write_files(code_map_with_tests, project_path)
+        # make both 'output/' and 'output/helloworld/' importable packages
+        ensure_init_py(project_path.parent)
+        ensure_init_py(project_path)  # <<< PATCH: Ensure __init__.py exists
     except Exception as e:
         canvas.error(f"Error during file writing step: {e}")
         canvas.end_process(f"Generation cycle failed during file writing.")

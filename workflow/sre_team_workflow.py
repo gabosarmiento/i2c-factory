@@ -12,10 +12,12 @@ from agno.workflow import Workflow, RunResponse
 from agents.sre_team import (
     dependency_verifier,
     sandbox_executor,
-    integration_checker_agent,
 )
 # Import analyzer
-from agents.quality_team import static_analysis_agent
+from agents.quality_team import (
+    static_analysis_agent,
+    integration_checker_agent,  # <--- moved here!
+)
 
 # CLI controller fallback
 try:
