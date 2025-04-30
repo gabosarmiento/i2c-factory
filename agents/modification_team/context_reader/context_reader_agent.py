@@ -1,68 +1,110 @@
-# /agents/modification_team/context_reader/context_reader_agent.py
-# Defines the ContextReaderAgent class which orchestrates context indexing.
+# agents/modification_team/context_reader/context_reader_agent.py
 
+import os
 from pathlib import Path
-from typing import Any # For type hinting
+from typing import Any, Callable, Optional
+import logging
 
-# Import SentenceTransformer handling from context_utils
-# This ensures model is loaded once when context_utils is imported
 try:
-    # Try relative import first (if context_utils is in the parent dir)
     from ..context_utils import _embedding_model as loaded_embedding_model
-except ImportError: # Fallback if structure is different or run directly
-     try:
-        # Try absolute import from expected location
-        from agents.modification_team.context_utils import _embedding_model as loaded_embedding_model
-     except ImportError:
-          print("❌ Critical Error: Cannot import pre-loaded embedding model from context_utils.")
-          loaded_embedding_model = None
-
-# Import the indexing function from the sibling module
-from .context_indexer import index_project_context
-
-# Import CLI for logging (optional, could be passed in)
-try:
-    from cli.controller import canvas
 except ImportError:
-    class FallbackCanvas:
-        def warning(self, msg): print(f"[WARN_AGENT] {msg}")
-        def error(self, msg): print(f"[ERROR_AGENT] {msg}")
-        def info(self, msg): print(f"[INFO_AGENT] {msg}")
-    canvas = FallbackCanvas()
+    loaded_embedding_model = None
 
+try:
+    from .context_indexer import ContextIndexer
+except ImportError:
+    ContextIndexer = None
+
+# Logger setup
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 class ContextReaderAgent:
     """
-    Agent responsible for managing the project context indexing process.
-    It holds the embedding model reference (loaded in context_utils)
-    and delegates indexing to context_indexer.
-    Note: This is not an Agno Agent as it doesn't directly call an LLM for its primary task.
+    Agent responsable de lanzar la indexación de contexto de un proyecto.
     """
-    def __init__(self):
-        print("📄 [ContextReaderAgent] Initialized.")
-        # Store the pre-loaded embedding model instance reference
-        self.embedding_model: Any | None = loaded_embedding_model # Reference pre-loaded model
-        if self.embedding_model is None:
-            # Warning already printed by context_utils if loading failed
-            canvas.warning("   ContextReaderAgent initialized without a valid embedding model.")
 
-    def index_project_context(self, project_path: Path) -> dict:
+    def __init__(
+        self,
+        project_path: Path,
+        progress_callback: Optional[Callable[[str, Any], None]] = None,
+    ):
+        self.project_path = project_path
+        self.progress_callback = progress_callback
+
+        # Carga del modelo de embeddings (puede ser None)
+        self.embedding_model: Any | None = loaded_embedding_model
+        if not self.embedding_model:
+            logger.warning("No se cargó modelo de embedding; RAG fallará luego.")
+
+        # Instancia el indexer si la clase está disponible
+        if ContextIndexer:
+            try:
+                self.indexer = ContextIndexer(self.project_path)
+            except Exception as e:
+                logger.error(f"Error al crear ContextIndexer: {e}", exc_info=True)
+                self.indexer = None
+        else:
+            logger.error("Clase ContextIndexer no encontrada.")
+            self.indexer = None
+
+    def index_project_context(
+        self,
+        project_path: Optional[Path] = None,
+    ) -> dict:
         """
-        Orchestrates the indexing process by calling the indexer function.
-        The indexer function now uses the pre-loaded embedding model internally.
-
-        Args:
-            project_path: Path to the project directory.
-
-        Returns:
-            A dictionary confirming indexing status.
+        Valida project_path y arranca la indexación.
+        Devuelve un dict con files_indexed, files_skipped, chunks_indexed y errors.
         """
-        # Call the indexer function WITHOUT passing the embedding model
-        # as it's accessed via the context_utils module now.
-        return index_project_context(project_path, self.embedding_model)
+        path = project_path or self.project_path
+        if path is None or not path.exists() or not path.is_dir():
+            err = f"Invalid project_path: {path}"
+            logger.error(err)
+            return {
+                "files_indexed": 0,
+                "files_skipped": 0,
+                "chunks_indexed": 0,
+                "errors": [err],
+            }
 
-    # Add other methods later if needed, e.g., for querying context directly
-    # def get_context_summary(self, project_path: Path) -> str: ...
+        if not self.indexer:
+            err = "ContextIndexer unavailable."
+            logger.error(err)
+            return {
+                "files_indexed": 0,
+                "files_skipped": 0,
+                "chunks_indexed": 0,
+                "errors": [err],
+            }
 
-# Instantiate the agent globally for easy import
-context_reader_agent = ContextReaderAgent()
+        # Callback de inicio
+        if self.progress_callback:
+            try:
+                self.progress_callback("start", {"project_path": str(path)})
+            except Exception as e:
+                logger.warning(f"start-callback failed: {e}")
+
+        # Llama al indexer
+        try:
+            status = self.indexer.index_project()
+        except Exception as e:
+            logger.error(f"Indexing error for {path}: {e}", exc_info=True)
+            status = {
+                "files_indexed": 0,
+                "files_skipped": 0,
+                "chunks_indexed": 0,
+                "errors": [str(e)],
+            }
+
+        # Callback de fin
+        if self.progress_callback:
+            try:
+                self.progress_callback("finish", status)
+            except Exception as e:
+                logger.warning(f"finish-callback failed: {e}")
+
+        return status
+
+# Singleton para imports
+default_root = Path(os.getenv("DEFAULT_PROJECT_ROOT", "."))
+context_reader_agent = ContextReaderAgent(default_root)
