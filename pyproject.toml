@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "idea-to-code-factory"
+version = "0.1.0"
+description = ""
+authors = ["gabosarmiento <gabrielsarmiento@gmail.com>"]
+license = "AGPL"
+readme = "README.md"
+package-mode = false 
+
+[tool.poetry.dependencies]
+python = ">=3.12,<4.0"
+# Add your actual packages below:
+# requests = "^2.31.0"
+# fastapi = "^0.110.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
