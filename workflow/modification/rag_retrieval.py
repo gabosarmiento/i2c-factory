@@ -3,10 +3,16 @@
 
 from pathlib import Path
 import pandas as pd
-from typing import Any # For type hinting embedding model
+from typing import Any, Optional, List
 
 # Import DB Utils directly (absolute import)
 from db_utils import query_context
+
+# Import context utility for embedding generation
+try:
+    from agents.modification_team.context_utils import generate_embedding
+except ImportError:
+    generate_embedding = None
 
 # Import CLI controller
 try:
@@ -21,31 +27,65 @@ except ImportError:
 
 
 # --- RAG Configuration ---
-MAX_RAG_RESULTS_PLANNER = 5
-MAX_RAG_RESULTS_MODIFIER = 3 # Context chunks for modifier (per step)
+MAX_RAG_RESULTS_PLANNER = 5  # Context chunks for planner
+MAX_RAG_RESULTS_MODIFIER = 3  # Context chunks for modifier (per step)
 
-def _generate_request_embedding(text: str, embed_model: Any) -> list[float] | None:
-    """Generates embedding for a user request string."""
-    if not embed_model or not text:
-        canvas.warning("   ⚠️ Embedding model not available or empty text. Cannot generate query vector.")
+
+def _generate_request_embedding(text: str, embed_model: Any) -> Optional[List[float]]:
+    """
+    Generates embedding for a user request string using either:
+    1. The imported generate_embedding function from context_utils (preferred)
+    2. Direct embedding generation using the provided model (fallback)
+    
+    Args:
+        text: The text to embed
+        embed_model: SentenceTransformer model instance
+        
+    Returns:
+        List of floats representing the embedding vector, or None on failure
+    """
+    if not text:
+        canvas.warning("   ⚠️ Cannot generate embedding: Input text is empty.")
         return None
+        
+    # Try using the dedicated function from context_utils first (if available)
+    if generate_embedding:
+        return generate_embedding(text)
+        
+    # Fallback to direct embedding if the model is available
+    if not embed_model:
+        canvas.warning("   ⚠️ Embedding model not available. Cannot generate query vector.")
+        return None
+        
     try:
-        vector = embed_model.encode(text, convert_to_numpy=False)
-        vector = [float(x) for x in vector]
-        canvas.info(f"   Generated query vector for text: '{text[:30]}...'")
-        return vector
+        # Generate embedding directly from the model
+        vector = embed_model.encode(text, convert_to_numpy=True)
+        # Ensure it's a list of floats
+        return [float(x) for x in vector.tolist()]
     except Exception as e:
         canvas.warning(f"   ⚠️ Failed to generate embedding for text '{text[:30]}...': {e}")
         return None
 
-def _format_rag_results(rag_results: pd.DataFrame | None, context_description: str, max_len: int = 500) -> str:
-    """Formats LanceDB query results into a string for LLM prompts."""
+
+def _format_rag_results(rag_results: pd.DataFrame, context_description: str, max_content_len: int = 500) -> str:
+    """
+    Formats LanceDB query results into a string for LLM prompts.
+    
+    Args:
+        rag_results: DataFrame from LanceDB containing retrieval results
+        context_description: Description of what this context is for (planner, step, etc.)
+        max_content_len: Maximum length to include from each chunk
+        
+    Returns:
+        Formatted string with all relevant context
+    """
     default_message = f"No relevant context chunks found via vector search for {context_description}."
     if rag_results is None or rag_results.empty:
         return default_message
 
     canvas.info(f"   Retrieved {len(rag_results)} relevant context chunks for {context_description}.")
     context_lines = [f"[Retrieved Context for {context_description}:]"]
+    
     for _, row in rag_results.iterrows():
         # Safely get values with defaults
         chunk_path = row.get('path', 'N/A')
@@ -54,7 +94,7 @@ def _format_rag_results(rag_results: pd.DataFrame | None, context_description: s
         chunk_content = row.get('content', '')
 
         context_lines.append(f"--- Start Chunk: {chunk_path} ({chunk_type}: {chunk_name}) ---")
-        content_snippet = chunk_content[:max_len] + ('...' if len(chunk_content) > max_len else '')
+        content_snippet = chunk_content[:max_content_len] + ('...' if len(chunk_content) > max_content_len else '')
         context_lines.append(content_snippet)
         context_lines.append(f"--- End Chunk: {chunk_path} ---")
 
@@ -64,8 +104,19 @@ def _format_rag_results(rag_results: pd.DataFrame | None, context_description: s
 
     return "\n".join(context_lines)
 
+
 def retrieve_context_for_planner(user_request: str, table: Any, embed_model: Any) -> str:
-    """Generates embedding for user request and retrieves context for the planner."""
+    """
+    Generates embedding for user request and retrieves context for the planner.
+    
+    Args:
+        user_request: The raw user request (r, f <feature>, etc.)
+        table: LanceDB table instance
+        embed_model: SentenceTransformer model instance
+        
+    Returns:
+        Formatted string with retrieved context
+    """
     canvas.step("Analyzing user request for planning context...")
     query_vector = None
     query_text = None
@@ -88,21 +139,56 @@ def retrieve_context_for_planner(user_request: str, table: Any, embed_model: Any
     return retrieved_context_str
 
 
-def retrieve_context_for_step(step: dict, table: Any, embed_model: Any) -> str | None:
-    """Generates embedding for a modification step and retrieves relevant context."""
-    canvas.info(f"    Retrieving context for step: {step.get('what')[:40]}...")
-    query_vector = None
-    # Create query text based on step details
-    step_query_text = f"File: {step.get('file')} Action: {step.get('action')} Task: {step.get('what')} Details: {step.get('how')}"
-
-    query_vector = _generate_request_embedding(step_query_text, embed_model)
-
-    retrieved_context_step_str = None
-    if table and query_vector:
-        rag_results = query_context(table, query_vector, limit=MAX_RAG_RESULTS_MODIFIER)
-        formatted_context = _format_rag_results(rag_results, f"step '{step.get('what')[:30]}...'", max_len=300)
-        # Only return the formatted context if it's not the default "No relevant context" message
-        if "No relevant context" not in formatted_context:
-             retrieved_context_step_str = formatted_context
-
-    return retrieved_context_step_str # Return formatted string or None
+def retrieve_context_for_step(step: dict, table: Any, embed_model: Any) -> Optional[str]:
+    """
+    Generates embedding for a modification step and retrieves relevant context.
+    
+    Args:
+        step: Dictionary containing a single modification step (file, action, what, how)
+        table: LanceDB table instance
+        embed_model: SentenceTransformer model instance
+        
+    Returns:
+        Formatted string with retrieved context or None if no relevant context found
+    """
+    # Extract step information
+    file_path = step.get('file', '')
+    action = step.get('action', '').lower()
+    what_to_do = step.get('what', '')
+    how_to_do_it = step.get('how', '')
+    
+    canvas.info(f"    Retrieving context for step: {what_to_do[:40]}...")
+    
+    # Create specialized query based on step type
+    query_texts = []
+    
+    # Always include the core step information
+    core_query = f"File: {file_path} Action: {action} Task: {what_to_do} Details: {how_to_do_it}"
+    query_texts.append(core_query)
+    
+    # Add file-specific query to find similar code in the same file
+    if action == 'modify':
+        query_texts.append(f"File path: {file_path}")
+    
+    # Generate embeddings and run queries
+    retrieved_contexts = []
+    for query_text in query_texts:
+        query_vector = _generate_request_embedding(query_text, embed_model)
+        if table and query_vector:
+            rag_results = query_context(table, query_vector, limit=MAX_RAG_RESULTS_MODIFIER)
+            if rag_results is not None and not rag_results.empty:
+                formatted_context = _format_rag_results(
+                    rag_results, 
+                    f"step '{what_to_do[:30]}...' ({file_path})", 
+                    max_content_len=300
+                )
+                # Only add non-empty context
+                if "No relevant context" not in formatted_context:
+                    retrieved_contexts.append(formatted_context)
+    
+    # Combine all retrieved contexts
+    if retrieved_contexts:
+        return "\n\n".join(retrieved_contexts)
+    
+    # Return None if no relevant context found
+    return None

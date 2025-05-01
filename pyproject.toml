@@ -1,20 +1,45 @@
 [tool.poetry]
 name = "idea-to-code-factory"
 version = "0.1.0"
-description = ""
-authors = ["gabosarmiento <gabrielsarmiento@gmail.com>"]
+description = "Interactive AI-driven CLI tool for code generation and modification"
+authors = ["Gabriel Sarmiento <gabrielsarmiento@gmail.com>"]
 license = "AGPL"
 readme = "README.md"
-package-mode = false 
+package-mode = false
 
 [tool.poetry.dependencies]
-python = ">=3.12,<4.0"
-# Add your actual packages below:
-# requests = "^2.31.0"
-# fastapi = "^0.110.0"
+python                = ">=3.12,<4.0"
+lancedb               = "^0.22.0"
+pyarrow               = "^20.0.0"
+pandas                = "^2.2.3"
+numpy                 = "<2.0"             # pin to 1.x for C-extensions compatibility
+sentence-transformers = "^2.2.0"          # for your embedding utilities
+agno                   = "*"               # core AGNO agents framework
+llm-providers          = "*"               # LLM backend providers
+
+# Expose your source directories as installable packages
+[[tool.poetry.packages]]
+include = "agents"
+
+[[tool.poetry.packages]]
+include = "cli"
+
+[[tool.poetry.packages]]
+include = "config"
+
+[[tool.poetry.packages]]
+include = "data"
+
+[[tool.poetry.packages]]
+include = "utils"
+
+[[tool.poetry.packages]]
+include = "workflow"
+
+[tool.poetry.group.dev.dependencies]
+pytest       = "^7.0.0"
+pytest-mock  = "^3.8.0"
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires    = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-
