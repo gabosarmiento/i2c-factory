@@ -34,15 +34,24 @@ def generate_modification_plan(user_request: str, retrieved_context_plan: str, p
         else:
             request_detail = f"Process request: {user_request}"
 
-        # Build Prompt with RAG Context
+        # Build enhanced prompt with structured RAG Context section
         plan_prompt = (
+            f"# Project Information\n"
             f"Project Path: {project_path}\n"
-            f"Language: {language}\n\n"
-            f"{retrieved_context_plan}\n\n" # Include retrieved context string
-            f"User Request: {request_detail}\n\n"
-            f"Based on the user request and ONLY the relevant context provided above (if any), "
-            f"provide a detailed modification plan as a JSON list of steps "
-            f"(keys: 'file', 'action', 'what', 'how'), adhering strictly to valid JSON format with double quotes:"
+            f"Primary Language: {language}\n\n"
+            
+            f"# User Request\n"
+            f"{request_detail}\n\n"
+            
+            f"# Retrieved Context\n"
+            f"{retrieved_context_plan}\n\n"
+            
+            f"# Planning Instructions\n"
+            f"1. Analyze the context above to understand the project structure and patterns\n"
+            f"2. Identify which components need to be modified to fulfill the user request\n"
+            f"3. Create a detailed, step-by-step modification plan as a valid JSON list\n"
+            f"4. Ensure each step specifies exactly what file to modify/create/delete and how\n"
+            f"5. Make your plan comprehensive yet minimal - include only necessary changes\n"
         )
 
         # Use direct agent call (error handling is outside this function for now)
@@ -51,10 +60,31 @@ def generate_modification_plan(user_request: str, retrieved_context_plan: str, p
 
         # Parse and Validate JSON Plan
         try:
+            # Enhanced content cleaning to handle different LLM output formats
             content_processed = content.strip()
-            if content_processed.startswith("```json"): content_processed = content_processed[len("```json"):].strip()
-            if content_processed.startswith("```"): content_processed = content_processed[3:].strip()
-            if content_processed.endswith("```"): content_processed = content_processed[:-3:].strip()
+            
+            # Handle potential markdown code blocks
+            if "```json" in content_processed:
+                # Extract content between ```json and ``` markers
+                start_idx = content_processed.find("```json") + len("```json")
+                end_idx = content_processed.find("```", start_idx)
+                if end_idx != -1:
+                    content_processed = content_processed[start_idx:end_idx].strip()
+            elif "```" in content_processed:
+                # Extract content between ``` markers (no language specified)
+                start_idx = content_processed.find("```") + len("```")
+                end_idx = content_processed.find("```", start_idx)
+                if end_idx != -1:
+                    content_processed = content_processed[start_idx:end_idx].strip()
+            
+            # Additional cleaning
+            # Remove any non-JSON text before/after the JSON content
+            open_bracket_idx = content_processed.find("[")
+            close_bracket_idx = content_processed.rfind("]")
+            if open_bracket_idx != -1 and close_bracket_idx != -1 and close_bracket_idx > open_bracket_idx:
+                content_processed = content_processed[open_bracket_idx:close_bracket_idx+1]
+            
+            # Parse JSON
             modification_plan = json.loads(content_processed)
 
             # Complete Validation Logic
@@ -67,7 +97,13 @@ def generate_modification_plan(user_request: str, retrieved_context_plan: str, p
                 isinstance(step.get('how'), str)
                 for step in modification_plan
             ):
-                 raise ValueError("LLM response was not a valid list of modification step objects.")
+                raise ValueError("LLM response was not a valid list of modification step objects.")
+
+            # Validate action types
+            for step in modification_plan:
+                action = step.get('action', '').lower()
+                if action not in ['create', 'modify', 'delete']:
+                    raise ValueError(f"Invalid action type '{action}' in modification plan. Must be 'create', 'modify', or 'delete'.")
 
             canvas.success(f"Generated modification plan with {len(modification_plan)} step(s).")
             return modification_plan # Return the valid plan
@@ -82,4 +118,3 @@ def generate_modification_plan(user_request: str, retrieved_context_plan: str, p
         # Let the exception propagate up
         canvas.error(f"Error during modification planning call: {e}")
         raise e
-
