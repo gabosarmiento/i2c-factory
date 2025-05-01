@@ -3,8 +3,10 @@
 
 import os
 from pathlib import Path
+from typing import Dict, Optional, Any
+
 from agno.agent import Agent
-from llm_providers import llm_highest # Use high-capacity model for code modification
+from llm_providers import llm_highest  # Use high-capacity model for code modification
 
 class CodeModifierAgent(Agent):
     """Applies planned code changes to existing or new files, utilizing provided RAG context."""
@@ -26,8 +28,69 @@ class CodeModifierAgent(Agent):
         )
         print("✍️  [CodeModifierAgent] Initialized.")
 
-    # <<< MODIFIED SIGNATURE to accept retrieved_context >>>
-    def modify_code(self, modification_step: dict, project_path: Path, retrieved_context: str | None = None) -> str | None:
+    def _prepare_modification_prompt(self, 
+                                     modification_step: Dict, 
+                                     project_path: Path, 
+                                     existing_code: str = "",
+                                     retrieved_context: Optional[str] = None) -> str:
+        """
+        Constructs a comprehensive prompt for code modification/creation that effectively
+        uses retrieved context.
+        
+        Args:
+            modification_step: A dictionary from the planner's output with action, file, what, how
+            project_path: The root path of the project
+            existing_code: The content of the file if it exists (for modify action)
+            retrieved_context: Optional string containing relevant code snippets from RAG
+            
+        Returns:
+            The constructed prompt string
+        """
+        action = modification_step.get('action', '').lower()
+        file_rel_path = modification_step.get('file')
+        what_to_do = modification_step.get('what')
+        how_to_do_it = modification_step.get('how')
+        
+        # --- Section 1: Project and Task Information ---
+        prompt = f"# Project and Task Information\n"
+        prompt += f"Project Path: {project_path}\n"
+        prompt += f"File to {action}: {file_rel_path}\n"
+        prompt += f"Task Description (What): {what_to_do}\n"
+        prompt += f"Implementation Details (How): {how_to_do_it}\n\n"
+
+        # --- Section 2: Retrieved Context (if available) ---
+        if retrieved_context:
+            prompt += f"# Relevant Context from Project\n"
+            prompt += f"{retrieved_context}\n\n"
+        else:
+            prompt += "# No specific relevant context was retrieved from the project.\n\n"
+
+        # --- Section 3: Existing Code (if modifying) ---
+        if existing_code and action == 'modify':
+            prompt += f"# Existing Code of '{file_rel_path}'\n"
+            prompt += f"```\n{existing_code}\n```\n\n"
+            prompt += f"Apply the requested modification ('{what_to_do}') to the existing code above,"
+            prompt += f"using any provided context for guidance.\n"
+        else:  # Create action
+            prompt += f"Generate the complete code for the new file '{file_rel_path}' based on the task,"
+            prompt += f"using any provided context for guidance.\n"
+        
+        # --- Section 4: Instructions ---
+        prompt += "\n# Instructions\n"
+        if action == 'modify':
+            prompt += "1. Identify where and how to implement the requested change\n"
+            prompt += "2. Make the modification while preserving the rest of the code\n"
+            prompt += "3. Ensure the change aligns with the existing code style and patterns\n"
+        else:  # create
+            prompt += "1. Generate complete, runnable code for the new file\n"
+            prompt += "2. Follow project patterns and conventions visible in the context\n"
+            prompt += "3. Implement the functionality described in the task\n"
+        
+        prompt += "\nOutput ONLY the final, complete source code for the file."
+        
+        return prompt
+
+    def modify_code(self, modification_step: Dict, project_path: Path, retrieved_context: Optional[str] = None) -> Optional[str]:
         """
         Generates the new/modified code content for a single step in the plan, using RAG context.
 
@@ -41,10 +104,8 @@ class CodeModifierAgent(Agent):
         """
         action = modification_step.get('action', '').lower()
         file_rel_path = modification_step.get('file')
-        what_to_do = modification_step.get('what')
-        how_to_do_it = modification_step.get('how')
-
-        if not all([action, file_rel_path, what_to_do, how_to_do_it]):
+        
+        if not all([action, file_rel_path]):
             print(f"   ❌ [CodeModifierAgent] Invalid modification step received: {modification_step}")
             return None
 
@@ -53,10 +114,11 @@ class CodeModifierAgent(Agent):
             print(f"   ⚪ [CodeModifierAgent] 'delete' action should not reach modify_code method for {file_rel_path}.")
             return None
 
-        print(f"   -> Applying '{action}' to '{file_rel_path}': {what_to_do}")
+        print(f"   -> Applying '{action}' to '{file_rel_path}': {modification_step.get('what', '')}")
 
-        full_file_path = project_path / file_rel_path
+        # Retrieve existing code if we're modifying a file
         existing_code = ""
+        full_file_path = project_path / file_rel_path
         if action == 'modify':
             if full_file_path.is_file():
                 try:
@@ -64,30 +126,18 @@ class CodeModifierAgent(Agent):
                     print(f"      Read existing code ({len(existing_code)} chars).")
                 except Exception as e:
                     print(f"      ⚠️ Warning: Could not read existing file {file_rel_path} for modification: {e}")
-                    action = 'create' # Fallback to create if read fails
+                    action = 'create'  # Fallback to create if read fails
             else:
                 print(f"      ⚠️ Warning: File {file_rel_path} not found for modification. Treating as 'create'.")
-                action = 'create' # Treat as create if file doesn't exist
+                action = 'create'  # Treat as create if file doesn't exist
 
-        # --- <<< Construct Prompt with RAG Context >>> ---
-        prompt = f"Project Path: {project_path}\nFile to modify/create: {file_rel_path}\nAction: {action}\n"
-        prompt += f"Task Description (What): {what_to_do}\nImplementation Details (How): {how_to_do_it}\n\n"
-
-        # Add retrieved context if available
-        if retrieved_context:
-            prompt += f"Potentially Relevant Context from Project:\n{retrieved_context}\n\n"
-        else:
-            prompt += "No specific relevant context was retrieved.\n\n"
-
-        # Add existing code if modifying
-        if existing_code:
-            prompt += f"Existing Code of '{file_rel_path}':\n```\n{existing_code}\n```\n\n"
-            prompt += f"Apply the requested modification ('{what_to_do}') to the existing code, using the provided context for guidance."
-        else: # Create action
-            prompt += f"Generate the complete code for the new file '{file_rel_path}' based on the task, using the provided context for guidance."
-
-        prompt += "\n\nOutput ONLY the final, complete, raw source code for the file."
-        # --- <<< End Prompt Construction >>> ---
+        # Prepare the prompt with all necessary context
+        prompt = self._prepare_modification_prompt(
+            modification_step=modification_step,
+            project_path=project_path,
+            existing_code=existing_code,
+            retrieved_context=retrieved_context
+        )
 
         try:
             # Use direct agent.run() - Rely on try/except in caller (workflow/modification.py)
@@ -96,12 +146,28 @@ class CodeModifierAgent(Agent):
 
             # Basic cleaning
             modified_code = modified_code.strip()
+            
+            # Remove markdown code fences if present
             if modified_code.startswith("```") and modified_code.endswith("```"):
-                 modified_code = modified_code.splitlines()
-                 if len(modified_code) > 1:
-                      if modified_code[0].strip().startswith("```"): modified_code = modified_code[1:]
-                      if modified_code[-1].strip() == "```": modified_code = modified_code[:-1]
-                 modified_code = "\n".join(modified_code).strip()
+                lines = modified_code.splitlines()
+                # Check if first line contains language identifier
+                first_line = lines[0].strip().lower()
+                if first_line.startswith("```"):
+                    # Handle potential language tag
+                    language_spec = first_line[3:].strip()  # Extract language specifier
+                    if language_spec:  # If there's a language specifier
+                        lines = lines[1:]  # Skip first line with language
+                    else:
+                        # Otherwise just remove the backticks from the first line
+                        lines[0] = lines[0][3:].strip()
+                
+                # Remove closing backticks
+                if lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                elif lines[-1].endswith("```"):
+                    lines[-1] = lines[-1][:-3].strip()
+                
+                modified_code = "\n".join(lines).strip()
 
             if modified_code:
                 print(f"      ✅ Generated modified/new code for {file_rel_path} ({len(modified_code)} chars).")
@@ -112,7 +178,7 @@ class CodeModifierAgent(Agent):
 
         except Exception as e:
             print(f"   ❌ Error generating modified code for {file_rel_path}: {e}")
-            raise e # Re-raise so the caller knows it failed
+            raise e  # Re-raise so the caller knows it failed
 
 # Instantiate the agent for easy import
 code_modifier_agent = CodeModifierAgent()

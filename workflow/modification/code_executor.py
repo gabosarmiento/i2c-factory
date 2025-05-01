@@ -2,8 +2,7 @@
 # Handles executing the modification plan steps by calling the CodeModifierAgent.
 
 from pathlib import Path
-import pandas as pd # For type hinting if needed, though not used directly here
-from typing import Any # For type hinting embed model and table
+from typing import Any, Dict, List, Tuple
 
 # Import necessary agent INSTANCES
 from agents.modification_team import code_modifier_agent
@@ -12,7 +11,12 @@ from .rag_retrieval import retrieve_context_for_step
 # Import CLI controller
 from cli.controller import canvas
 
-def execute_modification_steps(modification_plan: list[dict], project_path: Path, table: Any, embed_model: Any) -> tuple[dict, list]:
+def execute_modification_steps(
+    modification_plan: List[Dict], 
+    project_path: Path, 
+    table: Any, 
+    embed_model: Any
+) -> Tuple[Dict[str, str], List[Path]]:
     """
     Iterates through the plan, retrieves context for each step, calls the modifier,
     and collects results.
@@ -28,13 +32,15 @@ def execute_modification_steps(modification_plan: list[dict], project_path: Path
         - modified_code_map (dict): Map of file paths to their new content.
         - files_to_delete (list): List of Path objects for files to be deleted.
     """
-    canvas.step("Executing modification plan (generating code with specific context)...")
+    canvas.step("Executing modification plan (generating code with step-specific context)...")
     modified_code_map = {}
     files_to_delete = []
-    all_steps_succeeded = True # Assume success initially
+    all_steps_succeeded = True  # Assume success initially
 
     try:
-        for step in modification_plan:
+        for step_idx, step in enumerate(modification_plan):
+            canvas.info(f"  Step {step_idx+1}/{len(modification_plan)}")
+            
             action = step.get('action', '').lower()
             file_rel_path = step.get('file')
             if not file_rel_path:
@@ -47,17 +53,23 @@ def execute_modification_steps(modification_plan: list[dict], project_path: Path
                 continue
 
             # --- RAG Query for THIS Specific Step ---
+            canvas.info(f"   -> Retrieving context for '{action}' on '{file_rel_path}': {step.get('what', '')[:40]}...")
             retrieved_context_step_str = retrieve_context_for_step(step, table, embed_model)
+            
+            if retrieved_context_step_str:
+                canvas.info(f"   -> Found relevant context ({len(retrieved_context_step_str.split())} words)")
+            else:
+                canvas.info(f"   -> No specific relevant context found for this step")
             # --- End Per-Step RAG Query ---
 
             # Call modifier agent, passing the specific retrieved context
-            # Handle potential errors from modify_code directly
             try:
                 modified_content = code_modifier_agent.modify_code(
                     modification_step=step,
                     project_path=project_path,
                     retrieved_context=retrieved_context_step_str
                 )
+                
                 if modified_content is not None:
                     modified_code_map[file_rel_path] = modified_content
                     canvas.success(f"  - Generated content for '{action}' on {file_rel_path}")
@@ -67,21 +79,20 @@ def execute_modification_steps(modification_plan: list[dict], project_path: Path
                     raise RuntimeError(f"Code modifier returned None for '{action}' on {file_rel_path}")
 
             except Exception as mod_err:
-                 # Catch error from modify_code call
-                 canvas.error(f"  - Failed step '{action}' on {file_rel_path}: {mod_err}")
-                 all_steps_succeeded = False
-                 # Decide whether to stop the whole process on one step failure
-                 # For now, let's break the loop on the first failure
-                 break
+                # Catch error from modify_code call
+                canvas.error(f"  - Failed step '{action}' on {file_rel_path}: {mod_err}")
+                all_steps_succeeded = False
+                # Decision point: should we continue with remaining steps or abort on first failure?
+                # For now, let's break the loop on the first failure for predictability
+                break
 
     except Exception as e:
-         # Catch errors from the loop orchestration itself
-         canvas.error(f"Unexpected error during modification execution loop: {e}")
-         all_steps_succeeded = False
-
+        # Catch errors from the loop orchestration itself
+        canvas.error(f"Unexpected error during modification execution loop: {e}")
+        all_steps_succeeded = False
 
     if not all_steps_succeeded:
-         # Raise an exception to signal failure to the main cycle orchestrator
-         raise RuntimeError("One or more modification steps failed during code generation.")
+        # Raise an exception to signal failure to the main cycle orchestrator
+        raise RuntimeError("One or more modification steps failed during code generation.")
 
     return modified_code_map, files_to_delete
