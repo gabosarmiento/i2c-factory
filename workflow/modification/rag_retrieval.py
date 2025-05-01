@@ -1,4 +1,4 @@
-# /workflow/modification/rag_retrieval.py
+# workflow/modification/rag_retrieval.py
 # Handles RAG embedding generation and querying LanceDB for context.
 
 from pathlib import Path
@@ -25,11 +25,9 @@ except ImportError:
         def info(self, msg): print(f"[INFO_RAG] {msg}")
     canvas = FallbackCanvas()
 
-
 # --- RAG Configuration ---
 MAX_RAG_RESULTS_PLANNER = 5  # Context chunks for planner
 MAX_RAG_RESULTS_MODIFIER = 3  # Context chunks for modifier (per step)
-
 
 def _generate_request_embedding(text: str, embed_model: Any) -> Optional[List[float]]:
     """
@@ -65,7 +63,6 @@ def _generate_request_embedding(text: str, embed_model: Any) -> Optional[List[fl
     except Exception as e:
         canvas.warning(f"   ⚠️ Failed to generate embedding for text '{text[:30]}...': {e}")
         return None
-
 
 def _format_rag_results(rag_results: pd.DataFrame, context_description: str, max_content_len: int = 500) -> str:
     """
@@ -104,7 +101,6 @@ def _format_rag_results(rag_results: pd.DataFrame, context_description: str, max
 
     return "\n".join(context_lines)
 
-
 def retrieve_context_for_planner(user_request: str, table: Any, embed_model: Any) -> str:
     """
     Generates embedding for user request and retrieves context for the planner.
@@ -134,10 +130,9 @@ def retrieve_context_for_planner(user_request: str, table: Any, embed_model: Any
     retrieved_context_str = "No relevant context could be retrieved for planning (vector or table unavailable)."
     if table and query_vector:
         rag_results = query_context(table, query_vector, limit=MAX_RAG_RESULTS_PLANNER)
-        retrieved_context_str = _format_rag_results(rag_results, "planning", max_len=500)
+        retrieved_context_str = _format_rag_results(rag_results, "planning", max_content_len=500)
 
     return retrieved_context_str
-
 
 def retrieve_context_for_step(step: dict, table: Any, embed_model: Any) -> Optional[str]:
     """
