@@ -1,0 +1,24 @@
+# config.yaml  (repo root)
+
+# ── global defaults ────────────────────────────────────────────────
+EMBEDDING_MODEL: all-MiniLM-L6-v2
+MAX_FILE_SIZE: 102400          # bytes
+WORKERS: 8
+SKIP_DIRS: [.git, __pycache__, .venv, node_modules]
+
+# ── reflective agent settings ──────────────────────────────────────
+reflective:
+  plan_refinement:
+    max_reasoning_steps: 3
+    scope:
+      max_tokens:   5000
+      max_cost:     0.50
+      auto_approve: 0.05
+  issue_resolution:
+    max_reasoning_steps: 2
+    scope:
+      max_tokens:   3000
+      max_cost:     0.30
+  validation:
+    strict_schema: true
+    allow_large_patch: false
