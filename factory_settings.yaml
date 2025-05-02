@@ -1,0 +1,15 @@
+reflective:
+  plan_refinement:
+    max_reasoning_steps: 3           # 0 = first draft, +2 improvements
+    scope:
+      max_tokens: 5000
+      max_cost:   0.50
+      auto_approve: 0.05             # silent OK below 5 cents
+  issue_resolution:
+    max_reasoning_steps: 2
+    scope:
+      max_tokens: 3000
+      max_cost:   0.30
+  validation:
+    strict_schema: true              # block if schema warnings
+    allow_large_patch: false         # >20 changed lines = invalid
