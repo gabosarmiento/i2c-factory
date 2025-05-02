@@ -1,0 +1,11 @@
+.env
+.venv
+env/
+venv/
+output/
+__pycache__/
+*.pyc
+**/__pycache__/
+**/*.pyc
+data/lancedb/
+.DS_Store
