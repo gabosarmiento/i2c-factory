@@ -48,6 +48,8 @@ SCHEMA_KNOWLEDGE_BASE = pa.schema([
     pa.field("source", pa.string()),    # Source identifier (e.g., filename, URL)
     pa.field("content", pa.string()),   # The text chunk content
     pa.field("vector", pa.list_(pa.float32(), list_size=VECTOR_DIMENSION)),
+    pa.field("category",     pa.string()),                              # NEW
+    pa.field("last_updated", pa.string()),                              # NEW (ISO date)
     # Add other metadata as needed (e.g., page_number, chunk_index)
 ])
 

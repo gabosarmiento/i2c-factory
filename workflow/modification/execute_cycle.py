@@ -16,7 +16,12 @@ from .file_operations import write_files_to_disk, delete_files
 from agents.modification_team import context_reader_agent
 
 # Import DB utils
-from db_utils import get_db_connection, get_or_create_table
+from db_utils import (
+    get_db_connection,
+    get_or_create_table,
+    TABLE_CODE_CONTEXT,
+    SCHEMA_CODE_CONTEXT,
+)
 
 # Import CLI controller
 from cli.controller import canvas
@@ -42,13 +47,17 @@ def execute_modification_cycle(user_request: str, project_path: Path, language: 
             raise ConnectionError("get_db_connection() returned None.")
         # --- <<< End Check >>> ---
         canvas.info(f"   [DB] Connection object obtained: {type(db)}")
-        table = get_or_create_table(db)
+        table = get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
         if table is None:
             raise ConnectionError("get_or_create_table() returned None.")
         canvas.success("Database connection and table acquired successfully for modification.")
 
         # Step 2: RAG for Planner
-        retrieved_context_plan = retrieve_context_for_planner(user_request, table, embed_model)
+        retrieved_context_plan = retrieve_context_for_planner(
+            user_request=user_request,
+            db=db,
+            embed_model=embed_model
+        )
 
         # Step 3: Generate Plan
         modification_plan = generate_modification_plan(
@@ -64,7 +73,7 @@ def execute_modification_cycle(user_request: str, project_path: Path, language: 
         modified_code_map, files_to_delete = execute_modification_steps(
             modification_plan=modification_plan,
             project_path=project_path,
-            table=table,
+            db=db,
             embed_model=embed_model
         )
 

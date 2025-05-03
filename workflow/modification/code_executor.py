@@ -12,10 +12,7 @@ from .rag_retrieval import retrieve_context_for_step
 from cli.controller import canvas
 
 def execute_modification_steps(
-    modification_plan: List[Dict], 
-    project_path: Path, 
-    table: Any, 
-    embed_model: Any
+    modification_plan, project_path, db, embed_model
 ) -> Tuple[Dict[str, str], List[Path]]:
     """
     Iterates through the plan, retrieves context for each step, calls the modifier,
@@ -24,7 +21,7 @@ def execute_modification_steps(
     Args:
         modification_plan: The list of modification steps.
         project_path: Path to the project directory.
-        table: LanceDB table instance.
+        db: LanceDB table instance.
         embed_model: SentenceTransformer model instance.
 
     Returns:
@@ -54,7 +51,7 @@ def execute_modification_steps(
 
             # --- RAG Query for THIS Specific Step ---
             canvas.info(f"   -> Retrieving context for '{action}' on '{file_rel_path}': {step.get('what', '')[:40]}...")
-            retrieved_context_step_str = retrieve_context_for_step(step, table, embed_model)
+            retrieved_context_step_str = retrieve_context_for_step(step, db, embed_model)
             
             if retrieved_context_step_str:
                 canvas.info(f"   -> Found relevant context ({len(retrieved_context_step_str.split())} words)")

@@ -366,7 +366,10 @@ class ContextAwareOperator(ABC):
         model = step_scope._get_model_for_tier(model_tier)
         try:
             canvas.info(f"👉 Executing step {step_id} ({model_tier}) …")
-            response = model.run(prompt).content  # type: ignore[attr-defined]
+            # response = model.run(prompt).content  # type: ignore[attr-defined]
+            # Groq SDK no longer exposes `.run()`; use `.response()` instead
+            llm_reply, _ = model.response(messages=[{"role":"user","content":prompt}])
+            response = llm_reply.content  # extract the text out of the assistant message
             step_meta = self.cost_tracker.record_reasoning_step(
                 step_id=step_id,
                 prompt=prompt,
