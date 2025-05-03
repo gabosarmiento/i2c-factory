@@ -3,11 +3,15 @@
 
 from pathlib import Path
 import pandas as pd
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Dict    
 
 # Import DB Utils directly (absolute import)
-from db_utils import query_context
-
+# from db_utils import query_context
+from db_utils import (
+    query_context,
+    TABLE_CODE_CONTEXT,
+    TABLE_KNOWLEDGE_BASE,
+) 
 # Import context utility for embedding generation
 try:
     from agents.modification_team.context_utils import generate_embedding
@@ -29,6 +33,36 @@ except ImportError:
 MAX_RAG_RESULTS_PLANNER = 5  # Context chunks for planner
 MAX_RAG_RESULTS_MODIFIER = 3  # Context chunks for modifier (per step)
 
+# Let's add the following function to workflow/modification/rag_retrieval.py
+
+def retrieve_combined_context(
+    query_text: str,
+    table_code,          # LanceDB table or None
+    table_knowledge,     # LanceDB table or None
+    embed_model,
+    code_limit: int = 5,
+    knowledge_limit: int = 3,
+) -> Dict[str, str]:
+    """
+    Retrieve context from **both** code_context & knowledge_base tables.
+    Returns a dict of formatted‑string payloads ready for prompt injection.
+    """
+    try:
+        vector = _generate_request_embedding(query_text, embed_model)
+        code_ctx = ""
+        kb_ctx   = ""
+        if vector is not None:
+            if table_code:
+                res = query_context(table_code, vector, limit=code_limit)
+                code_ctx = _format_rag_results(res, "code‑context", 500)
+            if table_knowledge:
+                res = query_context(table_knowledge, vector, limit=knowledge_limit)
+                kb_ctx = _format_rag_results(res, "knowledge‑base", 500)
+        return {"code_context": code_ctx, "knowledge_context": kb_ctx}
+    except Exception as e:
+        canvas.error(f"Error retrieving combined context: {e}")
+        return {"code_context": "", "knowledge_context": ""}
+    
 def _generate_request_embedding(text: str, embed_model: Any) -> Optional[List[float]]:
     """
     Generates embedding for a user request string using either:
