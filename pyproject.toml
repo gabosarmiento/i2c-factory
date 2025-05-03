@@ -16,6 +16,7 @@ numpy                 = "<2.0"             # pin to 1.x for C-extensions compati
 sentence-transformers = "^2.2.0"          # for your embedding utilities
 agno                   = "*"               # core AGNO agents framework
 llm-providers          = "*"               # LLM backend providers
+groq = "0.23.1"
 
 # Expose your source directories as installable packages
 [[tool.poetry.packages]]
