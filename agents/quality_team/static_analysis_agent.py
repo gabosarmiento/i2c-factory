@@ -4,7 +4,12 @@
 from pathlib import Path
 import pandas as pd
 from typing import Dict, List, Any
-from db_utils import get_db_connection, get_or_create_table
+from db_utils import (
+    get_db_connection,
+    get_or_create_table,
+    TABLE_CODE_CONTEXT,
+    SCHEMA_CODE_CONTEXT,
+)
 
 # Import CLI for logging
 try:
@@ -49,7 +54,7 @@ class StaticAnalysisAgent:
             if db is None: 
                 raise ConnectionError("DB connection failed.")
             canvas.info(f"   [DB] Connection object obtained: {type(db)}")
-            table = get_or_create_table(db)
+            table = get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
             if table is None: raise ConnectionError("DB table acquisition failed.")
             canvas.success("   Database connection and table acquired successfully for analysis.")
 

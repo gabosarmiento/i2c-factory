@@ -122,7 +122,7 @@ class PlanRefinementOperator(ContextAwareOperator):
             parsed_plan = []
 
         retrieved_context = retrieve_context_for_planner(
-            user_request=user_request, table=self.rag_table, embed_model=self.embed_model
+            user_request, self.rag_table, self.embed_model
         )
 
         analysis_prompt = self._prepare_analysis_prompt(

@@ -63,10 +63,12 @@ class BestPracticesAgent(ContextAwareOperator):
         user_request: str,
         project_path: Path,
         language: str,
-        db_connection,
+        db_connection=None,
         issue_context: Optional[Dict] = None,
     ) -> Tuple[bool, Dict]:
         """Generate best practices for a given request or issue."""
+        from db_utils import get_db_connection
+        db = db_connection or get_db_connection()
         phase_id = "generate_practices"
         self.cost_tracker.start_phase(
             phase_id,
@@ -76,12 +78,8 @@ class BestPracticesAgent(ContextAwareOperator):
 
         try:
             # Retrieve RAG context - use the correct function signature
-            code_context = retrieve_context_for_step(
-                user_request,  # positional argument
-                TABLE_CODE_CONTEXT,
-                self.embed_model,
-                db_connection,
-            )
+            step_stub = {"what": user_request}
+            code_context = retrieve_context_for_step(step_stub, db, self.embed_model)
             if not code_context:
                 canvas.warning("No relevant code context found.")
                 code_context = []

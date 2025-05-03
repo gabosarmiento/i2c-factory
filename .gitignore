@@ -9,3 +9,7 @@ __pycache__/
 **/*.pyc
 data/lancedb/
 .DS_Store
+test_output/
+demo_output/
+real_test_output/
+demo_project/

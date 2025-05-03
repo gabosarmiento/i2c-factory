@@ -12,12 +12,12 @@ import pandas as pd
 import numpy as np
 
 from cli.controller import canvas
-from db_utils import get_db_connection, add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE
+from db_utils import get_db_connection, add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE,query_context
 from workflow.modification.rag_retrieval import retrieve_context_for_planner
 
 class ExternalKnowledgeManager:
     """Manages external knowledge ingestion and retrieval."""
-
+    
     def __init__(self, embed_model, db_path: str = "./data/lancedb"):
         self.embed_model = embed_model
         self.db_path = db_path
@@ -71,12 +71,13 @@ class ExternalKnowledgeManager:
     ) -> Optional[List[Dict]]:
         """Retrieve relevant knowledge for a query."""
         try:
-            results_df = retrieve_context_for_planner(
-                user_request=query,
-                table=TABLE_KNOWLEDGE_BASE,
-                embed_model=self.embed_model,
-                db_connection=self.db_connection,
-                limit=limit
+            
+            vector = self.embed_model.encode(query).tolist()
+            results_df = query_context(
+                self.db_connection,          # db handle
+                TABLE_KNOWLEDGE_BASE,        # table name
+                vector,                      # query vector
+                limit=limit,
             )
             if results_df is None or results_df.empty:
                 canvas.warning("No relevant knowledge found.")

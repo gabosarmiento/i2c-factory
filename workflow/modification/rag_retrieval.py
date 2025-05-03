@@ -12,6 +12,8 @@ from db_utils import (
     TABLE_CODE_CONTEXT,
     TABLE_KNOWLEDGE_BASE,
 ) 
+from db_utils import get_or_create_table, SCHEMA_CODE_CONTEXT, SCHEMA_KNOWLEDGE_BASE
+
 # Import context utility for embedding generation
 try:
     from agents.modification_team.context_utils import generate_embedding
@@ -37,11 +39,10 @@ MAX_RAG_RESULTS_MODIFIER = 3  # Context chunks for modifier (per step)
 
 def retrieve_combined_context(
     query_text: str,
-    table_code,          # LanceDB table or None
-    table_knowledge,     # LanceDB table or None
-    embed_model,
-    code_limit: int = 5,
-    knowledge_limit: int = 3,
+    db: Any,
+    embed_model: Any,
+    code_limit: int = MAX_RAG_RESULTS_PLANNER,
+    knowledge_limit: int = MAX_RAG_RESULTS_MODIFIER,
 ) -> Dict[str, str]:
     """
     Retrieve context from **both** code_context & knowledge_base tables.
@@ -52,13 +53,29 @@ def retrieve_combined_context(
         code_ctx = ""
         kb_ctx   = ""
         if vector is not None:
-            if table_code:
-                res = query_context(table_code, vector, limit=code_limit)
-                code_ctx = _format_rag_results(res, "code‑context", 500)
-            if table_knowledge:
-                res = query_context(table_knowledge, vector, limit=knowledge_limit)
-                kb_ctx = _format_rag_results(res, "knowledge‑base", 500)
+             # open and query the code_context table
+            code_table = get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
+            res = query_context(
+                code_table,
+                TABLE_CODE_CONTEXT,
+                query_vector=vector,
+                
+                limit=code_limit
+            )
+            code_ctx = _format_rag_results(res, "code-context", 500)
+
+            # open and query the knowledge_base table
+            kb_table = get_or_create_table(db, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE)
+            res = query_context(
+                kb_table,
+                TABLE_KNOWLEDGE_BASE,
+                query_vector=vector,
+                limit=knowledge_limit
+            )
+            kb_ctx = _format_rag_results(res, "knowledge-base", 500)
+
         return {"code_context": code_ctx, "knowledge_context": kb_ctx}
+
     except Exception as e:
         canvas.error(f"Error retrieving combined context: {e}")
         return {"code_context": "", "knowledge_context": ""}
@@ -135,13 +152,13 @@ def _format_rag_results(rag_results: pd.DataFrame, context_description: str, max
 
     return "\n".join(context_lines)
 
-def retrieve_context_for_planner(user_request: str, table: Any, embed_model: Any) -> str:
+def retrieve_context_for_planner(user_request: str, db, embed_model: Any) -> str:
     """
     Generates embedding for user request and retrieves context for the planner.
     
     Args:
         user_request: The raw user request (r, f <feature>, etc.)
-        table: LanceDB table instance
+        db: LanceDBConnection handle
         embed_model: SentenceTransformer model instance
         
     Returns:
@@ -162,19 +179,20 @@ def retrieve_context_for_planner(user_request: str, table: Any, embed_model: Any
         query_vector = _generate_request_embedding(query_text, embed_model)
 
     retrieved_context_str = "No relevant context could be retrieved for planning (vector or table unavailable)."
-    if table and query_vector:
-        rag_results = query_context(table, query_vector, limit=MAX_RAG_RESULTS_PLANNER)
+    if query_vector:
+        table = get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
+        rag_results = query_context(table,TABLE_CODE_CONTEXT, query_vector=query_vector, limit=MAX_RAG_RESULTS_PLANNER)
         retrieved_context_str = _format_rag_results(rag_results, "planning", max_content_len=500)
 
     return retrieved_context_str
 
-def retrieve_context_for_step(step: dict, table: Any, embed_model: Any) -> Optional[str]:
+def retrieve_context_for_step(step: dict, db, embed_model: Any) -> Optional[str]:
     """
     Generates embedding for a modification step and retrieves relevant context.
     
     Args:
-        step: Dictionary containing a single modification step (file, action, what, how)
-        table: LanceDB table instance
+        step: single modification step dict
+        db: LanceDBConnection handle
         embed_model: SentenceTransformer model instance
         
     Returns:
@@ -201,10 +219,12 @@ def retrieve_context_for_step(step: dict, table: Any, embed_model: Any) -> Optio
     
     # Generate embeddings and run queries
     retrieved_contexts = []
+    # open code_context once
+    table = get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
     for query_text in query_texts:
         query_vector = _generate_request_embedding(query_text, embed_model)
-        if table and query_vector:
-            rag_results = query_context(table, query_vector, limit=MAX_RAG_RESULTS_MODIFIER)
+        if query_vector:
+            rag_results = query_context(table, TABLE_CODE_CONTEXT, query_vector=query_vector, limit=MAX_RAG_RESULTS_MODIFIER)
             if rag_results is not None and not rag_results.empty:
                 formatted_context = _format_rag_results(
                     rag_results, 

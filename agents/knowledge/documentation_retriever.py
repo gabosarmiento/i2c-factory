@@ -65,9 +65,11 @@ class DocumentationRetrieverAgent(ContextAwareOperator):
         query: str,
         project_path: Path,
         language: str,
-        db_connection,
+        db_connection=None,
     ) -> Tuple[bool, Dict]:
         """Retrieve relevant documentation for a given query."""
+        from db_utils import get_db_connection
+        db = db_connection or get_db_connection()
         phase_id = "retrieve_docs"
         self.cost_tracker.start_phase(
             phase_id,
@@ -84,7 +86,7 @@ class DocumentationRetrieverAgent(ContextAwareOperator):
                 query_vector = list(embedding)
 
             # Query LanceDB knowledge_base table
-            results_df = query_context(db_connection, TABLE_KNOWLEDGE_BASE, query_vector, limit=5)
+            results_df = query_context(db, TABLE_KNOWLEDGE_BASE, query_vector, limit=5)
             if results_df is None or results_df.empty:
                 canvas.warning("No relevant documentation found.")
                 self.cost_tracker.end_phase(False, feedback="No documentation retrieved")
