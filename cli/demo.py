@@ -1,9 +1,23 @@
 # cli/demo.py
 """Demo script to showcase the Feature Pipeline capabilities"""
+import os
 import sys
 import argparse
 from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
+
+from llm_providers import initialize_groq_providers
+import builtins
+
+(
+    builtins.llm_highest,
+    builtins.llm_middle,
+    builtins.llm_small,
+    builtins.llm_xs
+) = initialize_groq_providers()
+
 from typing import List
 import time
 
@@ -15,7 +29,6 @@ from agents.knowledge.knowledge_manager import ExternalKnowledgeManager
 from cli.rich_output import rich_output
 from rich.panel import Panel
 from db_utils import get_db_connection
-import os
 
 
 def create_sample_stories() -> List[UserStory]:
