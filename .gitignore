@@ -12,5 +12,7 @@ data/lancedb/
 test_output/
 demo_output/
 real_test_output/
+demo/.env
 demo_project/
-demo/output
+demo/output/
+demo/data/lancedb/
