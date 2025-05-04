@@ -1,6 +1,17 @@
 # /main.py
 # Main entry point for the Idea-to-Code Factory application.
 
+import builtins
+from llm_providers import initialize_groq_providers
+
+# populate builtins.llm_* before any agents import them
+(
+    builtins.llm_highest,
+    builtins.llm_middle,
+    builtins.llm_small,
+    builtins.llm_xs
+) = initialize_groq_providers()
+
 import os
 import subprocess
 import sys
