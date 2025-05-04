@@ -15,7 +15,10 @@ from .self_healing_controller import SelfHealingController
 # from .sre_team_workflow import SRETeamWorkflow
 
 # Import only agents needed AFTER SRE workflow
-from agents.sre_team import version_controller # Keep VC here
+from agents.sre_team import (
+    dependency_verifier,
+    version_controller, # Keep VC here
+)
 from agents.quality_team import (
     reviewer_agent,
     guardrail_agent,
