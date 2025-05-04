@@ -2,12 +2,23 @@
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
-import json
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
+
+from dotenv import load_dotenv
+import json
+from llm_providers import initialize_groq_providers
+import builtins
+
+(
+    builtins.llm_highest,
+    builtins.llm_middle,
+    builtins.llm_small,
+    builtins.llm_xs
+) = initialize_groq_providers()
+
 
 # Load environment variables
 load_dotenv(project_root / '.env')

@@ -5,19 +5,11 @@ import os
 from pathlib import Path
 import json
 
-# Import agent instances needed
-from agents.core_agents import input_processor_agent
-from agents.budget_manager import BudgetManagerAgent
-# ← Import the class, not a singleton
-from agents.modification_team.context_reader.context_reader_agent import ContextReaderAgent
-
 # Import orchestrator function
 from .orchestrator import route_and_execute
 # Import CLI controller and utils
 from cli.controller import canvas
 from .utils import sanitize_filename, ensure_project_path
-# Import LLM instances for model IDs/fallbacks
-from llm_providers import llm_small, llm_xs, llm_middle, llm_highest
 # Import handlers from the sibling module
 from .session_handlers import (
     handle_get_user_action,
@@ -30,6 +22,9 @@ DEFAULT_OUTPUT_DIR_BASE = Path("./output")
 
 def run_session():
     """Manages the overall user session and interaction loop."""
+    from agents.core_agents import input_processor_agent  # Lazy import to avoid circular dependency
+    from agents.budget_manager import BudgetManagerAgent
+    
     canvas.info("Initializing Session…")
     budget_manager = BudgetManagerAgent(session_budget=None)
 
@@ -39,6 +34,7 @@ def run_session():
     current_structured_goal: dict | None = None
 
     # We'll keep a single reader-agent around once we have a project_path
+    from agents.modification_team.context_reader.context_reader_agent import ContextReaderAgent
     reader_agent: ContextReaderAgent | None = None
 
     while True:
@@ -70,7 +66,7 @@ def run_session():
             if not budget_manager.request_approval(
                 description="New Idea Clarification",
                 prompt=raw,
-                model_id=getattr(llm_middle, 'id', 'Unknown'),
+                model_id=getattr(input_processor_agent.model, 'id', 'Unknown'),
             ):
                 canvas.warning("Clarification cancelled due to budget rejection.")
                 print("-" * 30)
@@ -98,7 +94,7 @@ def run_session():
             final_name = sanitize_filename(answer or suggested)
             current_project_path = ensure_project_path(DEFAULT_OUTPUT_DIR_BASE, final_name)
 
-            # 4. Index (empty dir) using the class-based agent
+            # Index (empty dir) using the class-based agent
             reader_agent = ContextReaderAgent(project_path=current_project_path)
             status = reader_agent.index_project_context()
             canvas.info(f"Indexing Status: {status}")
@@ -109,7 +105,7 @@ def run_session():
             if budget_manager.request_approval(
                 description="Initial Project Generation",
                 prompt=current_structured_goal['objective'],
-                model_id=getattr(llm_middle, 'id', 'Unknown'),
+                model_id=getattr(input_processor_agent.model, 'id', 'Unknown'),
             ):
                 ok = route_and_execute(
                     action_type='generate',
@@ -131,7 +127,7 @@ def run_session():
             if budget_manager.request_approval(
                 description=f"Project Modification ({command_detail})",
                 prompt=command_detail,
-                model_id=getattr(llm_highest, 'id', 'Unknown'),
+                model_id=getattr(input_processor_agent.model, 'id', 'Unknown'),
             ):
                 ok = route_and_execute(
                     action_type='modify',
@@ -151,7 +147,6 @@ def run_session():
         print("-" * 30)
 
     canvas.end_process("Session ended.")
-
 
 def start_factory_session():
     run_session()

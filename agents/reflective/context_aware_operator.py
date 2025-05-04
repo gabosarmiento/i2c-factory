@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from cli.controller import canvas
-from llm_providers import llm_highest, llm_middle, llm_small, llm_xs
+from builtins import llm_highest, llm_middle, llm_small, llm_xs
 from workflow.utils import count_tokens, estimate_cost
 
 from agents.budget_manager import BudgetManagerAgent
@@ -71,12 +71,19 @@ class PhaseCostTracker:
         model_id: str,
         tools_used: Optional[List[str]] = None,
         context_chunks_used: Optional[List[str]] = None,
+        actual_tokens: Optional[int] = None,
+        actual_cost: Optional[float] = None,
     ) -> Dict:
         if not self.current_phase:
             raise ValueError("No active phase to record reasoning step")
 
-        tokens_consumed = count_tokens(prompt) + count_tokens(response)
-        _, cost_incurred = estimate_cost(prompt + response, model_id)
+        # Use actual values if provided, otherwise estimate
+        if actual_tokens is not None and actual_cost is not None:
+            tokens_consumed = actual_tokens
+            cost_incurred = actual_cost
+        else:
+            tokens_consumed = count_tokens(prompt) + count_tokens(response)
+            _, cost_incurred = estimate_cost(prompt + response, model_id)
 
         step = {
             "step_id": step_id,
@@ -97,8 +104,10 @@ class PhaseCostTracker:
         self.trajectory["total_tokens_consumed"] += tokens_consumed
         self.trajectory["total_cost_incurred"] += cost_incurred
 
+        # Update budget manager with actual values
         self.budget_manager.consumed_tokens_session += tokens_consumed
         self.budget_manager.consumed_cost_session += cost_incurred
+        
         return step
 
     def record_validation(self, step_id: str, outcome: bool, feedback: str) -> None:
@@ -360,26 +369,50 @@ class ContextAwareOperator(ABC):
             model_tier=model_tier,
             parent_scope_id=self.operation_id,
         )
+        
+        # Get the model
+        model = step_scope._get_model_for_tier(model_tier)
+        model_id = getattr(model, "id", "Unknown")
+        
+        # Request approval
         if not step_scope.request_approval(prompt, f"Reasoning step {step_id}"):
             canvas.error(f"Step {step_id} in phase {phase_id} denied by budget manager.")
             return None
-        model = step_scope._get_model_for_tier(model_tier)
+        
         try:
             canvas.info(f"👉 Executing step {step_id} ({model_tier}) …")
-            # response = model.run(prompt).content  # type: ignore[attr-defined]
-            # Groq SDK no longer exposes `.run()`; use `.response()` instead
-            llm_reply, _ = model.response(messages=[{"role":"user","content":prompt}])
-            response = llm_reply.content  # extract the text out of the assistant message
+            
+            # Make the API call with tracking
+            from llm_providers import make_tracked_request
+            
+            messages = [{"role": "user", "content": prompt}]
+            response_text, tokens_used, actual_cost = make_tracked_request(
+                model=model,
+                messages=messages,
+                budget_manager=self.budget_manager
+            )
+            
+            # Record in cost tracker with actual values
             step_meta = self.cost_tracker.record_reasoning_step(
                 step_id=step_id,
                 prompt=prompt,
-                response=response,
-                model_id=getattr(model, "id", "Unknown"),
+                response=response_text,
+                model_id=model_id,
                 tools_used=tools_used,
                 context_chunks_used=context_chunks_used,
             )
-            return {**step_meta, "step_id": step_id, "response": response}
-        except Exception as exc:  # noqa: BLE001
+            
+            # Update the step metadata with actual token count
+            step_meta['tokens_consumed'] = tokens_used
+            step_meta['cost_incurred'] = actual_cost
+            
+            # Update budget scope with actual values
+            step_scope.tokens_consumed = tokens_used
+            step_scope.cost_incurred = actual_cost
+            
+            return {**step_meta, "step_id": step_id, "response": response_text}
+            
+        except Exception as exc:
             canvas.error(f"Execution error at step {step_id}: {exc}")
             return None
 

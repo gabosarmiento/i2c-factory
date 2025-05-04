@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from agno.agent import Agent
 from cli.controller import canvas
-from llm_providers import llm_highest
+from builtins import llm_highest
 from workflow.modification.rag_retrieval import retrieve_context_for_planner
 
 from agents.reflective.context_aware_operator import (

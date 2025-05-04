@@ -8,7 +8,7 @@ from typing import Dict, List, Any
 
 # Import Agno Agent and LLM provider instance
 from agno.agent import Agent
-from llm_providers import llm_middle # Use middle tier for review tasks
+from builtins import llm_middle # Use middle tier for review tasks
 
 # Import CLI for logging
 try:

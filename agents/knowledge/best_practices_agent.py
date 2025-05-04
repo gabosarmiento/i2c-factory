@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 
 from cli.controller import canvas
-from llm_providers import llm_highest
+from builtins import llm_highest
 from agno.agent import Agent
 from agents.reflective.context_aware_operator import ContextAwareOperator, ValidationHook
 from db_utils import query_context, TABLE_CODE_CONTEXT

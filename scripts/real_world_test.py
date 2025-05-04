@@ -2,10 +2,23 @@
 """Real-world test of Feature Pipeline with actual LLM calls"""
 
 import sys, os
+# --- <<< Set Tokenizer Parallelism Env Var >>> ---
+# Set before other imports that might use tokenizers (like sentence-transformers via agents)
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from pathlib import Path
 import time
 project_root = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(project_root))
+
+# Load LLMs and set builtins
+from llm_providers import initialize_groq_providers
+import builtins
+(
+    builtins.llm_highest,
+    builtins.llm_middle,
+    builtins.llm_small,
+    builtins.llm_xs
+) = initialize_groq_providers()
 # Configure environment
 os.environ['GROQ_API_KEY'] = 'your_groq_api_key_here'  # Replace with actual key
 os.environ['EMBEDDING_MODEL_NAME'] = 'all-MiniLM-L6-v2'
