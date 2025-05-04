@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Optional, Any, List, Set
 
 from agno.agent import Agent
-from llm_providers import llm_highest  # Use high-capacity model for code modification
+from builtins import llm_highest  # Use high-capacity model for code modification
 
 class CodeModifierAgent(Agent):
     """Applies planned code changes to existing or new files, utilizing provided RAG context."""

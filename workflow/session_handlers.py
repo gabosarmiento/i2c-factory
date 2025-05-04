@@ -12,7 +12,7 @@ from agents.modification_team.context_reader import context_reader_agent
 from agents.budget_manager import BudgetManagerAgent
 from cli.controller import canvas
 from .utils import sanitize_filename, ensure_project_path
-from llm_providers import llm_middle
+from builtins import llm_middle
 
 # Function to safely parse JSON, returning None on failure
 def _safe_json_loads(text: str) -> dict | None:

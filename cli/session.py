@@ -15,7 +15,7 @@ from .orchestrator import route_and_execute
 from cli.controller import canvas
 from .utils import sanitize_filename, ensure_project_path
 # Import LLM instances for model IDs (needed for budget estimation)
-from llm_providers import llm_middle, llm_highest # Import relevant models
+from builtins import llm_middle, llm_highest # Import relevant models
 
 # --- Configuration ---
 DEFAULT_OUTPUT_DIR_BASE = Path("./output")

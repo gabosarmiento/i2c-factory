@@ -4,7 +4,7 @@
 import os
 import json
 from agno.agent import Agent
-from llm_providers import llm_highest
+from builtins import llm_highest
 
 class ModificationPlannerAgent(Agent):
     """Plans detailed code modifications based on context and user requests."""

@@ -6,7 +6,7 @@ import ast
 from pathlib import Path
 
 from agno.agent import Agent
-from llm_providers import llm_middle
+from builtins import llm_middle
 
 class UnitTestGeneratorAgent(Agent):
     """Generates basic unit tests for Python functions found in the generated code."""

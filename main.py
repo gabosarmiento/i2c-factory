@@ -2,21 +2,24 @@
 # Main entry point for the Idea-to-Code Factory application.
 
 import os
-# --- <<< Set Tokenizer Parallelism Env Var >>> ---
-# Set before other imports that might use tokenizers (like sentence-transformers via agents)
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-# --- <<< End Setting Env Var >>> ---
 import subprocess
-import sys # Keep sys import if needed elsewhere, though not used directly here now
+import sys
 from dotenv import load_dotenv
 
-# Import the main session execution function FROM THE WORKFLOW PACKAGE
-from workflow import start_factory_session # Should work due to __init__.py
-from cli.ascii import show_banner # Keep the banner if desired
-from config.config import load_groq_api_key # Keep API key loading
+# Set tokenizer env var early
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+# --- Core imports ---
+from workflow import start_factory_session
+from cli.ascii import show_banner
+from config.config import load_groq_api_key
+
+# --- Budget manager setup ---
+from agents.budget_manager import BudgetManagerAgent
+from llm_providers import initialize_groq_providers
 
 def check_environment():
-    """Check environment before starting"""
+    """Check Python and dependency versions"""
     print("🔍 Running environment check...")
     result = subprocess.run([sys.executable, "scripts/check_versions.py"], capture_output=True)
     if result.returncode != 0:
@@ -25,28 +28,48 @@ def check_environment():
         sys.exit(1)
     else:
         print("✅ Environment check passed.")
-        
+
 def load_environment():
-    """Loads environment variables from a .env file."""
+    """Loads environment variables from .env file."""
     load_dotenv()
     print("🔑 Environment variables loaded (if .env file exists).")
     try:
-        load_groq_api_key() # Validate GROQ_API_KEY presence
+        load_groq_api_key()
         print("   ✅ GROQ_API_KEY found.")
         return True
     except ValueError as e:
-        print(f"   {e}") # Print the error message from config
-        return False # Stop if key is missing
+        print(f"   {e}")
+        return False
 
-# --- Main Execution Block ---
+def initialize_budget_manager():
+    """Sets up and globally registers the budget manager."""
+    global_budget_manager = BudgetManagerAgent(session_budget=10.0)  # $10 session budget
+    import builtins
+    builtins.global_budget_manager = global_budget_manager
+    print("💰 Budget manager initialized with $10 session budget.")
+
+# --- Main Execution ---
 if __name__ == "__main__":
     print("--- Application Start ---")
     check_environment()
-    show_banner() # Show banner at the start
+    show_banner()
+
     if load_environment():
-        # Call the primary session function from the workflow package
+        initialize_budget_manager()  # Optional, still safe to use if some agents track usage
+
+        # ⬇️ Capture initialized models explicitly
+        import builtins
+        from llm_providers import initialize_groq_providers
+        (
+            builtins.llm_highest,
+            builtins.llm_middle,
+            builtins.llm_small,
+            builtins.llm_xs
+        ) = initialize_groq_providers()
+
         start_factory_session()
     else:
         print("❌ Workflow aborted due to missing environment configuration.")
+
     print("--- Application End ---")
 

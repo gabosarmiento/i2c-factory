@@ -7,7 +7,7 @@ from pathlib import Path
 from agno.agent import Agent
 
 # Import prepared LLMs
-from llm_providers import llm_middle, llm_highest, llm_small # Use llm_middle or llm_small for analysis
+from builtins import llm_middle, llm_highest, llm_small # Use llm_middle or llm_small for analysis
 
 # --- Input Processor Agent ---
 input_processor_agent = Agent(
