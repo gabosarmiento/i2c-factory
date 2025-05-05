@@ -11,14 +11,10 @@ from db_utils import (
     query_context,
     TABLE_CODE_CONTEXT,
     TABLE_KNOWLEDGE_BASE,
-) 
-from db_utils import get_or_create_table, SCHEMA_CODE_CONTEXT, SCHEMA_KNOWLEDGE_BASE
+)
 
-# Import context utility for embedding generation
-try:
-    from agents.modification_team.context_utils import generate_embedding
-except ImportError:
-    generate_embedding = None
+# Use AGNO's embedder (has .dimensions & get_embedding_and_usage)
+from agno.embedder.sentence_transformer import SentenceTransformerEmbedder
 
 # Import CLI controller
 try:
@@ -39,35 +35,34 @@ MAX_RAG_RESULTS_MODIFIER = 3  # Context chunks for modifier (per step)
 
 def retrieve_combined_context(
     query_text: str,
-    db: Any,
-    embed_model: Any,
+    db: Any,                  # LanceDBConnection
+    embed_model: SentenceTransformerEmbedder,         # SentenceTransformerEmbedder
     code_limit: int = MAX_RAG_RESULTS_PLANNER,
     knowledge_limit: int = MAX_RAG_RESULTS_MODIFIER,
 ) -> Dict[str, str]:
     """
-    Retrieve context from **both** code_context & knowledge_base tables.
-    Returns a dict of formatted‑string payloads ready for prompt injection.
+    Retrieve context from both code_context & knowledge_base tables.
     """
     try:
-        vector = _generate_request_embedding(query_text, embed_model)
+        # 1) embed the query
+        vector, _ = embed_model.get_embedding_and_usage(query_text)
+
+        # 2) retrieve from code_context
         code_ctx = ""
-        kb_ctx   = ""
         if vector is not None:
-             # open and query the code_context table
-            code_table = get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
             res = query_context(
-                code_table,
+                db,                      # ← DB, not table
                 TABLE_CODE_CONTEXT,
                 query_vector=vector,
-                
                 limit=code_limit
             )
             code_ctx = _format_rag_results(res, "code-context", 500)
 
-            # open and query the knowledge_base table
-            kb_table = get_or_create_table(db, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE)
+        # 3) retrieve from knowledge_base
+        kb_ctx = ""
+        if vector is not None:
             res = query_context(
-                kb_table,
+                db,
                 TABLE_KNOWLEDGE_BASE,
                 query_vector=vector,
                 limit=knowledge_limit
@@ -80,40 +75,6 @@ def retrieve_combined_context(
         canvas.error(f"Error retrieving combined context: {e}")
         return {"code_context": "", "knowledge_context": ""}
     
-def _generate_request_embedding(text: str, embed_model: Any) -> Optional[List[float]]:
-    """
-    Generates embedding for a user request string using either:
-    1. The imported generate_embedding function from context_utils (preferred)
-    2. Direct embedding generation using the provided model (fallback)
-    
-    Args:
-        text: The text to embed
-        embed_model: SentenceTransformer model instance
-        
-    Returns:
-        List of floats representing the embedding vector, or None on failure
-    """
-    if not text:
-        canvas.warning("   ⚠️ Cannot generate embedding: Input text is empty.")
-        return None
-        
-    # Try using the dedicated function from context_utils first (if available)
-    if generate_embedding:
-        return generate_embedding(text)
-        
-    # Fallback to direct embedding if the model is available
-    if not embed_model:
-        canvas.warning("   ⚠️ Embedding model not available. Cannot generate query vector.")
-        return None
-        
-    try:
-        # Generate embedding directly from the model
-        vector = embed_model.encode(text, convert_to_numpy=True)
-        # Ensure it's a list of floats
-        return [float(x) for x in vector.tolist()]
-    except Exception as e:
-        canvas.warning(f"   ⚠️ Failed to generate embedding for text '{text[:30]}...': {e}")
-        return None
 
 def _format_rag_results(rag_results: pd.DataFrame, context_description: str, max_content_len: int = 500) -> str:
     """
@@ -152,92 +113,88 @@ def _format_rag_results(rag_results: pd.DataFrame, context_description: str, max
 
     return "\n".join(context_lines)
 
-def retrieve_context_for_planner(user_request: str, db, embed_model: Any) -> str:
+def retrieve_context_for_planner(
+    user_request: str,
+    db: Any,                         # LanceDBConnection
+    embed_model: SentenceTransformerEmbedder
+) -> str:
     """
     Generates embedding for user request and retrieves context for the planner.
-    
-    Args:
-        user_request: The raw user request (r, f <feature>, etc.)
-        db: LanceDBConnection handle
-        embed_model: SentenceTransformer model instance
-        
-    Returns:
-        Formatted string with retrieved context
     """
     canvas.step("Analyzing user request for planning context...")
-    query_vector = None
-    query_text = None
 
+    # Decide what to embed:
     if user_request.lower() == 'r':
         canvas.info("   Skipping RAG context retrieval for generic 'refine' request.")
+        return "No context needed for generic refine request."
     elif user_request.lower().startswith('f '):
-        query_text = user_request[len('f '):].strip()
+        query_text = user_request[2:].strip()
     else:
-        query_text = user_request
+        query_text = user_request.strip()
 
-    if query_text:
-        query_vector = _generate_request_embedding(query_text, embed_model)
+    if not query_text:
+        return "No relevant context could be retrieved for planning."
 
-    retrieved_context_str = "No relevant context could be retrieved for planning (vector or table unavailable)."
-    if query_vector:
-        table = get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
-        rag_results = query_context(table,TABLE_CODE_CONTEXT, query_vector=query_vector, limit=MAX_RAG_RESULTS_PLANNER)
-        retrieved_context_str = _format_rag_results(rag_results, "planning", max_content_len=500)
+    # 1) Embed
+    vector, _ = embed_model.get_embedding_and_usage(query_text)
+    if vector is None:
+        return "No relevant context could be retrieved for planning."
 
-    return retrieved_context_str
+    # 2) Query LanceDB for planner context
+    res = query_context(
+        db,
+        TABLE_CODE_CONTEXT,
+        query_vector=vector,
+        limit=MAX_RAG_RESULTS_PLANNER
+    )
+
+    # 3) Format and return
+    return _format_rag_results(res, "planning", max_content_len=500)
 
 def retrieve_context_for_step(step: dict, db, embed_model: Any) -> Optional[str]:
     """
     Generates embedding for a modification step and retrieves relevant context.
-    
-    Args:
-        step: single modification step dict
-        db: LanceDBConnection handle
-        embed_model: SentenceTransformer model instance
-        
-    Returns:
-        Formatted string with retrieved context or None if no relevant context found
     """
     # Extract step information
-    file_path = step.get('file', '')
-    action = step.get('action', '').lower()
-    what_to_do = step.get('what', '')
+    file_path   = step.get('file', '')
+    action      = step.get('action', '').lower()
+    what_to_do  = step.get('what', '')
     how_to_do_it = step.get('how', '')
-    
+
     canvas.info(f"    Retrieving context for step: {what_to_do[:40]}...")
-    
-    # Create specialized query based on step type
-    query_texts = []
-    
-    # Always include the core step information
-    core_query = f"File: {file_path} Action: {action} Task: {what_to_do} Details: {how_to_do_it}"
-    query_texts.append(core_query)
-    
-    # Add file-specific query to find similar code in the same file
+
+    # Build one or two query texts
+    query_texts = [f"File: {file_path} Action: {action} Task: {what_to_do} Details: {how_to_do_it}"]
     if action == 'modify':
         query_texts.append(f"File path: {file_path}")
-    
-    # Generate embeddings and run queries
-    retrieved_contexts = []
-    # open code_context once
-    table = get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
+
+    retrieved_contexts: List[str] = []
+
     for query_text in query_texts:
-        query_vector = _generate_request_embedding(query_text, embed_model)
-        if query_vector:
-            rag_results = query_context(table, TABLE_CODE_CONTEXT, query_vector=query_vector, limit=MAX_RAG_RESULTS_MODIFIER)
-            if rag_results is not None and not rag_results.empty:
-                formatted_context = _format_rag_results(
-                    rag_results, 
-                    f"step '{what_to_do[:30]}...' ({file_path})", 
-                    max_content_len=300
-                )
-                # Only add non-empty context
-                if "No relevant context" not in formatted_context:
-                    retrieved_contexts.append(formatted_context)
-    
-    # Combine all retrieved contexts
-    if retrieved_contexts:
-        return "\n\n".join(retrieved_contexts)
-    
-    # Return None if no relevant context found
-    return None
+        # 1) Embed
+        vector, _ = embed_model.get_embedding_and_usage(query_text)
+        if not vector:
+            continue
+
+        # 2) Query LanceDB
+        rag_results = query_context(
+            db,
+            TABLE_CODE_CONTEXT,
+            query_vector=vector,
+            limit=MAX_RAG_RESULTS_MODIFIER
+        )
+        if not rag_results or rag_results.empty:
+            continue
+
+        # 3) Format
+        formatted = _format_rag_results(
+            rag_results,
+            f"step '{what_to_do[:30]}...' ({file_path})",
+            max_content_len=300
+        )
+        # Skip the “no context” message
+        if "No relevant context" not in formatted:
+            retrieved_contexts.append(formatted)
+
+    # Return combined contexts or None
+    return "\n\n".join(retrieved_contexts) if retrieved_contexts else None

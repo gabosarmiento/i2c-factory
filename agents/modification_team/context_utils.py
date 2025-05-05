@@ -24,16 +24,24 @@ except ImportError:
 EMBEDDING_MODEL_NAME = os.getenv('EMBEDDING_MODEL_NAME', 'all-MiniLM-L6-v2')
 _embedding_model: Optional['SentenceTransformer'] = None
 
-if SentenceTransformer:
-    try:
-        _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-        canvas.info(f"[ContextUtils] Loaded embedding model '{EMBEDDING_MODEL_NAME}' successfully.")
-    except (ValueError, RuntimeError, ImportError) as e:
-        _embedding_model = None
-        canvas.warning(f"[ContextUtils] Failed to load embedding model '{EMBEDDING_MODEL_NAME}': {e}")
-    except Exception as e:
-        _embedding_model = None
-        canvas.warning(f"[ContextUtils] Unexpected error loading model: {e}")
+try:
+    _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    # Patch missing 'dimensions' attribute if needed
+    if not hasattr(_embedding_model, "dimensions"):
+        _embedding_model.dimensions = _embedding_model.get_sentence_embedding_dimension()
+    
+    if not hasattr(_embedding_model, "get_embedding"):
+        def get_embedding(text):
+            return _embedding_model.encode(text, convert_to_numpy=True)
+        _embedding_model.get_embedding = get_embedding
+        
+    canvas.info(f"[ContextUtils] Loaded embedding model '{EMBEDDING_MODEL_NAME}' with dimensions {_embedding_model.dimensions}.")
+except (ValueError, RuntimeError, ImportError) as e:
+    _embedding_model = None
+    canvas.warning(f"[ContextUtils] Failed to load embedding model '{EMBEDDING_MODEL_NAME}': {e}")
+except Exception as e:
+    _embedding_model = None
+    canvas.warning(f"[ContextUtils] Unexpected error loading model: {e}")
 
 @lru_cache(maxsize=1024)
 def generate_embedding(text: str) -> Optional[List[float]]:

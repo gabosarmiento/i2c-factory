@@ -4,7 +4,7 @@
 from pathlib import Path
 import pandas as pd
 import json
-
+import traceback
 # Import functions from other modules in this package
 from .rag_retrieval import retrieve_context_for_planner, retrieve_context_for_step
 from .plan_generator import generate_modification_plan
@@ -26,85 +26,77 @@ from db_utils import (
 # Import CLI controller
 from cli.controller import canvas
 
-def execute_modification_cycle(user_request: str, project_path: Path, language: str) -> dict:
+def execute_modification_cycle(
+    user_request: str,
+    project_path: Path,
+    language: str,
+    db,                           # LanceDBConnection
+    embed_model                  # SentenceTransformerEmbedder
+) -> dict:
     """
     Runs the full cycle for modifying an existing project using RAG.
+    Returns a dict with keys: success (bool), language (str), code_map (dict).
     """
     canvas.start_process(f"Modification Cycle for: {project_path.name}")
-    return_context = {"success": False, "language": language, "code_map": None}
-    db = None
-    table = None
-    embed_model = getattr(context_reader_agent, 'embedding_model', None)
-    modification_plan = None
-    final_code_map_incl_tests = None
+    result = {"success": False, "language": language, "code_map": None}
 
     try:
-        # Step 1: DB Connection and Table
-        canvas.info("Attempting to connect to vector database for modification...")
-        db = get_db_connection()
-        # --- <<< Use explicit 'is None' check >>> ---
+        # ───── Step 1: Validate DB ─────────────────────────
         if db is None:
-            raise ConnectionError("get_db_connection() returned None.")
-        # --- <<< End Check >>> ---
-        canvas.info(f"   [DB] Connection object obtained: {type(db)}")
-        table = get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
-        if table is None:
-            raise ConnectionError("get_or_create_table() returned None.")
-        canvas.success("Database connection and table acquired successfully for modification.")
+            raise ConnectionError("No DB connection passed to modification cycle.")
+        canvas.info(f"[DB] Using LanceDBConnection: {type(db)}")
 
-        # Step 2: RAG for Planner
-        retrieved_context_plan = retrieve_context_for_planner(
+        # ───── Step 2: Retrieve Planner Context via RAG ─────
+        planner_ctx = retrieve_context_for_planner(
             user_request=user_request,
             db=db,
             embed_model=embed_model
         )
+        canvas.info(f"[RAG] Planner context retrieved.")
 
-        # Step 3: Generate Plan
+        # ───── Step 3: Generate Modification Plan ──────────
         modification_plan = generate_modification_plan(
             user_request=user_request,
-            retrieved_context_plan=retrieved_context_plan,
+            retrieved_context_plan=planner_ctx,
             project_path=project_path,
             language=language
         )
         if not modification_plan:
-             raise RuntimeError("Modification planning failed or produced empty plan.")
+            raise RuntimeError("Planning returned no steps.")
+        canvas.info(f"[Plan] Generated {len(modification_plan)} steps.")
 
-        # Step 4: Execute Modifications
+        # ───── Step 4: Execute Each Modification Step ──────
+        # Pass the DB & embedder into the step executor so it can RAG‐retrieve step context
         modified_code_map, files_to_delete = execute_modification_steps(
             modification_plan=modification_plan,
             project_path=project_path,
             db=db,
             embed_model=embed_model
         )
+        canvas.info(f"[Exec] Applied modifications to {len(modified_code_map)} files.")
 
-        # Step 5: Unit Tests
-        final_code_map_incl_tests = generate_unit_tests(modified_code_map)
-        return_context["code_map"] = final_code_map_incl_tests
+        # ───── Step 5: Generate & Run Unit Tests ──────────
+        final_code_map = generate_unit_tests(modified_code_map)
+        canvas.info(f"[Tests] Generated/ran tests for {len(final_code_map)} modules.")
 
-        # Step 6: Quality Checks
-        quality_checks_passed = run_quality_checks(final_code_map_incl_tests)
-        if not quality_checks_passed:
-             canvas.warning("Proceeding despite SRE Quality Check errors/failures.")
+        # ───── Step 6: Quality Checks ──────────────────────
+        if not run_quality_checks(final_code_map):
+            canvas.warning("[Quality] Some quality checks failed—continuing anyway.")
 
-        # Step 7: Write Files
-        write_files_to_disk(final_code_map_incl_tests, project_path)
-
-        # Step 8: Deletion
+        # ───── Step 7: Write Files & Cleanup ───────────────
+        write_files_to_disk(final_code_map, project_path)
         delete_files(files_to_delete, project_path)
-
         canvas.end_process(f"Modification cycle for {project_path.name} completed successfully.")
-        return_context["success"] = True
 
-    except ConnectionError as db_err: # Catch specific DB errors first
-        canvas.error(f"Modification cycle failed due to DB Connection/Table Error: {db_err}")
-        canvas.end_process(f"Modification cycle failed.")
+        # ───── All Done ────────────────────────────────────
+        result["success"]  = True
+        result["code_map"] = final_code_map
+
     except Exception as e:
-        canvas.error(f"Modification cycle failed unexpectedly: {type(e).__name__} - {e}")
-        import traceback
-        canvas.error(traceback.format_exc()) # Add traceback for unexpected errors
-        canvas.end_process(f"Modification cycle failed.")
+        canvas.error(f"Modification cycle failed: {type(e).__name__} - {e}")
+        canvas.error(traceback.format_exc())
+        canvas.end_process("Modification cycle aborted.")
     finally:
-        if db or table:
-             canvas.info("   [DB] Modification cycle finished using DB handles.")
+        canvas.info("[DB] Modification cycle cleaned up.")
 
-    return return_context
+    return result

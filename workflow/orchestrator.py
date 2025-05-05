@@ -9,6 +9,9 @@ import traceback
 from .generation import execute_generation_cycle
 from .modification import execute_modification_cycle
 
+from db_utils import get_db_connection
+from agno.embedder.sentence_transformer import SentenceTransformerEmbedder
+
 # --- <<< Import SelfHealingController >>> ---
 from .self_healing_controller import SelfHealingController
 # --- <<< Remove direct SRE Workflow import >>> ---
@@ -56,7 +59,9 @@ def route_and_execute(
     final_code_map = None
 
     # --- 0. Execute main generation or modification cycle ---
-    canvas.info(f"--- Starting {action_type.capitalize()} Cycle ---")
+    # Initialize RAG/KG support
+    db          = get_db_connection()
+    embed_model = SentenceTransformerEmbedder()
     try:
         if action_type == "generate":
             if isinstance(action_detail, dict):
@@ -67,10 +72,14 @@ def route_and_execute(
             else: raise ValueError("Missing structured goal for generation.")
         elif action_type == "modify":
             if isinstance(action_detail, str) and language:
-                result = execute_modification_cycle(action_detail, current_project_path, language)
-                cycle_success = result.get("success", False)
-                language = result.get("language") or language
-                final_code_map = result.get("code_map")
+                # Pass DB & embedder into the modification cycle
+                result = execute_modification_cycle(
+                    action_detail,
+                    current_project_path,
+                    language,
+                    db=db,
+                    embed_model=embed_model
+                )
             else: raise ValueError("Invalid detail or missing language for modification.")
         else: raise ValueError(f"Unknown action type: {action_type}")
     except Exception as e:
