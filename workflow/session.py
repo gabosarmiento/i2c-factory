@@ -14,7 +14,8 @@ from .utils import sanitize_filename, ensure_project_path
 from .session_handlers import (
     handle_get_user_action,
     handle_load_project,
-    handle_new_project_idea
+    handle_new_project_idea,
+    handle_knowledge_management
 )
 
 # --- Configuration ---
@@ -40,13 +41,20 @@ def run_session():
     while True:
         canvas.step("Ready for next action")
         command_type, command_detail = handle_get_user_action(current_project_path)
-
+        
         if command_type == 'quit':
             canvas.info("Exiting session.")
             tokens, cost = budget_manager.get_session_consumption()
             canvas.info(f"Session Summary: Consumed ~{tokens} tokens (~${cost:.6f})")
             break
-
+        
+        elif command_type == 'knowledge':  # NEW: Handle knowledge command
+            if not current_project_path:
+                canvas.warning("No active project. Create or load a project first.")
+                continue
+                
+            handle_knowledge_management(current_project_path)
+            
         elif command_type == 'load_project':
             loaded_path, inferred_goal = handle_load_project(command_detail)
             if loaded_path:

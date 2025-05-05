@@ -14,11 +14,21 @@ pyarrow               = "^20.0.0"
 pandas                = "^2.2.3"
 numpy                 = "<2.0"             # pin to 1.x for C-extensions compatibility
 sentence-transformers = "^2.2.0"          # for your embedding utilities
-agno                   = "*"               # core AGNO agents framework
-llm-providers          = "*"               # LLM backend providers
-groq = "0.23.1"
+agno                  = "*"               # core AGNO agents framework
+llm-providers         = "*"               # LLM backend providers
+groq                  = "0.23.1"
+# New dependencies for document parsing
+pypdf2                = "^3.0.0"          # PDF parsing
+python-docx           = "^0.8.11"         # .docx parsing
+beautifulsoup4        = "^4.12.2"         # HTML parsing
+lxml                  = "^4.9.3"          # XML/HTML parser backend
+watchdog              = "^6.0.0"          # File watching
+torch                 = "2.2.2"
+pypdf                 = "^5.4.0"          # PDF reader
+tantivy               = "^0.22.2"
+protobuf              = "^6.30.2"
 
-# Expose your source directories as installable packages
+
 [[tool.poetry.packages]]
 include = "agents"
 

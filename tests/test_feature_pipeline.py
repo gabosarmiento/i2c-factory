@@ -1,16 +1,29 @@
 # tests/test_feature_pipeline.py
 """Tests for the Feature Pipeline"""
-
+# Load LLMs and set builtins
+from llm_providers import initialize_groq_providers
+import builtins
+(
+    builtins.llm_highest,
+    builtins.llm_middle,
+    builtins.llm_small,
+    builtins.llm_xs
+) = initialize_groq_providers()
+import sys, os 
 import unittest
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 import json
 from datetime import datetime
 
+project_root = Path(__file__).parent.parent.resolve()
+sys.path.insert(0, str(project_root))
+
 from models.user_story import UserStory, AcceptanceCriteria, StoryPriority, StoryStatus
 from story_manager import StoryManager
 from workflow.feature_pipeline import FeaturePipeline
 from agents.budget_manager import BudgetManagerAgent
+
 
 
 class TestFeaturePipeline(unittest.TestCase):

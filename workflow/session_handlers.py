@@ -29,15 +29,14 @@ def _safe_json_loads(text: str) -> dict | None:
 
 def handle_get_user_action(current_project_path: Path | None) -> tuple[str | None, str | None]:
     """Gets and parses the user's next action command."""
-    # ... (logic remains the same) ...
     if current_project_path:
-         project_status = f"Project: '{current_project_path.name}'"
-         options = "'f <feature_idea>', 'r' (refine), 'p <path>' (switch project), 'q' (quit)"
-         action_prompt = f"{project_status} | Options: {options}:"
+        project_status = f"Project: '{current_project_path.name}'"
+        options = "'f <feature_idea>', 'r' (refine), 'k' (knowledge), 'p <path>' (switch project), 'q' (quit)"
+        action_prompt = f"{project_status} | Options: {options}:"
     else:
-         project_status = "No active project."
-         options = "'<your new idea>', 'p <path>' (load existing), 'q' (quit)"
-         action_prompt = f"{project_status} | Options: {options}:"
+        project_status = "No active project."
+        options = "'<your new idea>', 'p <path>' (load existing), 'q' (quit)"
+        action_prompt = f"{project_status} | Options: {options}:"
 
     user_input = canvas.get_user_input(action_prompt).strip()
     command_lower = user_input.lower()
@@ -47,23 +46,25 @@ def handle_get_user_action(current_project_path: Path | None) -> tuple[str | Non
     elif command_lower.startswith('p '):
         path_str = user_input[len('p '):].strip().strip('\'"')
         return 'load_project', path_str
-    elif current_project_path: # Actions requiring an active project
+    elif current_project_path: 
         if command_lower == 'r':
             return 'modify', 'r'
         elif command_lower.startswith('f '):
             feature_idea = user_input[len('f '):].strip()
             if not feature_idea:
-                 canvas.warning("Please provide a description for the feature.")
-                 return None, None # Invalid command
+                canvas.warning("Please provide a description for the feature.")
+                return None, None
             return 'modify', f'f {feature_idea}'
-        elif user_input: # Unrecognized command when project is active
-             canvas.warning(f"Unrecognized command '{user_input}'. Use 'f', 'r', 'p', or 'q'.")
-             return None, None
-        else: # Empty input when project active
-             return None, None
-    elif user_input: # No project active, assume new idea
+        elif command_lower == 'k':  
+            return 'knowledge', None
+        elif user_input:
+            canvas.warning(f"Unrecognized command '{user_input}'. Use 'f', 'r', 'k', 'p', or 'q'.")
+            return None, None
+        else:
+            return None, None
+    elif user_input:
         return 'new_idea', user_input
-    else: # Empty input when no project active
+    else:
         return None, None
 
 
@@ -189,3 +190,263 @@ def handle_new_project_idea(raw_idea: str, budget_manager: BudgetManagerAgent, b
     canvas.info(f"Preparing new project generation in: {project_path}")
     return processed_goal, project_path
 
+def handle_view_documentation(project_path: Path):
+    """View documentation files loaded in the knowledge base."""
+    try:
+        from db_utils import get_db_connection, TABLE_KNOWLEDGE_BASE
+        
+        db = get_db_connection()
+        if not db:
+            canvas.error("Failed to connect to database")
+            return
+        
+        # Get all documents for this project's knowledge space
+        knowledge_space = f"project_{project_path.name}"
+        
+        try:
+            table = db.open_table(TABLE_KNOWLEDGE_BASE)
+            df = table.to_pandas()
+            
+            # Filter by knowledge space
+            project_docs = df[df['knowledge_space'] == knowledge_space] if 'knowledge_space' in df.columns else df
+            
+            if project_docs.empty:
+                canvas.warning("No documentation loaded for this project yet.")
+                canvas.info("Use option 1 to add documentation files.")
+                return
+            
+            # Group by source file
+            unique_sources = project_docs['source'].unique()
+            
+            canvas.info(f"\nLoaded Documentation ({len(unique_sources)} files):")
+            canvas.info("-" * 50)
+            
+            for idx, source in enumerate(unique_sources, 1):
+                source_docs = project_docs[project_docs['source'] == source]
+                
+                # Extract metadata
+                doc_type = source_docs.iloc[0]['document_type'] if 'document_type' in source_docs.columns else 'unknown'
+                framework = source_docs.iloc[0]['framework'] if 'framework' in source_docs.columns else 'N/A'
+                version = source_docs.iloc[0]['version'] if 'version' in source_docs.columns else 'N/A'
+                chunks = len(source_docs)
+                
+                canvas.info(f"{idx}. {Path(source).name}")
+                canvas.info(f"   Type: {doc_type}")
+                canvas.info(f"   Framework: {framework}")
+                canvas.info(f"   Version: {version}")
+                canvas.info(f"   Chunks: {chunks}")
+                canvas.info("")
+            
+            canvas.info("-" * 50)
+            canvas.info(f"Total chunks in knowledge base: {len(project_docs)}")
+            
+        except Exception as e:
+            canvas.error(f"Error retrieving documentation list: {e}")
+            
+    except ImportError:
+        canvas.error("Database utilities not available. Please check your installation.")
+
+def handle_search_knowledge(project_path: Path):
+    """Search the knowledge base for specific information."""
+    try:
+        from db_utils import get_db_connection, query_context_filtered, TABLE_KNOWLEDGE_BASE
+        from agents.modification_team.context_utils import generate_embedding
+        
+        db = get_db_connection()
+        if not db:
+            canvas.error("Failed to connect to database")
+            return
+        
+        # Get search query from user
+        query = canvas.get_user_input("Enter search query (or 'back' to return): ").strip()
+        
+        if query.lower() == 'back':
+            return
+        
+        if not query:
+            canvas.warning("Please enter a search query.")
+            return
+        
+        canvas.info(f"\nSearching for: '{query}'...")
+        
+        try:
+            # Generate embedding for the query
+            query_vector = generate_embedding(query)
+            
+            if query_vector is None:
+                canvas.error("Failed to generate search embedding. Please check your embedding model.")
+                return
+            
+            # Search with filters for this project
+            knowledge_space = f"project_{project_path.name}"
+            
+            results = query_context_filtered(
+                db=db,
+                table_name=TABLE_KNOWLEDGE_BASE,
+                query_vector=query_vector,
+                filters={'knowledge_space': knowledge_space},
+                limit=5
+            )
+            
+            if results is None or results.empty:
+                canvas.warning("No relevant results found.")
+                return
+            
+            # Display results
+            canvas.info(f"\nFound {len(results)} relevant results:")
+            canvas.info("-" * 50)
+            
+            for idx, row in results.iterrows():
+                canvas.info(f"\n{idx + 1}. Source: {Path(row['source']).name}")
+                if 'document_type' in row:
+                    canvas.info(f"   Type: {row['document_type']}")
+                if 'framework' in row and row['framework']:
+                    canvas.info(f"   Framework: {row['framework']}")
+                
+                # Show content preview
+                content = row['content']
+                preview_length = 200
+                content_preview = content[:preview_length] + "..." if len(content) > preview_length else content
+                
+                canvas.info(f"\n   Content Preview:")
+                canvas.info(f"   {content_preview}")
+                canvas.info("-" * 50)
+            
+            # Ask if user wants to see full content
+            if len(results) > 0:
+                view_full = canvas.get_user_input("\nView full content of a result? Enter number (1-{}) or 'n': ".format(len(results))).strip()
+                
+                if view_full.isdigit() and 1 <= int(view_full) <= len(results):
+                    selected_idx = int(view_full) - 1
+                    selected_row = results.iloc[selected_idx]
+                    
+                    canvas.info("\nFull Content:")
+                    canvas.info("-" * 50)
+                    canvas.info(selected_row['content'])
+                    canvas.info("-" * 50)
+                    
+                    canvas.get_user_input("\nPress Enter to continue...")
+                    
+        except Exception as e:
+            canvas.error(f"Error searching knowledge base: {e}")
+            import traceback
+            canvas.error(traceback.format_exc())
+            
+    except ImportError as e:
+        canvas.error(f"Required modules not available: {e}")
+        canvas.error("Please ensure all dependencies are installed.")
+        
+def handle_knowledge_management(project_path: Path):
+    """Handle knowledge base management for current project."""
+    
+    # Check if required modules are available
+    try:
+        from agents.knowledge.knowledge_ingestor import KnowledgeIngestorAgent
+        from db_utils import get_db_connection
+    except ImportError as e:
+        canvas.error("Knowledge base features not fully implemented yet.")
+        canvas.error(f"Missing module: {e}")
+        canvas.info("\nThe knowledge base system is still under development.")
+        canvas.info("Required components:")
+        canvas.info("- KnowledgeIngestorAgent")
+        canvas.info("- Enhanced database utilities")
+        canvas.info("- Document parsers")
+        return
+    
+    while True:
+        canvas.info("\nKnowledge Base Management")
+        canvas.info("1. Add documentation file")
+        canvas.info("2. View loaded documentation")
+        canvas.info("3. Search knowledge base")
+        canvas.info("4. Return to main menu")
+        
+        choice = canvas.get_user_input("Select option (1-4): ").strip()
+        
+        if choice == '1':
+            handle_add_documentation(project_path)
+        elif choice == '2':
+            handle_view_documentation(project_path)
+        elif choice == '3':
+            handle_search_knowledge(project_path)
+        elif choice == '4':
+            break
+        else:
+            canvas.warning("Invalid option. Please select 1-4.")
+
+def handle_add_documentation(project_path: Path):
+    """Add a documentation file to the knowledge base."""
+    
+    # Get file path
+    file_path = canvas.get_user_input("Enter path to documentation file: ").strip()
+    
+    if not file_path:
+        canvas.warning("No file path provided.")
+        return
+        
+    doc_path = Path(file_path).expanduser()
+    
+    if not doc_path.exists():
+        canvas.error(f"File not found: {doc_path}")
+        return
+        
+    if not doc_path.is_file():
+        canvas.error(f"Path is not a file: {doc_path}")
+        return
+    
+    # Get document metadata
+    canvas.info("\nDocument types:")
+    canvas.info("1. API Documentation")
+    canvas.info("2. Tutorial/Guide")
+    canvas.info("3. Code Examples")
+    canvas.info("4. Best Practices")
+    canvas.info("5. Other")
+    
+    doc_type_map = {
+        '1': 'api_documentation',
+        '2': 'tutorial',
+        '3': 'code_examples',
+        '4': 'best_practices',
+        '5': 'other'
+    }
+    
+    doc_type_choice = canvas.get_user_input("Select document type (1-5): ").strip()
+    doc_type = doc_type_map.get(doc_type_choice, 'other')
+    
+    # Optional metadata
+    framework = canvas.get_user_input("Framework/Library (optional, e.g., React, Django): ").strip()
+    version = canvas.get_user_input("Version (optional, e.g., 3.0.0): ").strip()
+    
+    canvas.info(f"\nProcessing {doc_path.name}...")
+    
+    try:
+        # Initialize the knowledge ingestor
+        from agents.knowledge.knowledge_ingestor import KnowledgeIngestorAgent
+        from agents.budget_manager import BudgetManagerAgent
+        
+        # Use the project's knowledge space
+        knowledge_space = f"project_{project_path.name}"
+        
+        ingestor = KnowledgeIngestorAgent(
+            budget_manager=BudgetManagerAgent(session_budget=0.1),  # Small budget for ingestion
+            knowledge_space=knowledge_space
+        )
+        
+        # Execute ingestion
+        success, result = ingestor.execute(
+            document_path=doc_path,
+            document_type=doc_type,
+            metadata={
+                'framework': framework,
+                'version': version,
+                'project': project_path.name
+            }
+        )
+        
+        if success:
+            canvas.success(f"Successfully added {doc_path.name} to knowledge base!")
+            canvas.info(f"Created {result.get('chunks_created', 0)} knowledge chunks")
+        else:
+            canvas.error(f"Failed to add documentation: {result.get('error', 'Unknown error')}")
+            
+    except Exception as e:
+        canvas.error(f"Error adding documentation: {e}")
