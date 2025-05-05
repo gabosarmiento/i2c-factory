@@ -1,0 +1,37 @@
+[
+    {
+      "name": "Introduction",
+      "type": "narration",
+      "message": "Welcome to the I2C Factory demo. Today we'll build a 'Limitless'-style micro-skill mastery app that includes a live AI coach powered by AGNO and Groq.",
+      "pause": 3
+    },
+    {
+      "name": "Initial Project Setup",
+      "type": "initial_generation",
+      "prompt": "Create a frontend-only app using React, TypeScript, and Vite. It should help users explore and master micro-skills like 'reading people', 'public speaking', and 'language learning'. Include:\n\n1. A public/index.html with <div id='root'>\n2. src/main.tsx, App.tsx, style.css\n3. Components: Home, Navbar, ThemeSwitcher, MicroSkillExplorer\n4. Support dark/light mode\n5. Use localStorage for basic state\n6. Must be Vite-ready\n7. README.md with setup instructions"
+    },
+    {
+      "name": "Add AI Skill Coach (AGNO Integration)",
+      "type": "modification",
+      "prompt": "Add an AI-powered Skill Coach using AGNO. The backend agent should:\n- Use Groq (LLaMA-3) for reasoning\n- Accept prompts like 'How do I master storytelling?'\n- Return guidance and suggested exercises\n- Use ExaTools and DuckDuckGoTools for research\n- Save notes to local markdown files\n\nFrontend:\n- Add a `SkillCoach.tsx` with a text input and display panel\n- Connect to a simple Express backend proxy (Node.js)\n- Include `.env` support for Groq and Exa API keys\n- Assume .env file is one level above the demo folder",
+      "expected_changes": [
+        "src/components/Coach/SkillCoach.tsx",
+        "backend/agent/coach_agent.py",
+        "backend/server.js",
+        ".env.template",
+        "README.md"
+      ]
+    },
+    {
+      "name": "Add Run Script and Env Support",
+      "type": "modification",
+      "prompt": "Create a bash script `run.sh` that:\n- Copies ../.env to project root if it exists\n- Installs frontend deps and starts Vite\n- Installs backend deps (if backend folder exists) and starts Express server\n- Add comments for beginners\n- Ensure user can launch both servers in one command"
+    },
+    {
+      "name": "Conclusion",
+      "type": "narration",
+      "message": "We just built an app that mimics Limitless micro-skill mastery — complete with an AI skill coach that searches and adapts live. You can now test it by running: `bash run.sh`.",
+      "pause": 4
+    }
+  ]
+  
