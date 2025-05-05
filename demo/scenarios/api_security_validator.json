@@ -1,0 +1,74 @@
+[
+    {
+      "name": "Introduction",
+      "type": "narration",
+      "message": "Welcome to the I2C Factory backend demo! In this session, we'll build a Python-based API Security Auditor powered by AI. It automatically detects vulnerabilities in your endpoints using Groq and agno-agi agents.",
+      "pause": 3
+    },
+    {
+      "name": "Initial Project Setup",
+      "type": "initial_generation",
+      "prompt": "Create a FastAPI-based Python project named 'api-security-auditor' structured with separate folders for routes, services, agents, and models. Add a basic healthcheck endpoint at /health and prepare the project for easy extension. Use `uvicorn` as the server and include a .env loader.",
+      "expected_files": [
+        "main.py",
+        "requirements.txt",
+        "routes/__init__.py",
+        "routes/health.py",
+        "services/__init__.py",
+        "agents/__init__.py",
+        "models/__init__.py",
+        ".env",
+        "README.md"
+      ]
+    },
+    {
+      "name": "Add API Threat Scanner Agent",
+      "type": "modification",
+      "prompt": "Add an AI agent named `ThreatScannerAgent` using agno-agi and Groq. The agent receives a list of API route definitions and inspects each for security risks such as unvalidated input, missing authentication, and improper HTTP methods. Use an LLM-based evaluator with reasoning=True.",
+      "expected_changes": [
+        "agents/threat_scanner.py",
+        "models/threat_report.py",
+        "services/scan_service.py"
+      ]
+    },
+    {
+      "name": "Add Endpoint for Security Scan",
+      "type": "modification",
+      "prompt": "Add a POST endpoint `/scan` that accepts JSON with a list of endpoint definitions. Route it to the ThreatScannerAgent and return structured vulnerability results with recommendations.",
+      "expected_changes": [
+        "routes/scan.py",
+        "models/scan_input.py",
+        "main.py"
+      ]
+    },
+    {
+      "name": "Add AI Evaluation Memory",
+      "type": "modification",
+      "prompt": "Use agno-agi SQLiteAgentStorage to persist threat analysis sessions and reuse history across runs. Display recent scan summaries from the database at `/scan/history`.",
+      "expected_changes": [
+        "agents/threat_scanner.py",
+        "routes/history.py",
+        "services/history_service.py"
+      ]
+    },
+    {
+      "name": "Add Localhost Run Script",
+      "type": "modification",
+      "prompt": "Create a Bash script `run.sh` that loads the .env from the parent directory, installs dependencies in a virtualenv, and launches the FastAPI server on localhost:8000. Add instructions as comments.",
+      "expected_changes": [
+        "run.sh"
+      ]
+    },
+    {
+      "name": "Add Quick Start to README",
+      "type": "modification",
+      "prompt": "Update README.md with a 'Quick Start' section to clone the repo, install dependencies, run the server, and test the /scan endpoint with an example payload."
+    },
+    {
+      "name": "Conclusion",
+      "type": "narration",
+      "message": "We just built a full backend project that leverages Groq and agno-agi to identify API threats automatically. This shows the power of AI for real-time security auditing in modern applications.",
+      "pause": 5
+    }
+  ]
+  

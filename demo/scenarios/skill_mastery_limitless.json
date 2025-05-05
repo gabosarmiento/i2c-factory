@@ -1,0 +1,115 @@
+[
+    {
+      "name": "Introduction",
+      "type": "narration",
+      "message": "Welcome to the I2C Factory demo! Today, we'll create an app inspired by 'Limitless' the movie where users can rapidly master micro-skills like reading people, speaking languages, storytelling, confidence, and more, powered by AI.",
+      "pause": 3
+    },
+    {
+      "name": "Initial Project Setup",
+      "type": "initial_generation",
+      "prompt": "Create a frontend-only app using React, TypeScript, and Vite, designed for rapid micro-skill mastery. Include user authentication with localStorage, a homepage, a navigation bar, and light/dark mode support. Structure it for maintainability and ensure it runs with Vite.",
+      "expected_files": [
+        "public/index.html",
+        "src/main.tsx",
+        "src/App.tsx",
+        "src/style.css",
+        "src/components/Home.tsx",
+        "src/components/Auth/Login.tsx",
+        "src/components/Auth/Register.tsx",
+        "src/components/Navigation/Navbar.tsx",
+        "src/components/ThemeSwitcher.tsx",
+        "README.md"
+      ]
+    },
+    {
+      "name": "Add Micro-Skill Explorer",
+      "type": "modification",
+      "prompt": "Implement a micro-skill explorer feature where users can browse and search skills like 'reading people,' 'language mastery,' 'storytelling,' and more. Each skill has a detail page with a description, rapid-learning resources, and a 'start mastering' button. Store data in localStorage.",
+      "expected_changes": [
+        "src/components/Skills/SkillExplorer.tsx",
+        "src/components/Skills/MicroSkillDetail.tsx",
+        "src/types/microSkill.ts",
+        "src/services/skillService.ts"
+      ]
+    },
+    {
+      "name": "Add Rapid Skill Exercises",
+      "type": "modification",
+      "prompt": "Add bite-sized, interactive exercises to micro-skill detail pages (e.g., role-playing for 'reading people,' pronunciation drills for languages). Design them for quick mastery and store exercise data in localStorage.",
+      "expected_changes": [
+        "src/components/Exercises/SkillExercise.tsx",
+        "src/components/Exercises/ExerciseFeedback.tsx",
+        "src/types/exercise.ts",
+        "src/services/exerciseService.ts"
+      ]
+    },
+    {
+      "name": "Add Skill Mastery System",
+      "type": "modification",
+      "prompt": "Implement a mastery system to track user proficiency in micro-skills. Use AI-like logic to evaluate progress (e.g., quiz scores, exercise results) and store mastery data in localStorage.",
+      "expected_changes": [
+        "src/components/Mastery/MasteryDashboard.tsx",
+        "src/types/mastery.ts",
+        "src/services/masteryService.ts"
+      ]
+    },
+    {
+      "name": "Add Mastery Visualization",
+      "type": "modification",
+      "prompt": "Add a skill tree or radar chart to the MasteryDashboard to visualize user proficiency across micro-skills. Use Chart.js or Recharts for a futuristic look.",
+      "expected_changes": [
+        "src/components/Mastery/SkillTree.tsx"
+      ]
+    },
+    {
+      "name": "Add AI Skill Recommendations",
+      "type": "modification",
+      "prompt": "Implement an AI-powered feature that suggests the next micro-skill to master based on user progress and interests (e.g., 'confidence' after 'storytelling'). Display suggestions on the dashboard.",
+      "expected_changes": [
+        "src/components/Dashboard/AISuggestions.tsx",
+        "src/services/aiSuggestionService.ts"
+      ]
+    },
+    {
+      "name": "Add Gamification Elements",
+      "type": "modification",
+      "prompt": "Add gamification features like points for completing exercises, badges for skill mastery (e.g., 'People Reader Pro'), and a leveling system to keep users motivated.",
+      "expected_changes": [
+        "src/components/Gamification/GamificationPanel.tsx",
+        "src/components/Gamification/Badge.tsx",
+        "src/components/Gamification/Level.tsx",
+        "src/types/gamification.ts",
+        "src/services/gamificationService.ts"
+      ]
+    },
+    {
+      "name": "Optimize for Speed",
+      "type": "modification",
+      "prompt": "Implement caching for micro-skill data and mastery progress using localStorage or an in-memory cache to ensure lightning-fast load times, mimicking instant knowledge loading.",
+      "expected_changes": [
+        "src/services/cacheService.ts",
+        "src/hooks/useCachedSkills.ts"
+      ]
+    },
+    {
+      "name": "Enhance Developer Experience",
+      "type": "modification",
+      "prompt": "Update dependencies to their latest stable versions. Enhance README.md with instructions, a feature summary (e.g., rapid skill mastery, AI suggestions), and the tech stack.",
+      "expected_changes": [
+        "package.json",
+        "README.md"
+      ]
+    },
+    {
+      "name": "Add Quick Start Guide",
+      "type": "modification",
+      "prompt": "Update README.md with a 'Quick Start' section: install dependencies, run the dev server, and access the app. Keep it simple and beginner-friendly. Also create a `run.sh` Bash script in the root to install dependencies and start the Vite server, with comments for clarity."
+    },
+    {
+      "name": "Conclusion",
+      "type": "narration",
+      "message": "We've built an AI-powered app that lets you master micro-skills in record time, like a real-life 'Limitless' experience. The future of learning is here!",
+      "pause": 5
+    }
+]

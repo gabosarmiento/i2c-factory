@@ -1,0 +1,72 @@
+[
+    {
+      "name": "Introduction",
+      "type": "narration",
+      "message": "Welcome to the I2C Factory demo! Today we’ll build 'CodeGenius for Education', an AI-powered tutor that helps students turn learning goals into working code — in seconds.",
+      "pause": 3
+    },
+    {
+      "name": "Initial Project Setup",
+      "type": "initial_generation",
+      "prompt": "Create a Vite-based frontend app with React and TypeScript called 'CodeGenius'. Include a landing page, a simple code editor (like Monaco), a sidebar with skill categories (e.g., Python, JS, HTML), and a main panel to interact with an AI tutor. Include Tailwind CSS and dark mode toggle.",
+      "expected_files": [
+        "public/index.html",
+        "src/main.tsx",
+        "src/App.tsx",
+        "src/style.css",
+        "src/components/Layout/Sidebar.tsx",
+        "src/components/Layout/Navbar.tsx",
+        "src/components/Tutor/AIChatPanel.tsx",
+        "src/components/Tutor/CodeEditor.tsx",
+        "src/context/ThemeContext.tsx",
+        "src/hooks/useDarkMode.ts",
+        "README.md"
+      ]
+    },
+    {
+      "name": "Integrate AI Tutor Agent",
+      "type": "modification",
+      "prompt": "Add backend logic for the AI Tutor using a local Groq+AGNO agent. Create an Express server endpoint `/api/ask` that receives user prompts and streams answers from an AGNO-configured agent with DuckDuckGoTools, ExaTools, and FileTools. Include agent setup in `ai/tutor_agent.py` and wire it with the frontend via fetch.",
+      "expected_changes": [
+        "server/index.ts",
+        "ai/tutor_agent.py",
+        "src/services/aiService.ts",
+        "src/components/Tutor/AIChatPanel.tsx"
+      ]
+    },
+    {
+      "name": "Add Code Execution Preview",
+      "type": "modification",
+      "prompt": "Add a 'Run Code' button below the code editor. When clicked, it sends the current code to a backend `/api/execute` endpoint, executes it in a Dockerized Python/JS sandbox, and displays the output in a result panel.",
+      "expected_changes": [
+        "server/runner.ts",
+        "src/components/Tutor/CodeOutput.tsx",
+        "src/components/Tutor/CodeEditor.tsx",
+        "src/services/codeRunnerService.ts"
+      ]
+    },
+    {
+      "name": "Add AI Prompt Enhancer",
+      "type": "modification",
+      "prompt": "Add a helper in the AI chat panel that suggests smart prompts like 'Explain this function', 'Can you optimize this?', or 'Add comments to this code'. Suggestions should update based on user code using local heuristics.",
+      "expected_changes": [
+        "src/components/Tutor/PromptHelper.tsx",
+        "src/hooks/usePromptSuggestions.ts"
+      ]
+    },
+    {
+      "name": "Add Run Script",
+      "type": "modification",
+      "prompt": "Create a `run.sh` script that copies the `.env` from the project root if missing, installs both frontend and backend dependencies, and launches the dev server on http://localhost:3000 with proxy for /api to backend.",
+      "expected_changes": [
+        "run.sh"
+      ]
+    },
+    {
+      "name": "Conclusion",
+      "type": "narration",
+      "message": "You’ve just seen how I2C Factory can create an AI tutoring platform in minutes. This is the power of human-AI collaboration at your fingertips.",
+      "pause": 4
+    }
+  ]
+  

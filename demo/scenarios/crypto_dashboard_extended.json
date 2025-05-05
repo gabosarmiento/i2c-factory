@@ -1,0 +1,116 @@
+[
+    {
+      "name": "Introduction",
+      "type": "narration",
+      "message": "Welcome to the I2C Factory demo! Today we’ll explore how prompt quality impacts code generation. Watch as we build a crypto dashboard from natural language.",
+      "pause": 3
+    },
+    {
+      "name": "Initial Project Generation - V1 (Natural Prompt)",
+      "type": "initial_generation",
+      "prompt": "Create a real-time cryptocurrency dashboard with user authentication, dark/light mode, and the ability to save favorite coins. Use React and TypeScript, and integrate with the CoinGecko API."
+    },
+    {
+      "name": "Spot the Issues in V1",
+      "type": "narration",
+      "message": "The system created some useful code — but wait! There’s Angular code, some Express server files, and we’re even missing index.html. This happens when prompts aren’t clear about structure or scope.",
+      "pause": 4
+    },
+    {
+      "name": "Initial Project Generation - V2 (Refined Prompt)",
+      "type": "initial_generation",
+      "prompt": "Create a full frontend-only cryptocurrency dashboard using React and TypeScript. Use Vite as the build tool. Include a public/index.html with a <div id='root'>. Use main.tsx to mount the app. Add style.css for layout and themes. Avoid using Angular, Express, or any backend frameworks. Make sure the app is runnable and all files are in the correct folders. Also include a basic login form that saves the username to localStorage and treats the logged-in user as the active session. All data like favorites and portfolio should be scoped per user — stored and retrieved using localStorage keys like 'username:portfolio'.",
+      "expected_files": [
+        "public/index.html",
+        "src/main.tsx",
+        "src/App.tsx",
+        "src/style.css",
+        "src/components/Dashboard.tsx",
+        "src/components/Auth/Login.tsx",
+        "src/components/ThemeSwitcher.tsx",
+        "src/services/coingecko.ts",
+        "src/contexts/ThemeContext.tsx",
+        "package.json"
+      ]
+    },
+    {
+      "name": "Show Generated Files - V2",
+      "type": "narration",
+      "message": "Now the system has generated a clean, runnable React app. All expected files are in place. Let’s continue building features.",
+      "pause": 3
+    },
+    {
+      "name": "Add Portfolio Tracking",
+      "type": "modification",
+      "prompt": "Add portfolio tracking where users can input their crypto holdings and see total value",
+      "expected_changes": [
+        "src/components/Portfolio/PortfolioManager.tsx",
+        "src/types/portfolio.ts",
+        "src/services/portfolioCalculator.ts"
+      ]
+    },
+    {
+      "name": "Fix Performance Issues",
+      "type": "modification",
+      "prompt": "The real-time updates are causing too many API calls. Implement WebSocket updates with fallback to polling",
+      "expected_changes": [
+        "src/services/websocket.ts",
+        "src/hooks/useRealTimeData.ts"
+      ]
+    },
+    {
+      "name": "Add Caching",
+      "type": "modification",
+      "prompt": "Add a caching layer to reduce API calls and improve performance",
+      "expected_changes": [
+        "src/services/cache.ts",
+        "src/middleware/cacheMiddleware.ts"
+      ]
+    },
+    {
+      "name": "Update Dependencies",
+      "type": "modification",
+      "prompt": "Update all dependencies to latest versions and fix any breaking changes",
+      "expected_changes": [
+        "package.json",
+        "src/components/Dashboard.tsx"
+      ]
+    },
+    {
+      "name": "Upgrade UI Layout",
+      "type": "modification",
+      "prompt": "Redesign the application layout to look like a modern crypto dashboard. Use cards, grid/flexbox, proper spacing, a header bar, and subtle shadows. Make sure it works in dark mode and looks good on desktop and mobile."
+    },
+    {
+      "name": "Add Portfolio Chart",
+      "type": "modification",
+      "prompt": "Visualize the user's crypto portfolio with a pie chart using Chart.js or Recharts. Show percentage of holdings per coin. Display this inside the Portfolio component."
+    },
+    {
+      "name": "Polish Login and Theme Toggle UX",
+      "type": "modification",
+      "prompt": "Improve the login form styling and add a smooth animation for theme toggle. Use Tailwind or basic CSS transitions. Add placeholder logic for auth handling."
+    },
+    {
+      "name": "Add AI Insights Panel",
+      "type": "modification",
+      "prompt": "Add a side panel that uses an AI agent to summarize the latest crypto trends. For now, mock the insights with placeholder text like 'Bitcoin is trending up due to ETF announcements'."
+    },
+    {
+      "name": "Generate Documentation",
+      "type": "modification",
+      "prompt": "Generate comprehensive API documentation, a user guide, and a beginner-friendly README.md. The README should include clear instructions on how to install dependencies, run the app locally with Vite, and explore the project. Mention Node.js version, npm commands, and folder structure.",
+      "expected_changes": [
+        "docs/API.md",
+        "docs/USER_GUIDE.md",
+        "README.md"
+      ]
+    },
+    {
+      "name": "Conclusion",
+      "type": "narration",
+      "message": "Demo complete! You saw how natural language drives full-stack creation — and how refining your prompt can turn a basic app into a polished, production-ready experience.",
+      "pause": 5
+    }
+  ]
+  
