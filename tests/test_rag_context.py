@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
-
+from i2c.bootstrap import initialize_environment
+initialize_environment()
 # Immediately patch out the real DB connection
 patcher = patch(
     'agents.modification_team.context_reader.context_indexer.get_db_connection',
@@ -13,9 +14,9 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-from workflow.modification.rag_retrieval import retrieve_context_for_step
-from workflow.modification.code_executor import execute_modification_steps
-from agents.modification_team.code_modifier import code_modifier_agent
+from i2c.workflow.modification.rag_retrieval import retrieve_context_for_step
+from i2c.workflow.modification.code_executor import execute_modification_steps
+from i2c.agents.modification_team.code_modifier import code_modifier_agent
 class TestStepSpecificRAGRetrieval(unittest.TestCase):
     """Test the step-specific RAG context retrieval implementation."""
     

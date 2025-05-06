@@ -2,8 +2,9 @@ import tempfile                     # ← add this
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 import unittest
-
-from workflow import orchestrator
+from i2c.bootstrap import initialize_environment
+initialize_environment()
+from i2c.workflow import orchestrator
 
 
 class OrchestratorReflectiveTests(unittest.TestCase):

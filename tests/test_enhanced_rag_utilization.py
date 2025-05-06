@@ -7,10 +7,12 @@ from pathlib import Path
 import pandas as pd
 import json
 
+from i2c.bootstrap import initialize_environment
+initialize_environment()
 # Import modules to test
-from agents.modification_team.modification_planner import modification_planner_agent
-from agents.modification_team.code_modifier import code_modifier_agent
-from workflow.modification.plan_generator import generate_modification_plan
+from i2c.agents.modification_team.modification_planner import modification_planner_agent
+from i2c.agents.modification_team.code_modifier import code_modifier_agent
+from i2c.workflow.modification.plan_generator import generate_modification_plan
 
 class TestEnhancedRAGUtilization(unittest.TestCase):
     """Tests for the enhanced RAG utilization in planner and modifier agents."""
@@ -36,7 +38,7 @@ def add_numbers(a, b):
 
 --- Start Chunk: models/user.py (class: User) ---
 from database import db
-from utils.validators import validate_email
+from i2c.utils.validators import validate_email
 
 class User:
     def __init__(self, username, email):

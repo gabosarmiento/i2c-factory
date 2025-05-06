@@ -4,8 +4,8 @@
 import logging
 from pathlib import Path
 
-from agents.modification_team.context_reader.context_indexer import ContextIndexer
-from db_utils import VECTOR_DIMENSION, TABLE_CODE_CONTEXT
+from i2c.agents.modification_team.context_reader.context_indexer import ContextIndexer
+from i2c.db_utils import VECTOR_DIMENSION, TABLE_CODE_CONTEXT
 
 # Enable debug logging for the indexer
 logging.basicConfig(level=logging.DEBUG)

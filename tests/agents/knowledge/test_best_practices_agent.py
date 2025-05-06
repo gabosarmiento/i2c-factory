@@ -5,9 +5,10 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import json
-from agents.knowledge.best_practices_agent import BestPracticesAgent
-from agents.budget_manager import BudgetManagerAgent
-
+from i2c.agents.knowledge.best_practices_agent import BestPracticesAgent
+from i2c.agents.budget_manager import BudgetManagerAgent
+from i2c.bootstrap import initialize_environment
+initialize_environment()
 @pytest.fixture
 def budget_manager():
     return Mock(spec=BudgetManagerAgent, consumed_tokens_session=0, consumed_cost_session=0)

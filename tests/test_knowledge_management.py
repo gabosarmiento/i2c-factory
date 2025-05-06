@@ -20,7 +20,8 @@ from pathlib import Path
 import unittest
 from datetime import datetime
 import json
-
+from i2c.bootstrap import initialize_environment
+initialize_environment()
 # Add the project root to the Python path if needed
 script_dir = Path(__file__).resolve().parent
 project_root = script_dir.parent  # Adjust this if needed
@@ -33,13 +34,13 @@ try:
     from agno.document.reader.text_reader import TextReader
     
     # Then import our custom components
-    from lean_knowledge_ingest import add_document_to_knowledge_base, MyEmbedder
-    from db_utils import get_db_connection, query_context, query_context_filtered
+    from i2c.lean_knowledge_ingest import add_document_to_knowledge_base, MyEmbedder
+    from i2c.db_utils import get_db_connection, query_context, query_context_filtered
     from sentence_transformers import SentenceTransformer
     
     # Create a fallback canvas if needed
     try:
-        from cli.controller import canvas
+        from i2c.cli.controller import canvas
     except ImportError:
         class FallbackCanvas:
             def warning(self, msg): print(f"[WARN_TEST] {msg}")
@@ -204,7 +205,7 @@ It contains keywords like 'document', 'knowledge', and 'management'.
             chunks.append(chunk)
         
         # Add to database directly
-        from db_utils import add_knowledge_chunks
+        from i2c.db_utils import add_knowledge_chunks
         
         result = add_knowledge_chunks(self.db, chunks, self.knowledge_space)
         
@@ -223,7 +224,7 @@ It contains keywords like 'document', 'knowledge', and 'management'.
         self.assertTrue(txt_file.exists(), "Test text file not found")
         self.assertTrue(json_file.exists(), "Test JSON file not found")
         
-        from db_utils import add_knowledge_chunks
+        from i2c.db_utils import add_knowledge_chunks
         
         # Process text file
         txt_docs = process_document(txt_file)
@@ -326,7 +327,7 @@ It contains keywords like 'document', 'knowledge', and 'management'.
             chunks.append(chunk)
         
         # Add to database directly
-        from db_utils import add_knowledge_chunks
+        from i2c.db_utils import add_knowledge_chunks
         
         result = add_knowledge_chunks(self.db, chunks, self.knowledge_space)
         

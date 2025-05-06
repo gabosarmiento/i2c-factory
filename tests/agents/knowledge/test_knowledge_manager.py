@@ -5,9 +5,10 @@ from unittest.mock import Mock, patch
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from db_utils import SCHEMA_KNOWLEDGE_BASE
-from agents.knowledge.knowledge_manager import ExternalKnowledgeManager
-
+from i2c.db_utils import SCHEMA_KNOWLEDGE_BASE
+from i2c.agents.knowledge.knowledge_manager import ExternalKnowledgeManager
+from i2c.bootstrap import initialize_environment
+initialize_environment()
 @pytest.fixture
 def embed_model():
     model = Mock()
