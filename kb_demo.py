@@ -9,32 +9,22 @@ This script demonstrates the end-to-end flow of:
 4. Displaying the retrieved content in a format suitable for LLM consumption
 """
 
-import os
 import sys
 import json
 import argparse
 from pathlib import Path
 import traceback
 
-# Add project root to path to ensure imports work properly
-project_root = Path(__file__).parent.resolve()
-sys.path.insert(0, str(project_root))
-
+from i2c.bootstrap import initialize_environment
+initialize_environment()
 # Initialize LLM models early
-from llm_providers import initialize_groq_providers
+
 import builtins
 
-# Inject LLMs into builtins
-(
-    builtins.llm_highest,
-    builtins.llm_middle,
-    builtins.llm_small,
-    builtins.llm_xs
-) = initialize_groq_providers()
 
 # Import database utilities
 try:
-    from db_utils import (
+    from i2c.db_utils import (
         initialize_db,
         get_db_connection,
         query_context_filtered,
@@ -49,14 +39,14 @@ except ImportError as e:
 # Import embedding utilities
 try:
     from agno.embedder.sentence_transformer import SentenceTransformerEmbedder
-    from agents.modification_team.context_utils import generate_embedding
+    from i2c.agents.modification_team.context_utils import generate_embedding
 except ImportError as e:
     print(f"Error importing embedding utilities: {e}")
     sys.exit(1)
 
 # Import knowledge base components if available
 try:
-    from agents.knowledge.base import PDFDocumentationKnowledgeBase, EnhancedLanceDb
+    from i2c.agents.knowledge.base import PDFDocumentationKnowledgeBase, EnhancedLanceDb
     KB_BASE_AVAILABLE = True
 except ImportError:
     print("agents.knowledge.base not available - using simplified knowledge ingestion")
@@ -155,7 +145,7 @@ def process_file(file_path, document_type, knowledge_space, embed_model, metadat
 
 def ingest_pdf_file(file_path, document_type, knowledge_space, embed_model, metadata=None):
     """Ingest a PDF file into the knowledge base"""
-    from db_utils import get_db_connection, add_or_update_chunks
+    from i2c.db_utils import get_db_connection, add_or_update_chunks
     import hashlib
     from datetime import datetime
     
@@ -254,7 +244,7 @@ def ingest_pdf_file(file_path, document_type, knowledge_space, embed_model, meta
 
 def ingest_text_file(file_path, document_type, knowledge_space, embed_model, metadata=None):
     """Ingest a text file into the knowledge base"""
-    from db_utils import get_db_connection, add_or_update_chunks
+    from i2c.db_utils import get_db_connection, add_or_update_chunks
     import hashlib
     from datetime import datetime
     

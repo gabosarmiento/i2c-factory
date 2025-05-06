@@ -3,7 +3,7 @@ import unittest
 import tempfile
 from pathlib import Path
 import numpy as np
-from db_utils import (
+from i2c.db_utils import (
     initialize_db, 
     migrate_knowledge_base,
     add_knowledge_chunks,
@@ -11,14 +11,15 @@ from db_utils import (
     SCHEMA_KNOWLEDGE_BASE_V2, 
     DB_PATH
 )
-
+from i2c.bootstrap import initialize_environment
+initialize_environment()
 class TestKnowledgeBaseIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test database"""
         self.test_db_path = tempfile.mkdtemp()
         self.old_db_path = DB_PATH
         # Override DB_PATH for testing
-        import db_utils
+        import i2c.db_utils
         db_utils.DB_PATH = self.test_db_path
         
         self.db = initialize_db()
@@ -28,7 +29,7 @@ class TestKnowledgeBaseIntegration(unittest.TestCase):
         import shutil
         shutil.rmtree(self.test_db_path)
         # Restore original DB_PATH
-        import db_utils
+        import i2c.db_utils
         db_utils.DB_PATH = self.old_db_path
     
     def test_schema_migration(self):

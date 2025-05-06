@@ -12,17 +12,18 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-from agents.budget_manager import BudgetManagerAgent
-from agents.reflective.context_aware_operator import (
+from i2c.bootstrap import initialize_environment
+initialize_environment()
+from i2c.agents.budget_manager import BudgetManagerAgent
+from i2c.agents.reflective.context_aware_operator import (
     BudgetScope,
     ContextAwareOperator,
     PhaseCostTracker,
     ValidationHook,
     create_syntax_validation_hook,
 )
-from agents.reflective.issue_resolution_operator import IssueResolutionOperator
-from agents.reflective.plan_refinement_operator import PlanRefinementOperator
+from i2c.agents.reflective.issue_resolution_operator import IssueResolutionOperator
+from i2c.agents.reflective.plan_refinement_operator import PlanRefinementOperator
 
 ################################################################################
 # Shared base

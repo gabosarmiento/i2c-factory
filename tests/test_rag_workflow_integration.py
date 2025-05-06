@@ -9,11 +9,12 @@ import json
 import tempfile
 import shutil
 import os
-
+from i2c.bootstrap import initialize_environment
+initialize_environment()
 # Import workflow components
-from workflow.modification.rag_retrieval import retrieve_context_for_planner, retrieve_context_for_step
-from workflow.modification.plan_generator import generate_modification_plan
-from workflow.modification.code_executor import execute_modification_steps
+from i2c.workflow.modification.rag_retrieval import retrieve_context_for_planner, retrieve_context_for_step
+from i2c.workflow.modification.plan_generator import generate_modification_plan
+from i2c.workflow.modification.code_executor import execute_modification_steps
 
 class TestRAGWorkflowIntegration(unittest.TestCase):
     """Integration tests for the full RAG-enhanced modification workflow."""
