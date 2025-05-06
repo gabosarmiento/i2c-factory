@@ -155,7 +155,7 @@ def add_or_update_chunks(
         raise ConnectionError(f"Table '{table_name}' inaccessible")
     # delete old
     try:
-        table.delete(f"{identifier_field} = '{identifier_value.replace("'","''")}'")
+        table.delete(f"""{identifier_field} = '{identifier_value.replace("'", "''")}'""")
     except Exception:
         pass
     # insert new
@@ -258,25 +258,42 @@ def migrate_knowledge_base(db: lancedb.db.LanceDBConnection) -> bool:
     return tbl is not None
 
 # --- Initialization ---
-
 def initialize_db() -> Optional[lancedb.db.LanceDBConnection]:
     """Initialize database, create or migrate tables."""
     db = get_db_connection()
     if not db:
         canvas.error("[DB Init] Connection failed")
         return None
-    # code context
-    if not get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT):
-        canvas.error("[DB Init] code_context table failed")
+
+    code_context_failed = False
+    # --- Optional code_context setup ---
+    try:
+        get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
+    except Exception as e:
+        code_context_failed = True
+        canvas.warning(
+            "[DB Init] code_context table setup issue; proceeding without context: %s",
+            e
+        )
+
+    # --- Critical knowledge_base migration ---
+    try:
+        ok = get_or_create_table_with_migration(
+            db,
+            TABLE_KNOWLEDGE_BASE,
+            SCHEMA_KNOWLEDGE_BASE,
+            SCHEMA_KNOWLEDGE_BASE_V2
+        )
+        if not ok:
+            canvas.error("[DB Init] knowledge_base migration failed")
+            return None
+    except Exception as e:
+        canvas.error(f"[DB Init] knowledge_base table setup issue: {e}")
         return None
-    # knowledge base
-    if not get_or_create_table_with_migration(
-        db,
-        TABLE_KNOWLEDGE_BASE,
-        SCHEMA_KNOWLEDGE_BASE,
-        SCHEMA_KNOWLEDGE_BASE_V2
-    ):
-        canvas.error("[DB Init] knowledge_base migration failed")
-        return None
-    canvas.success("[DB Init] Database ready with Code Context & Knowledge Base v2")
+
+    # Success message reflects whether code_context is available
+    suffix = " (code_context unavailable)" if code_context_failed else ""
+    canvas.success(f"[DB Init] Database ready with Knowledge Base v2{suffix}")
+
+    # You could attach an attribute here: db.context_available = not code_context_failed
     return db

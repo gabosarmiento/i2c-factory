@@ -1,0 +1,22 @@
+[
+  {
+    "key": "api_documentation",
+    "label": "API Documentation"
+  },
+  {
+    "key": "tutorial",
+    "label": "Tutorial / Guide"
+  },
+  {
+    "key": "code_examples",
+    "label": "Code Examples"
+  },
+  {
+    "key": "best_practices",
+    "label": "Best Practices"
+  },
+  {
+    "key": "other",
+    "label": "Other"
+  }
+]

@@ -150,7 +150,8 @@ class JSONDemoRunner:
         }
 
 if __name__ == "__main__":
-    runner = JSONDemoRunner("scenarios/crypto_dashboard_wow.json")
+    # runner = JSONDemoRunner("scenarios/crypto_dashboard_wow.json")
+    runner = JSONDemoRunner("scenarios/smart_contract_factory.json")
     runner.run()
     runner.metrics.save_metrics()
     canvas.success("🎉 Demo Complete")

@@ -73,9 +73,9 @@ class DocumentationKnowledgeBase(AgentKnowledge):
             model_id     = "knowledge_ingestor"           
             
             if not self.budget_manager.request_approval(
-                description,    # string
-                prompt_text,    # string (used to estimate tokens/cost)
-                model_id        # string identifier for your agent/model
+                description,
+                prompt_text,
+                model_id
             ):
                 return False
         
@@ -84,35 +84,67 @@ class DocumentationKnowledgeBase(AgentKnowledge):
             content = f.read()
             doc_hash = hashlib.sha256(content).hexdigest()
         
-        # Check if document already exists
-        if doc_hash in self._loaded_documents:
-            return True
-            
         # Process document based on type
-        documents = self._process_document(path, document_type, metadata)
+        documents = self._process_document(path, document_type, metadata or {})
         
-        # Add metadata to all documents
+        # Ensure we have valid documents
+        if not documents:
+            return False
+        
+        # Convert documents to data format expected by LanceDB
+        lance_data = []
         for doc in documents:
-            # Create new metadata dict to avoid modifying original
-            enhanced_metadata = {
+            if not hasattr(doc, 'content'):
+                continue
+                
+            # Generate embedding for content
+            vector = self.vector_db.embedder.get_embedding(doc.content)
+            
+            # Create record for LanceDB
+            # Create record matching the EXACT field names in SCHEMA_KNOWLEDGE_BASE_V2
+            record = {
+                "source": str(path),  # This must match the schema field name exactly
+                "content": doc.content,
+                "vector": vector,
+                "category": metadata.get('category', 'document'),
+                "last_updated": datetime.now().isoformat(),
                 "knowledge_space": self.knowledge_space,
                 "document_type": document_type,
+                "framework": metadata.get('framework', ''),
+                "version": metadata.get('version', ''),
+                "parent_doc_id": metadata.get('parent_doc_id', ''),
+                "chunk_type": metadata.get('chunk_type', 'content'),
                 "source_hash": doc_hash,
-                "ingested_at": datetime.now().isoformat(),
-                **(metadata or {})
+                # Convert any additional metadata to JSON string
+                "metadata_json": json.dumps(metadata or {})
             }
+                            
+            lance_data.append(record)
+        
+      
+        # Add records to LanceDB
+        try:
+            # Use db_utils directly to get a fresh DB connection
+            from db_utils import get_db_connection, add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2
             
-            # Update document metadata
-            if hasattr(doc, 'meta_data') and doc.meta_data:
-                doc.meta_data.update(enhanced_metadata)
-            else:
-                doc.meta_data = enhanced_metadata
-        
-        # Load documents using parent class method
-        self.load_documents(documents, upsert=True)
-        self._loaded_documents[doc_hash] = True
-        
-        return True
+            db = get_db_connection()
+            if not db:
+                print("Error: Failed to get database connection")
+                return False
+                
+            success = add_or_update_chunks(
+                db=db,  # Use the new connection
+                table_name=TABLE_KNOWLEDGE_BASE,
+                schema=SCHEMA_KNOWLEDGE_BASE_V2,
+                identifier_field="source",
+                identifier_value=str(path),
+                chunks=lance_data
+            )
+            
+            return success
+        except Exception as e:
+            print(f"Error adding documents to vector DB: {e}")
+            return False
     
     def _process_document(
         self,
@@ -131,29 +163,51 @@ class DocumentationKnowledgeBase(AgentKnowledge):
 
 class PDFDocumentationKnowledgeBase(DocumentationKnowledgeBase):
     """PDF Documentation knowledge base with enhanced features"""
-    
+
+    # Update in agents/knowledge/base.py - load_document method for PDFDocumentationKnowledgeBase
     def _process_document(
         self,
-        path: Path,
+        path: Path,  # chemin vers le fichier
         document_type: str,
         metadata: Dict[str, Any]
     ) -> List[Document]:
         """Process PDF document"""
         # Use PDFKnowledgeBase for processing
         from agno.knowledge.pdf import PDFKnowledgeBase, PDFReader
-        
+
         # Create temporary knowledge base for PDF processing
         temp_kb = PDFKnowledgeBase(
             path=str(path.parent),
             vector_db=self.vector_db,
             reader=PDFReader(chunk=True)
         )
-        
+
         # Let PDFKnowledgeBase process the file
         temp_kb.load(recreate=False)
-        
-        # Return the processed documents
-        return temp_kb.document_lists
+
+        # Get the documents and enhance them with our metadata
+        documents = temp_kb.document_lists
+
+        # Ensure we're working with Document objects, not just a list
+        enhanced_docs = []
+        for doc in documents:
+            # Check if this is already a Document object
+            if hasattr(doc, 'meta_data'):
+                # Update existing metadata
+                if doc.meta_data is None:
+                    doc.meta_data = {}
+                doc.meta_data.update(metadata or {})
+                enhanced_docs.append(doc)
+            else:
+                # Create a new Document with the content and metadata
+                from agno.document.base import Document
+                enhanced_docs.append(Document(
+                    content=str(doc),
+                    meta_data=metadata or {}
+                ))
+
+        return enhanced_docs
+
 
 class MarkdownDocumentationKnowledgeBase(DocumentationKnowledgeBase):
     """Markdown documentation knowledge base"""
