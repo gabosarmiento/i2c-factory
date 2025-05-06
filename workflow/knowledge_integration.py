@@ -90,18 +90,24 @@ def format_knowledge_results(results: List[Dict[str, Any]]) -> str:
     if not results:
         return "No relevant knowledge found."
     
-    formatted = ["Retrieved Knowledge:"]
+    formatted = ["# Retrieved Knowledge:"]
     for i, result in enumerate(results, 1):
-        formatted.append(f"\n--- Knowledge Item {i} ---")
-        formatted.append(f"Source: {result.get('source', 'Unknown')}")
-        if 'framework' in result:
+        formatted.append(f"\n## Knowledge Item {i}")
+        formatted.append(f"Source: {Path(result['source']).name}")
+        
+        # Add metadata if available
+        if result.get('framework'):
             formatted.append(f"Framework: {result['framework']}")
-        if 'version' in result:
+        if result.get('version'):
             formatted.append(f"Version: {result['version']}")
-        if 'document_type' in result:
+        if result.get('document_type'):
             formatted.append(f"Type: {result['document_type']}")
-        formatted.append(f"Content: {result.get('content', '')}")
-        formatted.append("-------------------")
+        if result.get('chunk_type'):
+            formatted.append(f"Chunk: {result['chunk_type']}")
+        
+        # Add content
+        formatted.append(f"\n{result['content']}\n")
+        formatted.append("-" * 40)
     
     return "\n".join(formatted)
 

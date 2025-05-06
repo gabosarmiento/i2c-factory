@@ -8,7 +8,8 @@ from db_utils import (
     migrate_knowledge_base,
     add_knowledge_chunks,
     query_context_filtered,
-    SCHEMA_KNOWLEDGE_BASE_V2
+    SCHEMA_KNOWLEDGE_BASE_V2, 
+    DB_PATH
 )
 
 class TestKnowledgeBaseIntegration(unittest.TestCase):

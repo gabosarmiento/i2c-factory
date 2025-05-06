@@ -8,7 +8,8 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python                = ">=3.12,<4.0"
+python                = "^3.11"
+torch                 = "2.2.2"
 lancedb               = "^0.22.0"
 pyarrow               = "^20.0.0"
 pandas                = "^2.2.3"
@@ -23,10 +24,11 @@ python-docx           = "^0.8.11"         # .docx parsing
 beautifulsoup4        = "^4.12.2"         # HTML parsing
 lxml                  = "^4.9.3"          # XML/HTML parser backend
 watchdog              = "^6.0.0"          # File watching
-torch                 = "2.2.2"
 pypdf                 = "^5.4.0"          # PDF reader
 tantivy               = "^0.22.2"
 protobuf              = "^6.30.2"
+mcp = "^1.7.1"
+setuptools = "^80.3.1"
 
 
 [[tool.poetry.packages]]
@@ -50,7 +52,11 @@ include = "workflow"
 [tool.poetry.group.dev.dependencies]
 pytest       = "^7.0.0"
 pytest-mock  = "^3.8.0"
+reportlab = "^4.4.0"
+
+[virtualenvs]
+prompt = ".venv"
 
 [build-system]
-requires    = ["poetry-core>=2.0.0,<3.0.0"]
+requires    = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

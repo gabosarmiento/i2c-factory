@@ -6,11 +6,11 @@ from pathlib import Path
 
 # Import necessary components (agents, utils, canvas, llms)
 from agents.core_agents import input_processor_agent
-# <<< Import the new context analyzer agent >>>
 from agents.core_agents import project_context_analyzer_agent
 from agents.modification_team.context_reader import context_reader_agent
 from agents.budget_manager import BudgetManagerAgent
 from cli.controller import canvas
+from cli.utils.documentation_type_selector import get_document_type
 from .utils import sanitize_filename, ensure_project_path
 from builtins import llm_middle
 
@@ -68,7 +68,6 @@ def handle_get_user_action(current_project_path: Path | None) -> tuple[str | Non
         return None, None
 
 
-# <<< MODIFIED to return structured_goal >>>
 def handle_load_project(path_str: str) -> tuple[Path | None, dict | None]:
     """Handles loading, indexing, and analyzing an existing project path."""
     potential_path = Path(path_str).expanduser()
@@ -88,7 +87,7 @@ def handle_load_project(path_str: str) -> tuple[Path | None, dict | None]:
     else:
         canvas.success(f"Indexing complete. Indexed: {index_status['files_indexed']}, Skipped: {index_status['files_skipped']}.")
 
-    # --- <<< Call the Project Context Analyzer Agent >>> ---
+    # Call the Project Context Analyzer Agent
     canvas.step("Analyzing project structure for objective and suggestions...")
     try:
         # Create a list of file names relative to the project path
@@ -136,10 +135,8 @@ def handle_load_project(path_str: str) -> tuple[Path | None, dict | None]:
                  canvas.warning("Could not fully analyze project structure from LLM response.")
                  canvas.error(f"Analyzer Raw Response: {analysis_json[:500]}")
 
-
     except Exception as e:
         canvas.warning(f"Could not analyze project or generate suggestions: {e}")
-    # --- <<< End Analyzer Call >>> ---
 
     # Return path and the inferred goal (which might be None if analysis failed)
     return project_path, structured_goal
@@ -147,7 +144,6 @@ def handle_load_project(path_str: str) -> tuple[Path | None, dict | None]:
 
 def handle_new_project_idea(raw_idea: str, budget_manager: BudgetManagerAgent, base_output_dir: Path) -> tuple[dict | None, Path | None]:
     """Handles clarifying, naming, and setting up a new project."""
-    # ... (Budget check logic remains the same) ...
     budget_description = "New Idea Clarification"
     prompt_for_estimation = raw_idea
     model_id_for_estimation = getattr(llm_middle, 'id', 'Unknown')
@@ -189,6 +185,38 @@ def handle_new_project_idea(raw_idea: str, budget_manager: BudgetManagerAgent, b
 
     canvas.info(f"Preparing new project generation in: {project_path}")
     return processed_goal, project_path
+
+#
+# Knowledge Management Functions
+#
+
+def handle_knowledge_management(project_path: Path):
+    """Main entry point for knowledge base management for the current project."""
+    while True:
+        canvas.info("\n📚 Knowledge Base Management")
+        canvas.info("1. Add documentation file")
+        canvas.info("2. Add documentation folder")
+        canvas.info("3. View loaded documentation")
+        canvas.info("4. Search knowledge base")
+        canvas.info("5. Refresh documentation")
+        canvas.info("6. Return to main menu")
+        
+        choice = canvas.get_user_input("Select option (1-6): ").strip()
+        
+        if choice == '1':
+            handle_add_documentation_file(project_path)
+        elif choice == '2':
+            handle_add_documentation_folder(project_path)
+        elif choice == '3':
+            handle_view_documentation(project_path)
+        elif choice == '4':
+            handle_search_knowledge(project_path)
+        elif choice == '5':
+            handle_refresh_documentation(project_path)
+        elif choice == '6':
+            break
+        else:
+            canvas.warning("Invalid option. Please select 1-6.")
 
 def handle_view_documentation(project_path: Path):
     """View documentation files loaded in the knowledge base."""
@@ -302,6 +330,8 @@ def handle_search_knowledge(project_path: Path):
                     canvas.info(f"   Type: {row['document_type']}")
                 if 'framework' in row and row['framework']:
                     canvas.info(f"   Framework: {row['framework']}")
+                if 'chunk_type' in row:
+                    canvas.info(f"   Chunk: {row['chunk_type']}")
                 
                 # Show content preview
                 content = row['content']
@@ -335,118 +365,381 @@ def handle_search_knowledge(project_path: Path):
     except ImportError as e:
         canvas.error(f"Required modules not available: {e}")
         canvas.error("Please ensure all dependencies are installed.")
-        
-def handle_knowledge_management(project_path: Path):
-    """Handle knowledge base management for current project."""
-    
-    # Check if required modules are available
-    try:
-        from agents.knowledge.knowledge_ingestor import KnowledgeIngestorAgent
-        from db_utils import get_db_connection
-    except ImportError as e:
-        canvas.error("Knowledge base features not fully implemented yet.")
-        canvas.error(f"Missing module: {e}")
-        canvas.info("\nThe knowledge base system is still under development.")
-        canvas.info("Required components:")
-        canvas.info("- KnowledgeIngestorAgent")
-        canvas.info("- Enhanced database utilities")
-        canvas.info("- Document parsers")
-        return
-    
-    while True:
-        canvas.info("\nKnowledge Base Management")
-        canvas.info("1. Add documentation file")
-        canvas.info("2. View loaded documentation")
-        canvas.info("3. Search knowledge base")
-        canvas.info("4. Return to main menu")
-        
-        choice = canvas.get_user_input("Select option (1-4): ").strip()
-        
-        if choice == '1':
-            handle_add_documentation(project_path)
-        elif choice == '2':
-            handle_view_documentation(project_path)
-        elif choice == '3':
-            handle_search_knowledge(project_path)
-        elif choice == '4':
-            break
-        else:
-            canvas.warning("Invalid option. Please select 1-4.")
 
-def handle_add_documentation(project_path: Path):
-    """Add a documentation file to the knowledge base."""
-    
+def handle_add_documentation_file(project_path: Path):
+    """Add a single documentation file to the knowledge base."""
     # Get file path
-    file_path = canvas.get_user_input("Enter path to documentation file: ").strip()
+    file_path_str = canvas.get_user_input("Enter path to documentation file: ").strip()
     
-    if not file_path:
+    if not file_path_str:
         canvas.warning("No file path provided.")
         return
         
-    doc_path = Path(file_path).expanduser()
+    file_path = Path(file_path_str).expanduser().resolve()
     
-    if not doc_path.exists():
-        canvas.error(f"File not found: {doc_path}")
+    if not file_path.exists():
+        canvas.error(f"File not found: {file_path}")
         return
         
-    if not doc_path.is_file():
-        canvas.error(f"Path is not a file: {doc_path}")
+    if not file_path.is_file():
+        canvas.error(f"Path is not a file: {file_path}")
         return
     
     # Get document metadata
-    canvas.info("\nDocument types:")
-    canvas.info("1. API Documentation")
-    canvas.info("2. Tutorial/Guide")
-    canvas.info("3. Code Examples")
-    canvas.info("4. Best Practices")
-    canvas.info("5. Other")
-    
-    doc_type_map = {
-        '1': 'api_documentation',
-        '2': 'tutorial',
-        '3': 'code_examples',
-        '4': 'best_practices',
-        '5': 'other'
-    }
-    
-    doc_type_choice = canvas.get_user_input("Select document type (1-5): ").strip()
-    doc_type = doc_type_map.get(doc_type_choice, 'other')
-    
-    # Optional metadata
+    document_type = get_document_type()
     framework = canvas.get_user_input("Framework/Library (optional, e.g., React, Django): ").strip()
     version = canvas.get_user_input("Version (optional, e.g., 3.0.0): ").strip()
     
-    canvas.info(f"\nProcessing {doc_path.name}...")
+    # Process the file
+    ingest_documentation(
+        project_path=project_path,
+        doc_path=file_path,
+        document_type=document_type,
+        framework=framework,
+        version=version
+    )
+
+def handle_add_documentation_folder(project_path: Path):
+    """Add a folder of documentation files to the knowledge base."""
+    # Get folder path
+    folder_path_str = canvas.get_user_input("Enter path to documentation folder: ").strip()
     
+    if not folder_path_str:
+        canvas.warning("No folder path provided.")
+        return
+        
+    folder_path = Path(folder_path_str).expanduser().resolve()
+    
+    if not folder_path.exists():
+        canvas.error(f"Folder not found: {folder_path}")
+        return
+        
+    if not folder_path.is_dir():
+        canvas.error(f"Path is not a directory: {folder_path}")
+        return
+    
+    # Ask if we should process recursively
+    recursive_input = canvas.get_user_input("Process subdirectories recursively? (y/n): ").strip().lower()
+    recursive = recursive_input.startswith('y')
+    
+    # Get document metadata
+    document_type = get_document_type()
+    framework = canvas.get_user_input("Framework/Library (optional, e.g., React, Django): ").strip()
+    version = canvas.get_user_input("Version (optional, e.g., 3.0.0): ").strip()
+    
+    # Process the folder
+    ingest_documentation(
+        project_path=project_path,
+        doc_path=folder_path,
+        document_type=document_type,
+        framework=framework,
+        version=version,
+        recursive=recursive
+    )
+
+def handle_refresh_documentation(project_path: Path):
+    """Refresh/update previously loaded documentation."""
+    # Option to refresh file, folder, or all
+    canvas.info("\n🔄 Refresh Documentation")
+    canvas.info("1. Refresh a specific file")
+    canvas.info("2. Refresh a specific folder")
+    canvas.info("3. Refresh all documentation")
+    canvas.info("4. Return to knowledge menu")
+    
+    choice = canvas.get_user_input("Select option (1-4): ").strip()
+    
+    if choice == '4':
+        return
+    
+    if choice == '1':
+        # Refresh specific file
+        file_path_str = canvas.get_user_input("Enter path to documentation file: ").strip()
+        if not file_path_str:
+            canvas.warning("No file path provided.")
+            return
+            
+        file_path = Path(file_path_str).expanduser().resolve()
+        
+        if not file_path.exists() or not file_path.is_file():
+            canvas.error(f"Invalid file path: {file_path}")
+            return
+            
+        doc_path = file_path
+        
+    elif choice == '2':
+        # Refresh specific folder
+        folder_path_str = canvas.get_user_input("Enter path to documentation folder: ").strip()
+        if not folder_path_str:
+            canvas.warning("No folder path provided.")
+            return
+            
+        folder_path = Path(folder_path_str).expanduser().resolve()
+        
+        if not folder_path.exists() or not folder_path.is_dir():
+            canvas.error(f"Invalid folder path: {folder_path}")
+            return
+            
+        doc_path = folder_path
+        
+    elif choice == '3':
+        # Refresh all documentation - just use project docs directory
+        docs_dir = project_path / "docs"
+        if not docs_dir.exists() or not docs_dir.is_dir():
+            canvas.warning("No docs directory found in project. Using project directory.")
+            doc_path = project_path
+        else:
+            doc_path = docs_dir
+    else:
+        canvas.warning("Invalid option.")
+        return
+    
+    # Get document metadata
+    document_type = get_document_type()
+    framework = canvas.get_user_input("Framework/Library (optional, e.g., React, Django): ").strip()
+    version = canvas.get_user_input("Version (optional, e.g., 3.0.0): ").strip()
+    
+    # Execute refresh
+    ingest_documentation(
+        project_path=project_path,
+        doc_path=doc_path,
+        document_type=document_type,
+        framework=framework,
+        version=version,
+        is_refresh=True
+    )
+
+# Implementation function for documentation processing
+def ingest_documentation(
+    project_path: Path, 
+    doc_path: Path, 
+    document_type: str, 
+    framework: str = "",
+    version: str = "",
+    recursive: bool = True,
+    is_refresh: bool = False
+):
+    """Core function to ingest documentation into the knowledge base."""
     try:
-        # Initialize the knowledge ingestor
-        from agents.knowledge.knowledge_ingestor import KnowledgeIngestorAgent
-        from agents.budget_manager import BudgetManagerAgent
+        # Import dependencies
+        from sentence_transformers import SentenceTransformer
+        import hashlib
+        from datetime import datetime
+        import json
+        from db_utils import get_db_connection, get_or_create_table_with_migration, add_or_update_chunks
+        from db_utils import TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2 
+        from db_utils import SCHEMA_KNOWLEDGE_BASE
+        
+        # Create a SentenceTransformerEmbedder class that wraps SentenceTransformer
+        class SentenceTransformerEmbedder:
+            def __init__(self):
+                self.model = SentenceTransformer('all-MiniLM-L6-v2')
+                
+            def get_embedding(self, text):
+                return self.model.encode(text).tolist()
         
         # Use the project's knowledge space
         knowledge_space = f"project_{project_path.name}"
         
-        ingestor = KnowledgeIngestorAgent(
-            budget_manager=BudgetManagerAgent(session_budget=0.1),  # Small budget for ingestion
-            knowledge_space=knowledge_space
-        )
+        # Initialize embedding model
+        try:
+            embed_model = SentenceTransformerEmbedder()
+        except Exception as e:
+            canvas.error(f"Failed to initialize embedding model: {e}")
+            return False
         
-        # Execute ingestion
-        success, result = ingestor.execute(
-            document_path=doc_path,
-            document_type=doc_type,
-            metadata={
-                'framework': framework,
-                'version': version,
-                'project': project_path.name
-            }
-        )
+        # Connect to database
+        db = get_db_connection()
+        if not db:
+            canvas.error("Failed to connect to database")
+            return False
         
-        if success:
-            canvas.success(f"Successfully added {doc_path.name} to knowledge base!")
-            canvas.info(f"Created {result.get('chunks_created', 0)} knowledge chunks")
-        else:
-            canvas.error(f"Failed to add documentation: {result.get('error', 'Unknown error')}")
+        # Ensure knowledge base table exists
+        table = get_or_create_table_with_migration(
+            db,
+            TABLE_KNOWLEDGE_BASE,
+            SCHEMA_KNOWLEDGE_BASE,
+            SCHEMA_KNOWLEDGE_BASE_V2
+        )
+        if not table:
+            canvas.error("Failed to create or access knowledge base table")
+            return False
+        
+        # Process directory or single file
+        if doc_path.is_dir():
+            # Process directory
+            pattern = "**/*" if recursive else "*"
+            files_processed = 0
+            files_succeeded = 0
             
+            for file_path in doc_path.glob(pattern):
+                if file_path.is_file() and not any(part.startswith('.') for part in file_path.parts):
+                    files_processed += 1
+                    
+                    # Process file based on type
+                    if file_path.suffix.lower() == '.pdf':
+                        success = process_pdf_file(file_path, document_type, knowledge_space, embed_model, db, 
+                                                  {"framework": framework, "version": version, "project": project_path.name})
+                    else:
+                        success = process_text_file(file_path, document_type, knowledge_space, embed_model, db,
+                                                   {"framework": framework, "version": version, "project": project_path.name})
+                    
+                    if success:
+                        files_succeeded += 1
+            
+            # Report results
+            canvas.success(f"Successfully processed {files_succeeded}/{files_processed} files")
+            return files_succeeded > 0
+            
+        else:
+            # Process single file
+            if doc_path.suffix.lower() == '.pdf':
+                success = process_pdf_file(doc_path, document_type, knowledge_space, embed_model, db, 
+                                          {"framework": framework, "version": version, "project": project_path.name})
+            else:
+                success = process_text_file(doc_path, document_type, knowledge_space, embed_model, db,
+                                           {"framework": framework, "version": version, "project": project_path.name})
+            
+            if success:
+                canvas.success(f"Successfully processed {doc_path}")
+                return True
+            else:
+                canvas.error(f"Failed to process {doc_path}")
+                return False
+                
     except Exception as e:
-        canvas.error(f"Error adding documentation: {e}")
+        canvas.error(f"Error ingesting documentation: {e}")
+        import traceback
+        canvas.error(traceback.format_exc())
+        return False
+
+def process_pdf_file(file_path, document_type, knowledge_space, embed_model, db, metadata=None):
+    """Process a PDF file into knowledge chunks"""
+    try:
+        canvas.info(f"Processing PDF: {file_path}")
+        
+        # Try to import required libraries
+        try:
+            import pypdf
+        except ImportError:
+            canvas.error("pypdf package not installed. Install with 'pip install pypdf'")
+            return False
+            
+        # Calculate file hash
+        with open(file_path, 'rb') as f:
+            file_hash = hashlib.sha256(f.read()).hexdigest()
+        
+        # Read PDF
+        pdf_reader = pypdf.PdfReader(open(file_path, 'rb'))
+        num_pages = len(pdf_reader.pages)
+        
+        canvas.info(f"PDF has {num_pages} pages")
+        
+        # Process pages
+        chunks = []
+        for i in range(num_pages):
+            try:
+                if i % 10 == 0:
+                    canvas.info(f"Processing page {i+1}/{num_pages}...")
+                
+                page = pdf_reader.pages[i]
+                text = page.extract_text()
+                
+                # Skip empty pages
+                if not text or len(text.strip()) < 10:
+                    continue
+                
+                # Create vector
+                vector = embed_model.get_embedding(text)
+                
+                # Create chunk
+                chunk = {
+                    "source": str(file_path),
+                    "content": text,
+                    "vector": vector,
+                    "category": document_type,
+                    "last_updated": datetime.now().isoformat(),
+                    "knowledge_space": knowledge_space,
+                    "document_type": document_type,
+                    "framework": metadata.get("framework", "") if metadata else "",
+                    "version": metadata.get("version", "") if metadata else "",
+                    "parent_doc_id": "",
+                    "chunk_type": f"page_{i+1}",
+                    "source_hash": file_hash,
+                    "metadata_json": json.dumps(metadata or {}),
+                }
+                chunks.append(chunk)
+            except Exception as e:
+                canvas.warning(f"Error processing page {i+1}: {e}")
+        
+        # Add chunks to database
+        from db_utils import add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2
+        
+        add_or_update_chunks(
+            db=db,
+            table_name=TABLE_KNOWLEDGE_BASE,
+            schema=SCHEMA_KNOWLEDGE_BASE_V2,
+            identifier_field="source",
+            identifier_value=str(file_path),
+            chunks=chunks
+        )
+        
+        canvas.success(f"Added {len(chunks)} chunks from PDF: {file_path}")
+        return True
+    except Exception as e:
+        canvas.error(f"Error processing PDF: {e}")
+        import traceback
+        canvas.error(traceback.format_exc())
+        return False
+
+def process_text_file(file_path, document_type, knowledge_space, embed_model, db, metadata=None):
+    """Process a text file into knowledge chunks"""
+    try:
+        canvas.info(f"Processing text file: {file_path}")
+        
+        # Calculate file hash
+        with open(file_path, 'rb') as f:
+            file_hash = hashlib.sha256(f.read()).hexdigest()
+        
+        # Read file content
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+        
+        # Create vector
+        vector = embed_model.get_embedding(content)
+        
+        # Create chunk
+        chunks = [{
+            "source": str(file_path),
+            "content": content,
+            "vector": vector,
+            "category": document_type,
+            "last_updated": datetime.now().isoformat(),
+            "knowledge_space": knowledge_space,
+            "document_type": document_type,
+            "framework": metadata.get("framework", "") if metadata else "",
+            "version": metadata.get("version", "") if metadata else "",
+            "parent_doc_id": "",
+            "chunk_type": "text",
+            "source_hash": file_hash,
+            "metadata_json": json.dumps(metadata or {}),
+        }]
+        
+        # Add chunks to database
+        from db_utils import add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2
+        
+        add_or_update_chunks(
+            db=db,
+            table_name=TABLE_KNOWLEDGE_BASE,
+            schema=SCHEMA_KNOWLEDGE_BASE_V2,
+            identifier_field="source",
+            identifier_value=str(file_path),
+            chunks=chunks
+        )
+        
+        canvas.success(f"Added text file to knowledge base: {file_path}")
+        return True
+    except Exception as e:
+        canvas.error(f"Error processing text file: {e}")
+        import traceback
+        canvas.error(traceback.format_exc())
+        return False
