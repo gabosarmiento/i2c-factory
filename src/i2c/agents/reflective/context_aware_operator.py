@@ -23,10 +23,17 @@ from i2c.agents.budget_manager import BudgetManagerAgent
 ################################################################################
 
 
+# Updated section for context_aware_operator.py - PhaseCostTracker
+
 class PhaseCostTracker:
     """Tracks token/cost usage across multi‑phase reasoning chains."""
 
-    def __init__(self, budget_manager: BudgetManagerAgent, operation_id: str, description: str):
+    def __init__(
+        self,
+        budget_manager: BudgetManagerAgent,
+        operation_id: str,
+        description: str
+    ):
         self.budget_manager = budget_manager
         self.operation_id = operation_id
         self.description = description
@@ -73,6 +80,7 @@ class PhaseCostTracker:
         context_chunks_used: Optional[List[str]] = None,
         actual_tokens: Optional[int] = None,
         actual_cost: Optional[float] = None,
+        agno_metrics: Optional[Dict[str, Any]] = None,
     ) -> Dict:
         if not self.current_phase:
             raise ValueError("No active phase to record reasoning step")
@@ -96,6 +104,11 @@ class PhaseCostTracker:
             "validation_outcome": None,
             "validation_feedback": None,
         }
+        
+        # Add Agno metrics if available
+        if agno_metrics:
+            step["agno_metrics"] = agno_metrics
+            
         phase = self.phases[self.current_phase]
         phase["tokens_consumed"] += tokens_consumed
         phase["cost_incurred"] += cost_incurred
@@ -114,13 +127,7 @@ class PhaseCostTracker:
         if not self.current_phase:
             raise ValueError("No active phase to record validation")
         phase = self.phases[self.current_phase]
-        # for step in phase["reasoning_steps"]:
-        #     if step["step_id"] == step_id:
-        #         step["validation_outcome"] = outcome
-        #         step["validation_feedback"] = feedback
-        #         return
-        # raise ValueError(f"No reasoning step with ID {step_id} found in current phase")
-
+        
         # Find the step; if it does not exist (e.g. the caller mocked out
         # _execute_reasoning_step in unit‑tests) we create a stub so validation
         # can still be recorded without blowing up the run.
@@ -175,7 +182,6 @@ class PhaseCostTracker:
                 "steps": len(phase["reasoning_steps"]),
             }
         return summary
-
 ################################################################################
 # Budget scopes
 ################################################################################
