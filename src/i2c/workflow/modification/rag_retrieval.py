@@ -184,7 +184,8 @@ def retrieve_context_for_step(step: dict, db, embed_model: Any) -> Optional[str]
             query_vector=vector,
             limit=MAX_RAG_RESULTS_MODIFIER
         )
-        if not rag_results or rag_results.empty:
+        # explicitly guard against None *and* empty DataFrame
+        if rag_results is None or rag_results.empty:
             continue
 
         # 3) Format
