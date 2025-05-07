@@ -8,6 +8,26 @@ This script demonstrates the two main workflow paths of the I2C Factory:
 
 Usage:
     python demo_script.py [--path DEMO_PATH] [--output OUTPUT_DIR]
+
+How to Use the Script
+
+    Run it with Python:
+    python demo_script.py
+    
+    or Poetry:
+    poetry run python src/i2c/demo/scripts/demo_yc.py --path fast
+
+You can specify which path to run:
+    python demo_script.py --path fast      # Run only Fast Track demo
+    python demo_script.py --path structured # Run only Structured Approach demo
+    python demo_script.py --path both      # Run both demos (default)
+
+You can specify an output directory:
+    python demo_script.py --output ./my_demos
+
+The demo script creates simulated projects in the output directory and generates metrics about the run.
+
+This demo helps users understand the 2 different paths in I2C Factory and visualize how each approach works, making it easier to choose the right path for their specific needs.
 """
 
 import time
