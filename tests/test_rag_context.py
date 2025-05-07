@@ -3,7 +3,7 @@ from i2c.bootstrap import initialize_environment
 initialize_environment()
 # Immediately patch out the real DB connection
 patcher = patch(
-    'agents.modification_team.context_reader.context_indexer.get_db_connection',
+    'i2c.agents.modification_team.context_reader.context_indexer.get_db_connection',
     return_value=MagicMock(create_table=lambda *args, **kwargs: True)
 )
 patcher.start()
@@ -24,8 +24,11 @@ class TestStepSpecificRAGRetrieval(unittest.TestCase):
         """Set up test fixtures."""
         # Create a mock embedding model
         self.mock_embed_model = MagicMock()
-        self.mock_embed_model.encode.return_value = np.array([0.1, 0.2, 0.3])
-        
+        # simulate the two‐tuple return of get_embedding_and_usage()
+        dummy_vec = np.array([0.1, 0.2, 0.3])
+        self.mock_embed_model.get_embedding_and_usage.return_value = (dummy_vec, {"tokens": 3})
+        # if your code still calls `.encode()`, you can leave this or remove it
+        self.mock_embed_model.encode.return_value = dummy_vec        
         # Create a mock project path
         self.project_path = Path('/test/project')
         
@@ -41,11 +44,11 @@ class TestStepSpecificRAGRetrieval(unittest.TestCase):
         }
         
         # Mock CLI canvas to avoid prints during tests
-        self.canvas_patcher = patch('workflow.modification.rag_retrieval.canvas')
+        self.canvas_patcher = patch('i2c.workflow.modification.rag_retrieval.canvas')
         self.mock_canvas = self.canvas_patcher.start()
         
         # Mock query_context function
-        self.query_context_patcher = patch('workflow.modification.rag_retrieval.query_context')
+        self.query_context_patcher = patch('i2c.workflow.modification.rag_retrieval.query_context')
         self.mock_query_context = self.query_context_patcher.start()
         
     def tearDown(self):
@@ -84,8 +87,8 @@ class TestStepSpecificRAGRetrieval(unittest.TestCase):
         # Verify results
         self.assertIsNone(result)
     
-    @patch('agents.modification_team.code_modifier.CodeModifierAgent.run')
-    @patch('workflow.modification.code_executor.retrieve_context_for_step')
+    @patch('i2c.agents.modification_team.code_modifier.CodeModifierAgent.run')
+    @patch('i2c.workflow.modification.code_executor.retrieve_context_for_step')
     def test_execute_modification_steps_with_context(self, mock_retrieve_context, mock_agent_run):
         """Test executing modification steps with context retrieval."""
         # Set up mocks
@@ -97,7 +100,7 @@ class TestStepSpecificRAGRetrieval(unittest.TestCase):
         mock_agent_run.return_value = mock_response
         
         # Create a mock Code Modifier agent
-        with patch('workflow.modification.code_executor.code_modifier_agent') as mock_agent:
+        with patch('i2c.workflow.modification.code_executor.code_modifier_agent') as mock_agent:
             # Set up the mock to return the code
             mock_agent.modify_code.return_value = "def test_function():\n    return 'test'"
             

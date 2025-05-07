@@ -38,7 +38,7 @@ def add_numbers(a, b):
 
 --- Start Chunk: models/user.py (class: User) ---
 from database import db
-from i2c.utils.validators import validate_email
+from utils.validators import validate_email
 
 class User:
     def __init__(self, username, email):
@@ -107,14 +107,14 @@ def add_numbers(a, b):
 '''
         
         # Mock CLI canvas to avoid prints during tests
-        self.canvas_patcher = patch('workflow.modification.plan_generator.canvas')
+        self.canvas_patcher = patch('i2c.workflow.modification.plan_generator.canvas')
         self.mock_canvas = self.canvas_patcher.start()
         
     def tearDown(self):
         """Tear down test fixtures."""
         self.canvas_patcher.stop()
     
-    @patch('agents.modification_team.modification_planner.ModificationPlannerAgent.run')
+    @patch('i2c.agents.modification_team.modification_planner.ModificationPlannerAgent.run')
     def test_enhanced_planner_prompt(self, mock_run):
         """Test that the planner prompt is properly structured with context sections."""
         # Set up mock response
@@ -147,7 +147,7 @@ def add_numbers(a, b):
         self.assertEqual(result[0]["file"], "utils/math.py")
         self.assertEqual(result[0]["action"], "modify")
     
-    @patch('agents.modification_team.code_modifier.CodeModifierAgent.run')
+    @patch('i2c.agents.modification_team.code_modifier.CodeModifierAgent.run')
     def test_code_modifier_context_extraction(self, mock_run):
         """Test the code modifier's context extraction methods."""
         # Create an instance for testing
@@ -164,7 +164,7 @@ def add_numbers(a, b):
         self.assertTrue(any("def add_numbers" in p for p in patterns["function_patterns"]))
         self.assertIn("username", patterns["naming_conventions"])
         
-    @patch('agents.modification_team.code_modifier.CodeModifierAgent.run')
+    @patch('i2c.agents.modification_team.code_modifier.CodeModifierAgent.run')
     def test_enhanced_modifier_prompt(self, mock_run):
         """Test that the code modifier prompt properly incorporates context analysis."""
         # Set up mock response

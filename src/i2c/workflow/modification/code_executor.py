@@ -1,5 +1,5 @@
 # Handles executing the modification plan steps by calling the CodeModifierAgent.
-
+# src/i2c/workflow/modification/code_executor.py
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -16,22 +16,25 @@ def execute_modification_steps(
     """
     Iterates through the plan, retrieves context for each step, calls the modifier,
     and collects results.
-
-    Args:
-        modification_plan: The list of modification steps.
-        project_path: Path to the project directory.
-        db: LanceDB table instance.
-        embed_model: SentenceTransformer model instance.
-
-    Returns:
-        A tuple containing:
-        - modified_code_map (dict): Map of file paths to their new content.
-        - files_to_delete (list): List of Path objects for files to be deleted.
     """
     canvas.step("Executing modification plan (generating code with step-specific context)...")
     modified_code_map = {}
     files_to_delete = []
     all_steps_succeeded = True  # Assume success initially
+
+    # Check if database has any indexed chunks
+    db_has_chunks = False
+    try:
+        from i2c.db_utils import TABLE_CODE_CONTEXT
+        table = db.open_table(TABLE_CODE_CONTEXT)
+        df = table.to_pandas()
+        db_has_chunks = len(df) > 0
+        
+        if not db_has_chunks:
+            canvas.warning("  ⚠️ Warning: No indexed code chunks found in database. RAG retrieval will be limited.")
+            canvas.warning("  ⚠️ Consider running the indexing process for better context-aware modifications.")
+    except Exception as e:
+        canvas.warning(f"  ⚠️ Warning: Could not verify database chunks: {e}")
 
     try:
         for step_idx, step in enumerate(modification_plan):

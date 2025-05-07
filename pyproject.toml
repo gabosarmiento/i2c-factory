@@ -32,7 +32,8 @@ tantivy               = "^0.22.2"
 protobuf              = "^6.30.2"
 mcp                   = "^1.7.1"
 setuptools            = "^80.3.1"
-jsonschema = "^4.23.0"
+jsonschema            = "^4.23.0"
+esprima               = "^4.0.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest      = "^7.0.0"
