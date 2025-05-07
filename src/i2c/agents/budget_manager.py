@@ -1,11 +1,10 @@
 # agents/budget_manager.py
-# Update to track both OpenAI and Groq usage
+# Enhanced to integrate with Agno's built-in metrics
 
 import os
-from typing import Optional, Tuple
-from agno.agent import Agent
-
-# Import cost estimation utilities  
+from typing import Optional, Tuple, Dict, Any, Union
+from agno.agent import Agent, RunResponse
+from agno.agent.metrics import SessionMetrics
 
 # Import CLI controller for user interaction
 from i2c.cli.controller import canvas
@@ -36,7 +35,7 @@ def estimate_cost(text: str, model_id: str) -> tuple[int, float]:
 class BudgetManagerAgent:
     """
     Agent responsible for managing token usage and budget constraints.
-    Enhanced to track both OpenAI and Groq API usage.
+    Enhanced to integrate with Agno's built-in metrics.
     """
     def __init__(self, session_budget: Optional[float] = None, auto_approve_threshold: float = 0.01):
         # Session-level tracking
@@ -51,11 +50,14 @@ class BudgetManagerAgent:
             'other': {'tokens': 0, 'cost': 0.0, 'calls': 0}
         }
         
+        # Agno metrics integration
+        self.agno_metrics: Optional[SessionMetrics] = None
+        
         # Auto-approval threshold (requests under this cost are auto-approved)
         self.auto_approve_threshold = auto_approve_threshold
         
         # Load budget configuration if available
-        self._load_config ()
+        self._load_config()
         
         canvas.info(f"💰 [BudgetManagerAgent] Initialized. Session budget: ${self.session_budget if self.session_budget else 'Unlimited'}")
     
@@ -79,6 +81,85 @@ class BudgetManagerAgent:
         else:
             return 'other'
     
+    def update_from_agno_metrics(self, agent: Agent):
+        """
+        Update budget tracking using Agno's built-in metrics.
+        
+        Args:
+            agent: The Agno agent to extract metrics from
+        """
+        if not agent.session_metrics:
+            return
+            
+        # Store Agno metrics for reporting
+        self.agno_metrics = agent.session_metrics
+        
+        # Update total token counts from Agno
+        new_tokens = agent.session_metrics.total_tokens - self.consumed_tokens_session
+        if new_tokens <= 0:
+            return
+            
+        # Calculate cost based on Agno tracked tokens and the agent's model
+        model_id = getattr(agent.model, 'id', 'Unknown')
+        if not model_id.startswith('groq/'):
+            model_id = f"groq/{model_id}"
+            
+        _, cost = estimate_cost("", model_id)  # Just get cost per token
+        new_cost = (new_tokens / 1000) * (cost * 1000)  # Convert to per-token cost
+        
+        # Update session totals
+        self.consumed_tokens_session = agent.session_metrics.total_tokens
+        self.consumed_cost_session += new_cost
+        
+        # Update provider-specific stats
+        provider = self._determine_provider(model_id)
+        self.provider_stats[provider]['tokens'] += new_tokens
+        self.provider_stats[provider]['cost'] += new_cost
+        self.provider_stats[provider]['calls'] += 1
+        
+        canvas.info(f"💰 Updated from Agno metrics: +{new_tokens} tokens, +${new_cost:.6f}")
+    
+    def update_from_run_response(self, response: RunResponse, model_id: str):
+        """
+        Update budget tracking from a RunResponse object.
+        
+        Args:
+            response: The RunResponse to extract metrics from
+            model_id: The model identifier
+        """
+        if not response.metrics:
+            return
+            
+        # Extract metrics from RunResponse
+        total_tokens = 0
+        if isinstance(response.metrics, dict):
+            # Sum up token counts from the metrics dictionary
+            if 'total_tokens' in response.metrics:
+                total_tokens = sum(response.metrics['total_tokens'])
+            elif 'input_tokens' in response.metrics and 'output_tokens' in response.metrics:
+                input_tokens = sum(response.metrics['input_tokens']) if isinstance(response.metrics['input_tokens'], list) else response.metrics['input_tokens']
+                output_tokens = sum(response.metrics['output_tokens']) if isinstance(response.metrics['output_tokens'], list) else response.metrics['output_tokens']
+                total_tokens = input_tokens + output_tokens
+        
+        if total_tokens <= 0:
+            return
+            
+        # Calculate cost based on tracked tokens
+        _, cost_per_1k = estimate_cost("", model_id)  # Just get cost per token
+        new_cost = (total_tokens / 1000) * cost_per_1k  # Convert to per-token cost
+        
+        # Update session totals
+        self.consumed_tokens_session += total_tokens
+        self.consumed_cost_session += new_cost
+        
+        # Update provider-specific stats
+        provider = self._determine_provider(model_id)
+        self.provider_stats[provider]['tokens'] += total_tokens
+        self.provider_stats[provider]['cost'] += new_cost
+        self.provider_stats[provider]['calls'] += 1
+        
+        canvas.info(f"💰 Tracked from RunResponse: {total_tokens} tokens, ${new_cost:.6f}")
+    
     def track_usage(self, prompt: str, response: str, model_id: str, actual_tokens: int = None, actual_cost: float = None):
         """
         Track token usage for a completed API call.
@@ -96,6 +177,7 @@ class BudgetManagerAgent:
             cost = actual_cost
         else:
             # Fallback to estimation
+            from i2c.workflow.utils import count_tokens, estimate_cost
             total_text = prompt + response
             tokens, cost = estimate_cost(total_text, model_id)
         
@@ -115,6 +197,7 @@ class BudgetManagerAgent:
     def request_approval(self, description: str, prompt: str, model_id: str) -> bool:
         """Request budget approval for an operation."""
         # Estimate cost
+        from i2c.workflow.utils import estimate_cost
         token_estimate, cost_estimate = estimate_cost(prompt, model_id)
         provider = self._determine_provider(model_id)
         
@@ -155,7 +238,15 @@ class BudgetManagerAgent:
     
     def get_session_consumption(self) -> Tuple[int, float]:
         """Get total session consumption."""
-        return self.consumed_tokens_session, self.consumed_cost_session
+        tokens = self.consumed_tokens_session
+        cost = self.consumed_cost_session
+        
+        # If we have Agno metrics and they report higher token usage, use those
+        if self.agno_metrics is not None:
+            if self.agno_metrics.total_tokens > tokens:
+                tokens = self.agno_metrics.total_tokens
+        
+        return tokens, cost
     
     def get_provider_stats(self) -> dict:
         """Get detailed provider statistics."""
@@ -163,17 +254,35 @@ class BudgetManagerAgent:
     
     def get_summary(self) -> str:
         """Get a formatted summary of budget usage."""
+        tokens, cost = self.get_session_consumption()
+        
         summary = f"""
 💰 Budget Usage Summary
 ----------------------
-Session Total: {self.consumed_tokens_session} tokens, ${self.consumed_cost_session:.6f}
+Session Total: {tokens} tokens, ${cost:.6f}
 Budget Limit: ${self.session_budget if self.session_budget else 'Unlimited'}
-Remaining: ${self.session_budget - self.consumed_cost_session:.6f if self.session_budget else 'Unlimited'}
+Remaining: ${f"{self.session_budget - cost:.6f}" if self.session_budget else "Unlimited"}
 
 Provider Breakdown:
 """
         for provider, stats in self.provider_stats.items():
             if stats['calls'] > 0:
                 summary += f"  {provider}: {stats['calls']} calls, {stats['tokens']} tokens, ${stats['cost']:.6f}\n"
+        
+        # Add Agno metrics details if available
+        if self.agno_metrics:
+            summary += "\nAgno Metrics Detail:\n"
+            summary += f"  Input Tokens: {self.agno_metrics.input_tokens}\n"
+            summary += f"  Output Tokens: {self.agno_metrics.output_tokens}\n"
+            
+            if self.agno_metrics.prompt_tokens > 0 or self.agno_metrics.completion_tokens > 0:
+                summary += f"  Prompt Tokens: {self.agno_metrics.prompt_tokens}\n"
+                summary += f"  Completion Tokens: {self.agno_metrics.completion_tokens}\n"
+                
+            if self.agno_metrics.reasoning_tokens > 0:
+                summary += f"  Reasoning Tokens: {self.agno_metrics.reasoning_tokens}\n"
+                
+            if self.agno_metrics.time is not None:
+                summary += f"  Response Time: {self.agno_metrics.time:.2f}s\n"
         
         return summary

@@ -16,10 +16,12 @@ from .session_handlers import (
     handle_new_project_idea,
     handle_knowledge_management
 )
+from i2c.cli.budget_display import show_budget_status, show_budget_summary, show_operation_cost
 
 # --- Configuration ---
 DEFAULT_OUTPUT_DIR_BASE = Path("./output")
 
+# Updated section for workflow/session.py with simplified budget display integration
 def run_session():
     """Manages the overall user session and interaction loop."""
     from i2c.agents.core_agents import input_processor_agent  # Lazy import to avoid circular dependency
@@ -38,16 +40,22 @@ def run_session():
     reader_agent: ContextReaderAgent | None = None
 
     while True:
+        # Show budget status (with warnings only when approaching limit)
+        # Returns True if a warning was shown
+        show_budget_status(budget_manager)
+        
         canvas.step("Ready for next action")
         command_type, command_detail = handle_get_user_action(current_project_path)
         
         if command_type == 'quit':
             canvas.info("Exiting session.")
+            # Show comprehensive budget summary at end of session
+            show_budget_summary(budget_manager)
             tokens, cost = budget_manager.get_session_consumption()
             canvas.info(f"Session Summary: Consumed ~{tokens} tokens (~${cost:.6f})")
             break
         
-        elif command_type == 'knowledge':  # NEW: Handle knowledge command
+        elif command_type == 'knowledge':  # Handle knowledge command
             if not current_project_path:
                 canvas.warning("No active project. Create or load a project first.")
                 continue
@@ -69,7 +77,7 @@ def run_session():
             raw = command_detail
             last_raw_idea = raw
 
-            # Clarify idea
+            # Standard approval without visual display
             if not budget_manager.request_approval(
                 description="New Idea Clarification",
                 prompt=raw,
@@ -81,7 +89,26 @@ def run_session():
 
             canvas.step("Clarifying new idea…")
             try:
+                # Get start cost for operation tracking
+                start_tokens, start_cost = budget_manager.get_session_consumption()
+                
                 resp = input_processor_agent.run(raw)
+                
+                # Update budget manager with metrics from Agno agent
+                budget_manager.update_from_agno_metrics(input_processor_agent)
+                
+                # Calculate operation cost
+                end_tokens, end_cost = budget_manager.get_session_consumption()
+                op_tokens = end_tokens - start_tokens
+                op_cost = end_cost - start_cost
+                
+                # Show simple operation cost 
+                show_operation_cost(
+                    operation="Idea Clarification",
+                    tokens=op_tokens,
+                    cost=op_cost
+                )
+                
                 proc = json.loads(getattr(resp, 'content', str(resp)))
                 if not (isinstance(proc, dict) and "objective" in proc and "language" in proc):
                     raise ValueError("Invalid JSON from LLM")
@@ -108,20 +135,39 @@ def run_session():
 
             canvas.info(f"Preparing new project generation in: {current_project_path}")
 
-            # Generation planning
+            # Standard approval without visual display
             if budget_manager.request_approval(
                 description="Initial Project Generation",
                 prompt=current_structured_goal['objective'],
                 model_id=getattr(input_processor_agent.model, 'id', 'Unknown'),
             ):
+                # Get start cost for operation tracking
+                start_tokens, start_cost = budget_manager.get_session_consumption()
+                
                 ok = route_and_execute(
                     action_type='generate',
                     action_detail=current_structured_goal,
                     current_project_path=current_project_path,
                     current_structured_goal=current_structured_goal,
+                    budget_manager=budget_manager  # Pass budget manager to enable tracking
                 )
                 if not ok:
                     canvas.error("Action 'generate' failed. Please review logs.")
+                
+                # Calculate operation cost
+                end_tokens, end_cost = budget_manager.get_session_consumption()
+                op_tokens = end_tokens - start_tokens
+                op_cost = end_cost - start_cost
+                
+                # Show operation cost after major operation
+                show_operation_cost(
+                    operation="Initial Project Generation",
+                    tokens=op_tokens,
+                    cost=op_cost
+                )
+                
+                # Show comprehensive budget summary after major operations
+                show_budget_summary(budget_manager)
             else:
                 canvas.warning("Generation cancelled due to budget rejection.")
 
@@ -131,19 +177,36 @@ def run_session():
                 print("-" * 30)
                 continue
 
+            # Standard approval without visual display
             if budget_manager.request_approval(
                 description=f"Project Modification ({command_detail})",
                 prompt=command_detail,
                 model_id=getattr(input_processor_agent.model, 'id', 'Unknown'),
             ):
+                # Get start cost for operation tracking
+                start_tokens, start_cost = budget_manager.get_session_consumption()
+                
                 ok = route_and_execute(
                     action_type='modify',
                     action_detail=command_detail,
                     current_project_path=current_project_path,
                     current_structured_goal=current_structured_goal,
+                    budget_manager=budget_manager  # Pass budget manager to enable tracking
                 )
                 if not ok:
                     canvas.error("Action 'modify' failed. Please review logs.")
+                
+                # Calculate operation cost
+                end_tokens, end_cost = budget_manager.get_session_consumption()
+                op_tokens = end_tokens - start_tokens
+                op_cost = end_cost - start_cost
+                
+                # Show operation cost after major operation
+                show_operation_cost(
+                    operation=f"Project Modification ({command_detail[:20]}...)",
+                    tokens=op_tokens,
+                    cost=op_cost
+                )
             else:
                 canvas.warning("Modification cancelled due to budget rejection.")
 
@@ -154,6 +217,6 @@ def run_session():
         print("-" * 30)
 
     canvas.end_process("Session ended.")
-
+    
 def start_factory_session():
     run_session()
