@@ -15,7 +15,10 @@ from i2c.workflow.utils import sanitize_filename, ensure_project_path
 from builtins import llm_middle
 import hashlib
 import datetime
-
+from i2c.workflow.visual_helpers import (
+    show_help_message,
+    show_project_plan
+)
 # Function to safely parse JSON, returning None on failure
 def _safe_json_loads(text: str) -> dict | None:
     try:
@@ -29,45 +32,86 @@ def _safe_json_loads(text: str) -> dict | None:
         canvas.error(f"DEBUG: Failed to parse JSON: {text[:500]}")
         return None
 
+
+
 def handle_get_user_action(current_project_path: Path | None) -> tuple[str | None, str | None]:
     """Gets and parses the user's next action command."""
     if current_project_path:
         project_status = f"Project: '{current_project_path.name}'"
-        options = "'f <feature_idea>', 'r' (refine), 'k' (knowledge), 'p <path>' (switch project), 'q' (quit)"
+        options = "'f <idea>', 'r', 's <story>', 'k', 'plan', '?', 'q'"
         action_prompt = f"{project_status} | Options: {options}:"
     else:
         project_status = "No active project."
-        options = "'<your new idea>', 'p <path>' (load existing), 'q' (quit)"
+        options = "'<idea>', 'p <path>', '?', 'q'"
         action_prompt = f"{project_status} | Options: {options}:"
 
-    user_input = canvas.get_user_input(action_prompt).strip()
+    user_input = canvas.get_user_input(f"🎯 {action_prompt}").strip()
     command_lower = user_input.lower()
 
+    # Handle help command
+    if command_lower == "?" or command_lower == "help":
+        show_help_message(current_project_path)
+        return None, None
+        
+    # Handle plan command
+    if command_lower == "plan" and current_project_path:
+        show_project_plan(current_project_path)
+        return None, None
+
+    # Handle quit
     if command_lower == 'q':
         return 'quit', None
+        
+    # Handle project path
     elif command_lower.startswith('p '):
         path_str = user_input[len('p '):].strip().strip('\'"')
         return 'load_project', path_str
+        
+    # Commands requiring an active project
     elif current_project_path: 
+        # Handle refine
         if command_lower == 'r':
             return 'modify', 'r'
-        elif command_lower.startswith('f '):
-            feature_idea = user_input[len('f '):].strip()
+            
+        # Handle feature (both 'f' and 'feature')
+        elif command_lower.startswith('f ') or command_lower.startswith('feature '):
+            prefix = 'f ' if command_lower.startswith('f ') else 'feature '
+            feature_idea = user_input[len(prefix):].strip()
             if not feature_idea:
-                canvas.warning("Please provide a description for the feature.")
+                canvas.warning("⚠️ Please provide a description for the feature.")
                 return None, None
             return 'modify', f'f {feature_idea}'
+            
+        # Handle story (both 's' and 'story')
+        elif command_lower.startswith('s ') or command_lower.startswith('story '):
+            prefix = 's ' if command_lower.startswith('s ') else 'story '
+            story_text = user_input[len(prefix):].strip()
+            if not story_text:
+                canvas.warning("⚠️ Please provide a description for the user story.")
+                return None, None
+            return 'feature_pipeline', story_text
+            
+        # Handle knowledge
         elif command_lower == 'k':  
             return 'knowledge', None
+            
+        # Unknown command
         elif user_input:
-            canvas.warning(f"Unrecognized command '{user_input}'. Use 'f', 'r', 'k', 'p', or 'q'.")
+            canvas.warning(f"⚠️ Unrecognized command. Type '?' for help.")
             return None, None
+            
+        # Empty input
         else:
             return None, None
+            
+    # No project active - treat as new idea
     elif user_input:
         return 'new_idea', user_input
+        
+    # Empty input
     else:
         return None, None
+
 
 
 def handle_load_project(path_str: str) -> tuple[Path | None, dict | None]:
