@@ -63,7 +63,9 @@ if __name__ == "__main__":
         self.mock_table = MagicMock()
         self.mock_embed_model = MagicMock()
         self.mock_embed_model.encode.return_value = [0.1, 0.2, 0.3]
-        
+        # make get_embedding_and_usage return (vector, usage_dict)
+        dummy_vec = self.mock_embed_model.encode.return_value
+        self.mock_embed_model.get_embedding_and_usage.return_value = (dummy_vec, {"tokens": len(dummy_vec)})
         # Set up mock database query results (context chunks)
         self.mock_query_results = pd.DataFrame({
             'path': ['utils/math.py', 'main.py'],
@@ -90,14 +92,14 @@ if __name__ == "__main__":
         self.patchers = []
         
         # Patch RAG retrieval functions
-        self.patchers.append(patch('workflow.modification.rag_retrieval.query_context'))
+        self.patchers.append(patch('i2c.workflow.modification.rag_retrieval.query_context'))
         self.mock_query_context = self.patchers[-1].start()
         self.mock_query_context.return_value = self.mock_query_results
         
         # Patch canvas (CLI output)
-        self.patchers.append(patch('workflow.modification.plan_generator.canvas'))
-        self.patchers.append(patch('workflow.modification.code_executor.canvas'))
-        self.patchers.append(patch('workflow.modification.rag_retrieval.canvas'))
+        self.patchers.append(patch('i2c.workflow.modification.plan_generator.canvas'))
+        self.patchers.append(patch('i2c.workflow.modification.code_executor.canvas'))
+        self.patchers.append(patch('i2c.workflow.modification.rag_retrieval.canvas'))
         
         # Start all remaining patchers
         for patcher in self.patchers[1:]:
@@ -112,8 +114,8 @@ if __name__ == "__main__":
         for patcher in self.patchers:
             patcher.stop()
     
-    @patch('agents.modification_team.modification_planner.ModificationPlannerAgent.run')
-    @patch('agents.modification_team.code_modifier.CodeModifierAgent.run')
+    @patch('i2c.agents.modification_team.modification_planner.ModificationPlannerAgent.run')
+    @patch('i2c.agents.modification_team.code_modifier.CodeModifierAgent.run')
     def test_full_modification_workflow(self, mock_modifier_run, mock_planner_run):
         """Test the full modification workflow with RAG context."""
         # Set up mock responses
@@ -203,7 +205,7 @@ if __name__ == "__main__":
         # 1. Get planning context
         planning_context = retrieve_context_for_planner(
             user_request="f Add a subtract_numbers function and use it in main",
-            table=self.mock_table,
+            db=self.mock_table,
             embed_model=self.mock_embed_model
         )
         
@@ -219,7 +221,7 @@ if __name__ == "__main__":
         modified_code_map, files_to_delete = execute_modification_steps(
             modification_plan=modification_plan,
             project_path=self.project_path,
-            table=self.mock_table,
+            db=self.mock_table,
             embed_model=self.mock_embed_model
         )
         
