@@ -3,6 +3,7 @@
 
 import subprocess
 import shlex
+import textwrap
 from pathlib import Path
 
 class VersionControlAgent:
@@ -67,8 +68,16 @@ class VersionControlAgent:
             print("   ⚠️ Warning during staging. Attempting commit anyway.")
 
         print("   -> Committing changes...")
-        # Allow empty commits in case only .gitattributes or similar changed, or for re-runs
-        success, output = self._run_git_command(f"commit --allow-empty -m {shlex.quote(commit_message)}", cwd=project_path)
+        # Shorten the commit message to a single, 72-char line
+        
+        short_msg = textwrap.shorten(commit_message, width=72, placeholder="…")
+
+        print("   -> Committing changes…")
+        # Allow empty commits in case only metadata changed
+        success, output = self._run_git_command(
+            f"commit --allow-empty -m {shlex.quote(short_msg)}",
+            cwd=project_path
+        )
         if success:
              print("   ✅ Git commit successful.")
         elif "nothing to commit" in output or "no changes added to commit" in output:
