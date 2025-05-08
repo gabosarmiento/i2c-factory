@@ -1,0 +1,200 @@
+# Weather API Specification v1.0
+
+## Base URL
+https://api.weatherdata.com/v1
+
+## Authentication
+All requests require an API key provided as a query parameter: `?api_key=YOUR_API_KEY`
+Alternatively, you can include an Authorization header: `Authorization: Bearer YOUR_API_KEY`
+
+## Rate Limiting
+- Free tier: 1000 requests per day, max 5 requests per minute
+- Pro tier: 10,000 requests per day, max 20 requests per minute
+- Enterprise tier: Unlimited requests, max 100 requests per minute
+
+## Endpoints
+
+### Current Weather
+`GET /current`
+
+Retrieves current weather conditions for a specific location.
+
+**Parameters:**
+- `location` (required): City name, postal code, or coordinates (lat,lon)
+- `units` (optional): 'metric' (default) or 'imperial'
+- `lang` (optional): Language code (en, es, fr, de, etc.)
+
+**Example Request:**
+```
+GET /current?location=london&units=metric&api_key=YOUR_API_KEY
+```
+
+**Response Format:**
+```json
+{
+  "location": {
+    "name": "London",
+    "country": "GB",
+    "lat": 51.51,
+    "lon": -0.13
+  },
+  "current": {
+    "temp": 18.5,
+    "feels_like": 17.8,
+    "humidity": 72,
+    "pressure": 1012,
+    "wind_speed": 3.6,
+    "wind_direction": 270,
+    "condition": {
+      "code": 800,
+      "description": "Clear sky"
+    },
+    "uv_index": 5.2,
+    "visibility": 10000,
+    "precipitation": 0
+  },
+  "updated_at": "2023-09-15T13:45:00Z"
+}
+```
+
+### 5-Day Forecast
+`GET /forecast`
+
+Retrieves a 5-day weather forecast with 3-hour intervals.
+
+**Parameters:**
+- `location` (required): City name, postal code, or coordinates (lat,lon)
+- `units` (optional): 'metric' (default) or 'imperial'
+- `lang` (optional): Language code (en, es, fr, de, etc.)
+- `daily` (optional): If set to 'true', returns daily aggregated data instead of 3-hour intervals
+
+**Example Request:**
+```
+GET /forecast?location=paris&units=metric&daily=true&api_key=YOUR_API_KEY
+```
+
+**Response Format:**
+```json
+{
+  "location": {
+    "name": "Paris",
+    "country": "FR",
+    "lat": 48.85,
+    "lon": 2.35
+  },
+  "forecast": [
+    {
+      "date": "2023-09-16",
+      "temp_min": 14.2,
+      "temp_max": 22.5,
+      "humidity": 65,
+      "pressure": 1015,
+      "wind_speed": 4.2,
+      "wind_direction": 180,
+      "condition": {
+        "code": 802,
+        "description": "Scattered clouds"
+      },
+      "precipitation_chance": 20,
+      "precipitation_amount": 0.5,
+      "sunrise": "07:15:00",
+      "sunset": "19:45:00"
+    },
+    // Additional days...
+  ]
+}
+```
+
+### Historical Data
+`GET /historical`
+
+Retrieves historical weather data for a specific location and date range.
+
+**Parameters:**
+- `location` (required): City name, postal code, or coordinates (lat,lon)
+- `start_date` (required): Start date in YYYY-MM-DD format
+- `end_date` (required): End date in YYYY-MM-DD format
+- `units` (optional): 'metric' (default) or 'imperial'
+- `aggregation` (optional): 'daily' (default), 'hourly', or 'monthly'
+
+**Example Request:**
+```
+GET /historical?location=berlin&start_date=2023-01-01&end_date=2023-01-31&aggregation=daily&api_key=YOUR_API_KEY
+```
+
+**Response Format:**
+```json
+{
+  "location": {
+    "name": "Berlin",
+    "country": "DE",
+    "lat": 52.52,
+    "lon": 13.41
+  },
+  "historical_data": [
+    {
+      "date": "2023-01-01",
+      "temp_avg": 2.5,
+      "temp_min": -1.2,
+      "temp_max": 5.8,
+      "humidity": 80,
+      "pressure": 1020,
+      "wind_speed": 5.1,
+      "precipitation": 2.3,
+      "condition": {
+        "code": 600,
+        "description": "Light snow"
+      }
+    },
+    // Additional days...
+  ]
+}
+```
+
+## Error Codes
+
+The API uses standard HTTP status codes and provides detailed error messages:
+
+### 400-level errors (Client errors)
+- 400: Bad Request - Malformed request or invalid parameters
+- 401: Unauthorized - Missing or invalid API key
+- 403: Forbidden - Valid API key but insufficient permissions
+- 404: Not Found - Requested resource not found (invalid location)
+- 429: Too Many Requests - Rate limit exceeded
+
+### 500-level errors (Server errors)
+- 500: Internal Server Error - Unexpected server error
+- 502: Bad Gateway - Upstream data provider error
+- 503: Service Unavailable - Service temporarily unavailable, retry after
+
+For all errors, the response body will contain:
+```json
+{
+  "error": {
+    "code": 401,
+    "message": "Invalid API key provided",
+    "details": "Please check your API key or register for a new one at https://weatherdata.com/register"
+  }
+}
+```
+
+## Retry Strategy
+For 5xx errors, clients should implement an exponential backoff strategy:
+1. Wait 1 second, then retry
+2. If still failing, wait 2 seconds, then retry
+3. If still failing, wait 4 seconds, then retry
+4. And so on, up to a maximum of 5 retries or 60 seconds
+
+## Additional Features
+
+### Weather Alerts
+Premium feature available on Pro and Enterprise tiers:
+`GET /alerts?location=miami&api_key=YOUR_API_KEY`
+
+### Air Quality Index
+Available as an add-on to any tier:
+`GET /air-quality?location=tokyo&api_key=YOUR_API_KEY`
+
+### Climate Data
+Historical climate statistics (30-year averages):
+`GET /climate?location=sydney&month=january&api_key=YOUR_API_KEY`

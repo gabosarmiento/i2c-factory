@@ -148,8 +148,8 @@ def run_session():
                     action_type='generate',
                     action_detail=current_structured_goal,
                     current_project_path=current_project_path,
-                    current_structured_goal=current_structured_goal,
-                    budget_manager=budget_manager  # Pass budget manager to enable tracking
+                    current_structured_goal=current_structured_goal
+                    
                 )
                 if not ok:
                     canvas.error("Action 'generate' failed. Please review logs.")
@@ -190,8 +190,8 @@ def run_session():
                     action_type='modify',
                     action_detail=command_detail,
                     current_project_path=current_project_path,
-                    current_structured_goal=current_structured_goal,
-                    budget_manager=budget_manager  # Pass budget manager to enable tracking
+                    current_structured_goal=current_structured_goal
+                    
                 )
                 if not ok:
                     canvas.error("Action 'modify' failed. Please review logs.")

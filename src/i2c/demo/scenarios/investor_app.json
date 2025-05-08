@@ -1,0 +1,68 @@
+[
+    {
+      "name": "Intro: Safe Investment Agent",
+      "type": "narration",
+      "message": "Welcome to the Safe Investment Agent demo. We're building a Python-based automated trading agent that prioritizes capital preservation while achieving steady growth in stocks, forex, or crypto markets, using risk-managed strategies and real-time market data.",
+      "pause": 3
+    },
+    {
+      "name": "Initial Project Setup",
+      "type": "initial_generation",
+      "prompt": "Create a Python-based Safe Investment Agent MVP with a modular structure. The agent should fetch real-time market data and execute trades with risk controls. Include:\n1. A `SafeInvestmentAgent` class in `agent/trader.py` with methods for data fetching, risk assessment, and trade execution.\n2. Use `yfinance` for stock market data (configurable for other markets later).\n3. A `config.json` for risk parameters (e.g., max 2% per-trade risk, 3-5% stop-loss).\n4. A `README.md` with setup and run instructions.\n5. A `requirements.txt` with necessary dependencies (e.g., yfinance, pandas)."
+    },
+    {
+      "name": "Add Risk Management Module",
+      "type": "modification",
+      "prompt": "Enhance the SafeInvestmentAgent with a risk management module in `agent/risk_manager.py`. Implement:\n- Per-trade risk limit (max 2% of capital).\n- Dynamic stop-loss (3-5% based on volatility).\n- Volatility-adjusted position sizing.\n- A circuit breaker to halt trading after three consecutive losses.\nUpdate `agent/trader.py` to integrate risk checks before trade execution. Add a JSON schema for risk parameters in `config.json`.",
+      "expected_changes": [
+        "agent/risk_manager.py",
+        "agent/trader.py",
+        "config.json"
+      ]
+    },
+    {
+      "name": "Add Backtesting Framework",
+      "type": "modification",
+      "prompt": "Add a backtesting module in `backtest/backtester.py` to evaluate trading strategies. Implement:\n- A `backtest` function that takes historical data, strategy, and risk parameters, returning performance metrics (e.g., Sharpe ratio, max drawdown).\n- Use `yfinance` to fetch historical stock data for testing.\n- Save results to a JSON file (`results/backtest_results.json`).\nUpdate `README.md` with backtesting instructions.",
+      "expected_changes": [
+        "backtest/backtester.py",
+        "results/backtest_results.json",
+        "README.md"
+      ]
+    },
+    {
+      "name": "Add Performance Dashboard",
+      "type": "modification",
+      "prompt": "Create a simple CLI-based performance dashboard in `dashboard/performance.py`. It should:\n- Display weekly ROI (target 0.5-1%), total portfolio value, and risk metrics.\n- Read trade history from a JSON log (`logs/trade_log.json`).\n- Allow monthly performance review via command-line arguments.\nUpdate `agent/trader.py` to log trades to `logs/trade_log.json`.",
+      "expected_changes": [
+        "dashboard/performance.py",
+        "agent/trader.py",
+        "logs/trade_log.json"
+      ]
+    },
+    {
+      "name": "Add Adaptive Learning System",
+      "type": "modification",
+      "prompt": "Implement a basic learning system in `agent/learning.py` to improve trading decisions. Include:\n- Market regime detection (e.g., trending vs. volatile) using simple statistical measures (e.g., ATR).\n- Analysis of win/loss patterns to adjust risk parameters.\n- A position timeout system (max 48hr hold).\nIntegrate with `SafeInvestmentAgent` to adapt strategies dynamically. Update `config.json` to include learning parameters.",
+      "expected_changes": [
+        "agent/learning.py",
+        "agent/trader.py",
+        "config.json"
+      ]
+    },
+    {
+      "name": "Add One-Click Run Script",
+      "type": "modification",
+      "prompt": "Create a bash script `run.sh` that:\n- Checks for a `.env` file and copies it if available.\n- Installs dependencies from `requirements.txt`.\n- Runs the SafeInvestmentAgent in live mode.\n- Includes comments for beginner-friendly usage.\nUpdate `README.md` with script usage instructions.",
+      "expected_changes": [
+        "run.sh",
+        "README.md"
+      ]
+    },
+    {
+      "name": "Outro",
+      "type": "narration",
+      "message": "We've built a Safe Investment Agent MVP that trades securely with robust risk management, backtesting, and adaptive learning. This is your foundation for safe, automated investing in dynamic markets.",
+      "pause": 5
+    }
+]

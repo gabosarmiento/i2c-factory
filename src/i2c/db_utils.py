@@ -256,7 +256,75 @@ def migrate_knowledge_base(db: lancedb.db.LanceDBConnection) -> bool:
         SCHEMA_KNOWLEDGE_BASE_V2
     )
     return tbl is not None
+# --- New Migration ---
 
+def get_or_create_table_with_migration(
+    db: lancedb.db.LanceDBConnection,
+    table_name: str,
+    base_schema: pa.Schema,
+    target_schema: pa.Schema
+) -> Optional[lancedb.table.LanceTable]:
+    """Gets or creates a table, migrating schema from base to target if needed."""
+    try:
+        if table_name in db.table_names():
+            tbl = db.open_table(table_name)
+            if tbl.schema == target_schema:
+                return tbl
+            
+            # Migration needed
+            canvas.info(f"[DB] Migrating '{table_name}' to v2 schema...")
+            
+            try:
+                # Get current data
+                df = tbl.to_pandas()
+                
+                # Handle empty table case
+                if df.empty:
+                    # For empty tables, just drop and recreate with new schema
+                    canvas.info(f"[DB] Table '{table_name}' is empty, recreating with new schema")
+                    db.drop_table(table_name)
+                    return db.create_table(table_name, schema=target_schema)
+                    
+                # For tables with data, proceed with migration
+                rows = []
+                for _, r in df.iterrows():
+                    new_r = {}
+                    # Copy existing fields
+                    for f in df.columns:
+                        if f in target_schema.names:
+                            new_r[f] = r[f]
+                    
+                    # Add missing fields with defaults
+                    for f in target_schema.names:
+                        if f not in new_r:
+                            if f == "knowledge_space": new_r[f] = "default"
+                            elif f == "document_type": new_r[f] = r.get("category", "unknown")
+                            elif f == "last_updated": new_r[f] = r.get("last_updated", datetime.now().isoformat())
+                            elif f == "metadata_json": new_r[f] = json.dumps({})
+                            elif f == "source_hash": new_r[f] = ""
+                            elif f == "chunk_type": new_r[f] = "text"
+                            else: new_r[f] = ""
+                    
+                    rows.append(new_r)
+                
+                # Replace table
+                db.drop_table(table_name)
+                return db.create_table(table_name, data=rows, schema=target_schema)
+                
+            except Exception as e:
+                canvas.error(f"[DB] Data migration error: {e}")
+                # If migration fails, create empty table with target schema
+                db.drop_table(table_name)
+                return db.create_table(table_name, schema=target_schema)
+                
+        else:
+            canvas.info(f"[DB] Creating new table '{table_name}'")
+            return db.create_table(table_name, schema=target_schema)
+            
+    except Exception as e:
+        canvas.error(f"[DB] Migration for '{table_name}' failed: {e}")
+        return None
+    
 # --- Initialization ---
 def initialize_db() -> Optional[lancedb.db.LanceDBConnection]:
     """Initialize database, create or migrate tables."""

@@ -20,6 +20,11 @@ def initialize_environment():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     builtins.llm_highest, builtins.llm_middle, builtins.llm_small, builtins.llm_xs = initialize_groq_providers()
 
+    # 2) Initialize a global budget manager if not already present
+    if not hasattr(builtins, 'global_budget_manager'):
+        from i2c.agents.budget_manager import BudgetManagerAgent
+        builtins.global_budget_manager = BudgetManagerAgent(session_budget=10.0)
+        
     # 3) Auto-create/migrate our tables *here*, before any agent loads
     from i2c.db_utils import (
         get_db_connection,

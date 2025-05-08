@@ -8,6 +8,8 @@ from i2c.workflow import start_factory_session
 from i2c.cli.ascii   import show_banner
 from i2c.config.config import load_groq_api_key
 from i2c.agents.budget_manager import BudgetManagerAgent
+from i2c.workflow.scenario_processor import run_scenario, add_scenario_arguments
+
 import builtins
 
 def check_environment():
@@ -49,10 +51,26 @@ def main():
     print("--- Application Start ---")
     check_environment()
     show_banner()
+    
+    # Add argument parsing
+    import argparse
+    parser = argparse.ArgumentParser(description="I2C Factory")
+    
+    # Add scenario arguments
+    add_scenario_arguments(parser)
+    
+     # Parse arguments
+    args = parser.parse_args()
 
     if load_environment():
         initialize_budget_manager()
-        start_factory_session()
+        # Check if we should run a scenario
+        if hasattr(args, 'scenario') and args.scenario:
+            print(f"Running scenario: {args.scenario}")
+            run_scenario(args.scenario, builtins.global_budget_manager)
+        else:
+            # Start normal interactive session
+            start_factory_session()
     else:
         print("❌ Workflow aborted due to missing environment configuration.")
 

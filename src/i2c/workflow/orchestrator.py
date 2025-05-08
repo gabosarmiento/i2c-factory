@@ -1,5 +1,6 @@
 # In orchestrator.py
 from pathlib import Path
+from typing import Any
 import json
 import traceback
 
@@ -11,7 +12,8 @@ def route_and_execute(
     action_type: str,
     action_detail: any,
     current_project_path: Path,
-    current_structured_goal: dict | None
+    current_structured_goal: dict | None,
+    budget_manager: Any = None 
 ) -> bool:
     """
     Routes action to appropriate workflows using WorkflowController.

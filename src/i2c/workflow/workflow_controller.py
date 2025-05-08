@@ -12,7 +12,16 @@ from i2c.workflow.sre_team_workflow import SRETeamWorkflow
 from agno.embedder.sentence_transformer import SentenceTransformerEmbedder
 from i2c.db_utils import get_db_connection
 from i2c.cli.controller import canvas
+import builtins
 
+# Get the global budget manager
+if hasattr(builtins, 'global_budget_manager'):
+    budget_manager = builtins.global_budget_manager
+else:
+    # Create a default one if not available
+    from i2c.agents.budget_manager import BudgetManagerAgent
+    budget_manager = BudgetManagerAgent(session_budget=None)
+    
 class WorkflowController:
     """
     Controls workflow execution with recovery capabilities.

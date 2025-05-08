@@ -1,0 +1,43 @@
+[
+    {
+      "name": "Intro: API Client Demo",
+      "type": "narration",
+      "project_name": "weather_api_client", 
+      "message": "Welcome to the I2C Factory demo. Today, we'll see how the system can build a Python API client and then enhance it using technical documentation from our knowledge base.",
+      "pause": 3
+    },
+    {
+      "name": "Initial Project Setup",
+      "type": "initial_generation",
+      "prompt": "Create a simple Python HTTP API client for accessing weather data. Include classes for authentication, request handling, and response parsing. The client should have a clean interface and handle common error cases."
+    },
+    {
+      "name": "Add Weather API Documentation",
+      "type": "knowledge",
+      "doc_path": "src/i2c/docs/weather_api_specs.txt",
+      "doc_type": "API Documentation",
+      "framework": "REST",
+      "version": "1.0"
+    },
+    {
+      "name": "Manual Explanation",
+      "type": "pause",
+      "message": "I've just added the Weather API documentation to our knowledge base. Let's now ask the system to enhance our client with specific endpoint implementations based on this documentation."
+    },
+    {
+      "name": "Enhance with API-Specific Endpoints",
+      "type": "modification",
+      "prompt": "Based on the Weather API documentation in our knowledge base, implement specific endpoint methods for: current conditions, 5-day forecast, and historical data. Each method should properly format parameters according to the API specifications and handle the specific response format for that endpoint."
+    },
+    {
+      "name": "Adding Error Handling",
+      "type": "modification",
+      "prompt": "Enhance the API client with comprehensive error handling based on the error codes and messages documented in our knowledge base. Implement retry logic for temporary errors (5xx) and add specific exception classes for each error category."
+    },
+    {
+      "name": "Outro",
+      "type": "narration",
+      "message": "We've just seen how I2C Factory can not only generate code but also leverage specific technical documentation in its knowledge base to create contextually aware implementations that follow real-world API specifications.",
+      "pause": 5
+    }
+  ]

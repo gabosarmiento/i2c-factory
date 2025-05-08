@@ -21,21 +21,75 @@ from i2c.workflow.visual_helpers import (
 )
 # Function to safely parse JSON, returning None on failure
 def _safe_json_loads(text: str) -> dict | None:
+    """Safely parse JSON, handling potentially complex JSON structures."""
     try:
-        # Pre-process potential markdown fences just in case
+        # Handle case where the input is already a dict
+        if isinstance(text, dict):
+            return text
+            
+        # Pre-process potential markdown fences
         text = text.strip()
         if text.startswith("```json"): text = text[len("```json"):].strip()
         if text.startswith("```"): text = text[3:].strip()
         if text.endswith("```"): text = text[:-3].strip()
-        return json.loads(text)
-    except (json.JSONDecodeError, TypeError):
-        canvas.error(f"DEBUG: Failed to parse JSON: {text[:500]}")
+        
+        # Try to parse the JSON
+        parsed = json.loads(text)
+        
+        # Handle case where we have a JSON with a "prompt" field
+        if isinstance(parsed, dict) and "prompt" in parsed:
+            prompt_content = parsed["prompt"]
+            
+            # For handling single-line input with escaped newlines
+            if isinstance(prompt_content, str):
+                # Replace literal "\n" with actual newlines for better processing
+                prompt_content = prompt_content.replace("\\n", "\n")
+            
+            # Process the prompt content through the input processor
+            from i2c.agents.core_agents import input_processor_agent
+            canvas.info("Processing JSON prompt content...")
+            
+            response = input_processor_agent.run(prompt_content)
+            response_content = response.content if hasattr(response, 'content') else str(response)
+            
+            try:
+                processed = json.loads(response_content)
+                if isinstance(processed, dict) and "objective" in processed and "language" in processed:
+                    return processed
+                else:
+                    # If structured correctly but missing fields
+                    canvas.warning("Processed JSON missing required fields. Using original.")
+            except json.JSONDecodeError:
+                # If not valid JSON, use the original parsed content
+                canvas.warning("Could not parse processor response as JSON.")
+                
+            # Return the original parsed JSON if we couldn't process the prompt
+            return parsed
+            
+        # If we have a regular JSON with objective/language, use it directly
+        if isinstance(parsed, dict) and "objective" in parsed and "language" in parsed:
+            return parsed
+            
+        # Return whatever was successfully parsed
+        return parsed
+    except (json.JSONDecodeError, TypeError) as e:
+        # Log the full error without truncation
+        import logging
+        logging.error(f"JSON parse error: {str(e)}")
+        logging.error(f"Failed JSON content: {text}")
+        
+        # Show a more helpful error to the user
+        canvas.error(f"Failed to parse JSON: {str(e)}")
+        canvas.error("Make sure your JSON is properly formatted and doesn't contain unescaped special characters.")
+        canvas.info("Tip: For complex JSON, try escaping newlines with \\n instead of actual line breaks.")
+        
         return None
 
 
 
 def handle_get_user_action(current_project_path: Path | None) -> tuple[str | None, str | None]:
     """Gets and parses the user's next action command."""
+    
     if current_project_path:
         project_status = f"Project: '{current_project_path.name}'"
         options = "'f <idea>', 'r', 's <story>', 'k', 'plan', '?', 'q'"
@@ -563,93 +617,200 @@ def ingest_documentation(
     version: str = "",
     recursive: bool = True,
     is_refresh: bool = False
-):
-    """Core function to ingest documentation into the knowledge base."""
-    try:
-        # Import dependencies
-        from sentence_transformers import SentenceTransformer
-        import hashlib
-        from datetime import datetime
-        import json
-        from i2c.db_utils import get_db_connection, get_or_create_table_with_migration, add_or_update_chunks
-        from i2c.db_utils import TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2 
-        from i2c.db_utils import SCHEMA_KNOWLEDGE_BASE
+) -> bool:
+    """
+    Core function to ingest documentation into the knowledge base with improved error handling.
+    
+    Args:
+        project_path: The project path for which documentation is being added
+        doc_path: Path to the document or directory to ingest
+        document_type: Type of document (e.g., "API Documentation")
+        framework: Optional framework name (e.g., "React")
+        version: Optional version info
+        recursive: Whether to process directories recursively
+        is_refresh: Whether this is a refresh of existing documentation
         
-        # Create a SentenceTransformerEmbedder class that wraps SentenceTransformer
+    Returns:
+        bool: True if ingestion was successful, False otherwise
+    """
+    try:
+        # Import dependencies with detailed error reporting
+        canvas.info("Setting up knowledge ingestion...")
+        
+        try:
+            from sentence_transformers import SentenceTransformer
+            canvas.info("✅ SentenceTransformer imported successfully")
+        except ImportError as e:
+            canvas.error(f"Failed to import SentenceTransformer: {e}")
+            canvas.error("Please install with: pip install sentence-transformers")
+            return False
+            
+        try:
+            import hashlib
+            from datetime import datetime
+            import json
+            canvas.info("✅ Standard libraries imported successfully")
+        except ImportError as e:
+            canvas.error(f"Failed to import standard libraries: {e}")
+            return False
+            
+        try:
+            from i2c.db_utils import (
+                get_db_connection,
+                get_or_create_table,
+                add_or_update_chunks,
+                TABLE_KNOWLEDGE_BASE,
+                SCHEMA_KNOWLEDGE_BASE_V2,
+                SCHEMA_KNOWLEDGE_BASE
+            )
+            canvas.info("✅ Database utilities imported successfully")
+        except ImportError as e:
+            canvas.error(f"Failed to import database utilities: {e}")
+            return False
+        
+        # Create a SentenceTransformerEmbedder wrapper class
         class SentenceTransformerEmbedder:
             def __init__(self):
-                self.model = SentenceTransformer('all-MiniLM-L6-v2')
+                canvas.info("Initializing embedding model...")
+                try:
+                    self.model = SentenceTransformer('all-MiniLM-L6-v2')
+                    canvas.info("✅ Embedding model initialized")
+                except Exception as e:
+                    canvas.error(f"Error initializing embedding model: {e}")
+                    raise
                 
             def get_embedding(self, text):
                 return self.model.encode(text).tolist()
         
         # Use the project's knowledge space
         knowledge_space = f"project_{project_path.name}"
+        canvas.info(f"Using knowledge space: {knowledge_space}")
         
         # Initialize embedding model
         try:
             embed_model = SentenceTransformerEmbedder()
+            canvas.info("✅ Embedding model created successfully")
         except Exception as e:
             canvas.error(f"Failed to initialize embedding model: {e}")
             return False
         
-        # Connect to database
-        db = get_db_connection()
+        # Connect to database with retry
+        db = None
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                canvas.info(f"Connecting to database (attempt {attempt+1}/{max_retries})...")
+                db = get_db_connection()
+                if db:
+                    canvas.info(f"✅ Connected to database: {db}")
+                    break
+            except Exception as e:
+                canvas.error(f"Database connection error (attempt {attempt+1}): {e}")
+                if attempt < max_retries - 1:
+                    canvas.info("Retrying database connection...")
+                    import time
+                    time.sleep(1)  # Wait before retry
+                else:
+                    canvas.error("Failed to connect to database after multiple attempts")
+                    return False
+                    
         if not db:
             canvas.error("Failed to connect to database")
             return False
-        
-        # Ensure knowledge base table exists
-        table = get_or_create_table_with_migration(
-            db,
-            TABLE_KNOWLEDGE_BASE,
-            SCHEMA_KNOWLEDGE_BASE,
-            SCHEMA_KNOWLEDGE_BASE_V2
-        )
-        if not table:
-            canvas.error("Failed to create or access knowledge base table")
+            
+        # Check database tables
+        canvas.info("Checking for knowledge base table...")
+        try:
+            # First try to open the table to see if it exists
+            if TABLE_KNOWLEDGE_BASE in db.table_names():
+                canvas.info(f"Table '{TABLE_KNOWLEDGE_BASE}' exists")
+                try:
+                    table = db.open_table(TABLE_KNOWLEDGE_BASE)
+                    # Try to get table schema to check if it's valid
+                    schema = table.schema
+                    canvas.info(f"Table schema: {schema}")
+                except Exception as e:
+                    canvas.warning(f"Error opening existing table: {e}")
+                    canvas.warning("Will attempt to recreate the table")
+                    try:
+                        canvas.info(f"Dropping problematic table '{TABLE_KNOWLEDGE_BASE}'")
+                        db.drop_table(TABLE_KNOWLEDGE_BASE)
+                    except Exception as drop_e:
+                        canvas.error(f"Error dropping table: {drop_e}")
+            
+            # Direct table creation approach
+            try:
+                canvas.info(f"Creating/ensuring table '{TABLE_KNOWLEDGE_BASE}'")
+                if TABLE_KNOWLEDGE_BASE in db.table_names():
+                    table = db.open_table(TABLE_KNOWLEDGE_BASE)
+                else:
+                    table = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE_V2)
+                canvas.success(f"✅ Table ready: {TABLE_KNOWLEDGE_BASE}")
+            except Exception as e:
+                canvas.error(f"Error creating table: {e}")
+                import traceback
+                canvas.error(traceback.format_exc())
+                return False
+        except Exception as e:
+            canvas.error(f"Error checking/creating knowledge base table: {e}")
+            import traceback
+            canvas.error(traceback.format_exc())
             return False
-        
-        # Process directory or single file
+            
+        # Now process the document or directory
         if doc_path.is_dir():
             # Process directory
             pattern = "**/*" if recursive else "*"
             files_processed = 0
             files_succeeded = 0
             
+            canvas.info(f"Processing directory: {doc_path}")
             for file_path in doc_path.glob(pattern):
                 if file_path.is_file() and not any(part.startswith('.') for part in file_path.parts):
                     files_processed += 1
+                    canvas.info(f"Processing file {files_processed}: {file_path}")
                     
                     # Process file based on type
                     if file_path.suffix.lower() == '.pdf':
-                        success = process_pdf_file(file_path, document_type, knowledge_space, embed_model, db, 
-                                                  {"framework": framework, "version": version, "project": project_path.name})
+                        success = process_pdf_file(
+                            file_path, document_type, knowledge_space, embed_model, db, 
+                            {"framework": framework, "version": version, "project": project_path.name}
+                        )
                     else:
-                        success = process_text_file(file_path, document_type, knowledge_space, embed_model, db,
-                                                   {"framework": framework, "version": version, "project": project_path.name})
+                        success = process_text_file(
+                            file_path, document_type, knowledge_space, embed_model, db,
+                            {"framework": framework, "version": version, "project": project_path.name}
+                        )
                     
                     if success:
                         files_succeeded += 1
+                        canvas.success(f"✅ Successfully processed {file_path}")
+                    else:
+                        canvas.error(f"❌ Failed to process {file_path}")
             
             # Report results
-            canvas.success(f"Successfully processed {files_succeeded}/{files_processed} files")
+            canvas.success(f"📚 Successfully processed {files_succeeded}/{files_processed} files")
             return files_succeeded > 0
             
         else:
             # Process single file
+            canvas.info(f"Processing single file: {doc_path}")
             if doc_path.suffix.lower() == '.pdf':
-                success = process_pdf_file(doc_path, document_type, knowledge_space, embed_model, db, 
-                                          {"framework": framework, "version": version, "project": project_path.name})
+                success = process_pdf_file(
+                    doc_path, document_type, knowledge_space, embed_model, db, 
+                    {"framework": framework, "version": version, "project": project_path.name}
+                )
             else:
-                success = process_text_file(doc_path, document_type, knowledge_space, embed_model, db,
-                                           {"framework": framework, "version": version, "project": project_path.name})
+                success = process_text_file(
+                    doc_path, document_type, knowledge_space, embed_model, db,
+                    {"framework": framework, "version": version, "project": project_path.name}
+                )
             
             if success:
-                canvas.success(f"Successfully processed {doc_path}")
+                canvas.success(f"✅ Successfully processed {doc_path}")
                 return True
             else:
-                canvas.error(f"Failed to process {doc_path}")
+                canvas.error(f"❌ Failed to process {doc_path}")
                 return False
                 
     except Exception as e:
@@ -657,7 +818,7 @@ def ingest_documentation(
         import traceback
         canvas.error(traceback.format_exc())
         return False
-
+    
 def process_pdf_file(file_path, document_type, knowledge_space, embed_model, db, metadata=None):
     """Process a PDF file into knowledge chunks"""
     try:
@@ -738,6 +899,88 @@ def process_pdf_file(file_path, document_type, knowledge_space, embed_model, db,
         return False
 
 def process_text_file(file_path, document_type, knowledge_space, embed_model, db, metadata=None):
+    """Process a text file into knowledge chunks with better error handling"""
+    try:
+        canvas.info(f"Processing text file: {file_path}")
+        
+        # Calculate file hash
+        try:
+            with open(file_path, 'rb') as f:
+                file_hash = hashlib.sha256(f.read()).hexdigest()
+                canvas.info(f"File hash calculated: {file_hash[:8]}...")
+        except Exception as e:
+            canvas.error(f"Error calculating file hash: {e}")
+            file_hash = "unknown_hash"
+        
+        # Read file content
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+                canvas.info(f"File content read: {len(content)} characters")
+                
+                if not content or len(content) < 10:
+                    canvas.warning(f"File content too short or empty: {len(content)} chars")
+                    return False
+        except Exception as e:
+            canvas.error(f"Error reading file content: {e}")
+            return False
+        
+        # Create vector
+        try:
+            vector = embed_model.get_embedding(content)
+            canvas.info(f"Vector embedding created: {len(vector)} dimensions")
+        except Exception as e:
+            canvas.error(f"Error creating vector embedding: {e}")
+            return False
+        
+        # Create chunk
+        try:
+            chunks = [{
+                "source": str(file_path),
+                "content": content,
+                "vector": vector,
+                "category": document_type,
+                "last_updated": datetime.now().isoformat(),
+                "knowledge_space": knowledge_space,
+                "document_type": document_type,
+                "framework": metadata.get("framework", "") if metadata else "",
+                "version": metadata.get("version", "") if metadata else "",
+                "parent_doc_id": "",
+                "chunk_type": "text",
+                "source_hash": file_hash,
+                "metadata_json": json.dumps(metadata or {}),
+            }]
+            canvas.info(f"Chunk created successfully")
+        except Exception as e:
+            canvas.error(f"Error creating chunk: {e}")
+            return False
+        
+        # Add chunks to database
+        try:
+            from i2c.db_utils import add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2
+            
+            add_or_update_chunks(
+                db=db,
+                table_name=TABLE_KNOWLEDGE_BASE,
+                schema=SCHEMA_KNOWLEDGE_BASE_V2,
+                identifier_field="source",
+                identifier_value=str(file_path),
+                chunks=chunks
+            )
+            
+            canvas.success(f"Added text file to knowledge base: {file_path}")
+            return True
+        except Exception as e:
+            canvas.error(f"Error adding chunks to database: {e}")
+            import traceback
+            canvas.error(traceback.format_exc())
+            return False
+            
+    except Exception as e:
+        canvas.error(f"Error processing text file: {e}")
+        import traceback
+        canvas.error(traceback.format_exc())
+        return False
     """Process a text file into knowledge chunks"""
     try:
         canvas.info(f"Processing text file: {file_path}")
