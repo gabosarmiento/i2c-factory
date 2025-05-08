@@ -660,7 +660,6 @@ def ingest_documentation(
                 get_or_create_table,
                 add_or_update_chunks,
                 TABLE_KNOWLEDGE_BASE,
-                SCHEMA_KNOWLEDGE_BASE_V2,
                 SCHEMA_KNOWLEDGE_BASE
             )
             canvas.info("✅ Database utilities imported successfully")
@@ -744,7 +743,7 @@ def ingest_documentation(
                 if TABLE_KNOWLEDGE_BASE in db.table_names():
                     table = db.open_table(TABLE_KNOWLEDGE_BASE)
                 else:
-                    table = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE_V2)
+                    table = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE)
                 canvas.success(f"✅ Table ready: {TABLE_KNOWLEDGE_BASE}")
             except Exception as e:
                 canvas.error(f"Error creating table: {e}")
@@ -879,12 +878,12 @@ def process_pdf_file(file_path, document_type, knowledge_space, embed_model, db,
                 canvas.warning(f"Error processing page {i+1}: {e}")
         
         # Add chunks to database
-        from i2c.db_utils import add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2
+        from i2c.db_utils import add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE
         
         add_or_update_chunks(
             db=db,
             table_name=TABLE_KNOWLEDGE_BASE,
-            schema=SCHEMA_KNOWLEDGE_BASE_V2,
+            schema=SCHEMA_KNOWLEDGE_BASE,
             identifier_field="source",
             identifier_value=str(file_path),
             chunks=chunks
@@ -957,12 +956,12 @@ def process_text_file(file_path, document_type, knowledge_space, embed_model, db
         
         # Add chunks to database
         try:
-            from i2c.db_utils import add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2
+            from i2c.db_utils import add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE
             
             add_or_update_chunks(
                 db=db,
                 table_name=TABLE_KNOWLEDGE_BASE,
-                schema=SCHEMA_KNOWLEDGE_BASE_V2,
+                schema=SCHEMA_KNOWLEDGE_BASE,
                 identifier_field="source",
                 identifier_value=str(file_path),
                 chunks=chunks
@@ -1014,12 +1013,12 @@ def process_text_file(file_path, document_type, knowledge_space, embed_model, db
         }]
         
         # Add chunks to database
-        from i2c.db_utils import add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2
+        from i2c.db_utils import add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE
         
         add_or_update_chunks(
             db=db,
             table_name=TABLE_KNOWLEDGE_BASE,
-            schema=SCHEMA_KNOWLEDGE_BASE_V2,
+            schema=SCHEMA_KNOWLEDGE_BASE,
             identifier_field="source",
             identifier_value=str(file_path),
             chunks=chunks

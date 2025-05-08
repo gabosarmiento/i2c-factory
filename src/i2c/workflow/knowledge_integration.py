@@ -9,7 +9,7 @@ import json
 from i2c.cli.controller import canvas
 
 # Import database utilities
-from i2c.db_utils import get_db_connection, get_or_create_table_with_migration, SCHEMA_KNOWLEDGE_BASE_V2
+from i2c.db_utils import get_db_connection, SCHEMA_KNOWLEDGE_BASE
 
 # Import budget manager
 from i2c.agents.budget_manager import BudgetManagerAgent

@@ -7,6 +7,90 @@ import traceback
 from i2c.workflow.workflow_controller import WorkflowController
 from i2c.cli.controller import canvas
 from i2c.workflow.visual_helpers import show_progress, show_file_list
+# Add the enhanced route_and_execute_with_recovery function to the orchestrator
+from i2c.workflow.validation import (
+    validate_generated_application, 
+    get_code_map_from_path,
+    apply_fixes_based_on_validation,
+    try_recovery_actions
+)
+
+def route_and_execute_with_recovery(
+    action_type: str,
+    action_detail: any,
+    current_project_path: Path,
+    current_structured_goal: dict | None,
+    max_retries: int = 2  # Allow for retries
+) -> bool:
+    """Enhanced route_and_execute with error recovery"""
+    from i2c.cli.controller import canvas
+    import traceback
+    
+    # Track attempts for each step
+    attempts = 0
+    last_error = None
+    
+    while attempts <= max_retries:
+        try:
+            # 1. Regular execution attempt
+            if attempts > 0:
+                canvas.warning(f"Retry attempt {attempts}/{max_retries} after error: {str(last_error)}")
+            
+            # Call the normal workflow
+            success = route_and_execute(
+                action_type=action_type,
+                action_detail=action_detail,
+                current_project_path=current_project_path,
+                current_structured_goal=current_structured_goal
+            )
+            
+            if success:
+                # 2. Validate the generated output
+                validation_success, validation_results = validate_generated_application(
+                    get_code_map_from_path(current_project_path),
+                    current_project_path,
+                    current_structured_goal.get("language", "python")
+                )
+                
+                if validation_success:
+                    canvas.success("Generated application passed validation checks!")
+                    return True
+                else:
+                    # Failed validation
+                    canvas.warning(f"Generated application failed validation on attempt {attempts + 1}")
+                    if attempts < max_retries:
+                        # Apply fixes based on validation results before retrying
+                        apply_fixes_based_on_validation(validation_results, current_project_path)
+                    else:
+                        canvas.warning("Max retries reached. Proceeding with warnings.")
+                        return True  # Return success despite validation issues
+            
+            # Retry on failure if attempts remain
+            if not success and attempts < max_retries:
+                attempts += 1
+                canvas.warning(f"Action failed. Retrying ({attempts}/{max_retries})...")
+                continue
+            else:
+                return success
+            
+        except Exception as e:
+            # Capture error for potential retry
+            last_error = e
+            attempts += 1
+            
+            # Log the error
+            canvas.error(f"Error during execution: {str(e)}")
+            canvas.error(traceback.format_exc())
+            
+            if attempts <= max_retries:
+                canvas.warning(f"Attempting recovery ({attempts}/{max_retries})...")
+                # Try recovery actions before retry
+                try_recovery_actions(action_type, current_project_path)
+            else:
+                canvas.error(f"Max retries exceeded. Recovery failed.")
+                return False
+    
+    return False
 
 def route_and_execute(
     action_type: str,

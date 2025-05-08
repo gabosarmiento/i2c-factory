@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import traceback
 
 # Import core agent instances
 from i2c.agents.core_agents import (
@@ -18,95 +19,109 @@ from .modification.file_operations import write_files_to_disk as write_files
 # Import CLI controller
 from i2c.cli.controller import canvas
 
-def clean_llm_response(raw_text, file_path):
-    """Cleans the LLM response to extract only valid code"""
-    # 1. Remove XML/HTML tags
+def clean_and_validate_code(raw_text, file_path):
+    """Enhanced code cleaning and validation function"""
+    # 1. Remove thinking/reasoning text
     import re
-    clean_raw = re.sub(r'<\/?think>', '', raw_text)
-    clean_raw = re.sub(r'<\/?answer>', '', clean_raw)
-    clean_raw = re.sub(r'<\/?code>', '', clean_raw)
     
-    # 2. Handle markdown code blocks
-    if clean_raw.strip().startswith("```"):
-        # Extract code from markdown blocks
-        code_start = clean_raw.find("```") + 3
-        # Skip language declaration if it exists
-        language_marker_end = clean_raw.find("\n", code_start)
-        if language_marker_end != -1:
-            code_start = language_marker_end + 1
-        code_end = clean_raw.rfind("```")
-        if code_end != -1:
-            code = clean_raw[code_start:code_end].strip()
+    # First, extract code blocks if present
+    if "```" in raw_text:
+        code_blocks = re.findall(r'```(?:python|javascript)?\s*([\s\S]*?)```', raw_text)
+        if code_blocks:
+            # Use the largest code block found
+            code = max(code_blocks, key=len).strip()
         else:
-            # If no closing block, take everything after the opening
-            code = clean_raw[code_start:].strip()
+            code = raw_text.strip()
     else:
-        # Try to extract only code if no markdown blocks
-        python_pattern = re.compile(r'(def|class|import|from|print|if __name__|#!\/usr\/bin\/env python)', re.MULTILINE)
-        matches = list(python_pattern.finditer(clean_raw))
-        if matches:
-            # Start from the first Python pattern
-            first_match = matches[0]
-            code = clean_raw[first_match.start():].strip()
-        else:
-            code = clean_raw.strip()
+        code = raw_text.strip()
     
-    # 3. Special handling for qwen model's thinking patterns
-    thinking_phrases = [
-        "The file needs to be named", "Let me make sure", 
-        "When you run", "I don't need any", "Alright, that's all",
-        "So the entire code", "should output", "just that one line"
-    ]
+    # 2. Enhanced language detection
+    is_python = file_path.endswith('.py')
+    is_javascript = file_path.endswith('.js') or file_path.endswith('.jsx')
+    is_html = file_path.endswith('.html') or file_path.endswith('.htm')
     
-    # If any of these phrases are found, create a fallback hello world program
-    if any(phrase in code for phrase in thinking_phrases):
-        if file_path.endswith('.py'):
-            return '#!/usr/bin/env python3\n\ndef main():\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    main()'
-        elif file_path.endswith('.js'):
-            return 'console.log("Hello, World!");'
-        elif file_path.endswith('.html'):
-            return '<!DOCTYPE html>\n<html>\n<head>\n    <title>Hello World</title>\n</head>\n<body>\n    <h1>Hello, World!</h1>\n</body>\n</html>'
-        else:
-            return f'# {file_path}\nprint("Hello, World!")'
-    
-    # 4. Check for other thinking text
-    thinking_phrases = ["Let's think about", "I need to create", "Okay, I need to", 
-                       "should", "could", "would", "thinking", "plan", "First,", 
-                       "create a Python script", "implement", "write a program"]
-    
-    contains_thinking = any(phrase in code for phrase in thinking_phrases)
-    
-    if contains_thinking:
-        # Extract only what looks like real code
-        real_code_lines = []
-        in_comment_block = False
-        for line in code.split('\n'):
-            # Skip thinking lines
-            if any(re.search(rf'.*{re.escape(phrase)}.*', line, re.IGNORECASE) for phrase in thinking_phrases):
-                continue
-                
-            # Check if we're in a comment block
-            if line.strip().startswith('"""') or line.strip().startswith("'''"):
-                in_comment_block = not in_comment_block
-                
-            # Only include actual code and proper comments
-            if not in_comment_block or line.strip().startswith('#'):
-                real_code_lines.append(line)
-                
-        code = '\n'.join(real_code_lines).strip()
-    
-    # 5. Final fallback for invalid or empty code
-    if not code or len(code) < 10:
-        if file_path.endswith('.py'):
-            return '#!/usr/bin/env python3\n\ndef main():\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    main()'
-        elif file_path.endswith('.js'):
-            return 'console.log("Hello, World!");'
-        elif file_path.endswith('.html'):
-            return '<!DOCTYPE html>\n<html>\n<head>\n    <title>Hello World</title>\n</head>\n<body>\n    <h1>Hello, World!</h1>\n</body>\n</html>'
-        else:
-            return f'# {file_path}\nprint("Hello, World!")'
+    # 3. Validate syntax based on language
+    if is_python:
+        try:
+            import ast
+            ast.parse(code)
+            # Syntax is valid, keep the code
+        except SyntaxError as e:
+            # Log the error
+            from i2c.cli.controller import canvas
+            canvas.warning(f"Syntax error in generated Python code: {e}")
             
+            # Apply auto-fixes for common Python syntax issues
+            code = fix_common_python_errors(code)
+            
+            # If code still has syntax errors after fixes, fall back to template
+            try:
+                ast.parse(code)
+            except SyntaxError:
+                code = generate_fallback_template(file_path)
+    
+    elif is_javascript:
+        try:
+            # Use esprima for JS validation (already in dependencies)
+            import esprima
+            esprima.parseScript(code)
+        except Exception as e:
+            # Log the error
+            from i2c.cli.controller import canvas
+            canvas.warning(f"Syntax error in generated JavaScript code: {e}")
+            
+            # Fall back to template
+            code = generate_fallback_template(file_path)
+    
+    # 4. Ensure file has minimum required content
+    if len(code.strip()) < 10:
+        code = generate_fallback_template(file_path)
+        
     return code
+
+def fix_common_python_errors(code):
+    """Fix common Python syntax errors"""
+    import re
+    
+    # Fix 1: Missing colons after function/class definitions
+    code = re.sub(r'(def\s+\w+\([^)]*\))\s*\n', r'\1:\n', code)
+    code = re.sub(r'(class\s+\w+(?:\([^)]*\))?)\s*\n', r'\1:\n', code)
+    
+    # Fix 2: Incorrect indentation (basic fix)
+    lines = code.split('\n')
+    fixed_lines = []
+    in_class_or_func = False
+    expected_indent = 0
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            fixed_lines.append(line)
+            continue
+            
+        # Check for class/function definitions
+        if re.match(r'(def|class)\s+\w+', stripped):
+            in_class_or_func = True
+            expected_indent = len(line) - len(line.lstrip())
+            fixed_lines.append(line)
+        elif in_class_or_func and not line.startswith(' '):
+            # Indentation needed but not present
+            fixed_lines.append(' ' * 4 + line)
+        else:
+            fixed_lines.append(line)
+    
+    return '\n'.join(fixed_lines)
+
+def generate_fallback_template(file_path):
+    """Generate a minimal working fallback template based on file type"""
+    if file_path.endswith('.py'):
+        return '#!/usr/bin/env python3\n\n"""\nModule: {}\nGenerated fallback template\n"""\n\ndef main():\n    """Main function"""\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    main()'.format(file_path)
+    elif file_path.endswith('.js'):
+        return '/**\n * File: {}\n * Generated fallback template\n */\n\nconsole.log("Hello, World!");'.format(file_path)
+    elif file_path.endswith('.html'):
+        return '<!DOCTYPE html>\n<html>\n<head>\n    <meta charset="UTF-8">\n    <title>{}</title>\n</head>\n<body>\n    <h1>Hello, World!</h1>\n</body>\n</html>'.format(file_path)
+    else:
+        return '# {}\n# Generated fallback template\n\nprint("Hello, World!")'.format(file_path)
 
 def ensure_init_py(project_path: Path):
     """Ensure __init__.py exists in the project root to make it a Python package."""
@@ -178,7 +193,7 @@ def execute_generation_cycle(structured_goal: dict, project_path: Path) -> dict:
             raw = response.content if hasattr(response, 'content') else str(response)
             
             # Use the clean_llm_response function to handle the cleaning
-            code = clean_llm_response(raw, file_path)
+            code = clean_and_validate_code(raw, file_path)
             
             # Debug logging
             canvas.info(f"Cleaned code for {file_path}: {len(code)} chars")

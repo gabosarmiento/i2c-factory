@@ -16,7 +16,7 @@ from agno.document.reader.docx_reader import DocxReader
 from agno.document.reader.url_reader import URLReader
 from agno.utils.log import logger
 
-from db_utils import get_db_connection, add_knowledge_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2
+from i2c.db_utils import get_db_connection, add_knowledge_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE
 
 # Shim for batch embedding
 from sentence_transformers import SentenceTransformer

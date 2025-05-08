@@ -102,7 +102,7 @@ class ScenarioProcessor:
                 TABLE_CODE_CONTEXT, 
                 SCHEMA_CODE_CONTEXT,
                 TABLE_KNOWLEDGE_BASE, 
-                SCHEMA_KNOWLEDGE_BASE_V2
+                SCHEMA_KNOWLEDGE_BASE
             )
             
             # Connect to DB
@@ -131,7 +131,7 @@ class ScenarioProcessor:
                     db.drop_table(TABLE_KNOWLEDGE_BASE)
                     
                 canvas.info(f"Creating {TABLE_KNOWLEDGE_BASE} table")
-                kb_tbl = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE_V2)
+                kb_tbl = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE)
                 canvas.success(f"Created {TABLE_KNOWLEDGE_BASE} table")
             except Exception as e:
                 canvas.error(f"Failed to create {TABLE_KNOWLEDGE_BASE} table: {e}")
@@ -680,7 +680,7 @@ class ScenarioProcessor:
     def debug_knowledge_base(self) -> bool:
         """Debug knowledge base connectivity and schema"""
         try:
-            from i2c.db_utils import get_db_connection, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2
+            from i2c.db_utils import get_db_connection, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE
             
             # Connect to DB
             db = get_db_connection()
@@ -722,7 +722,6 @@ class ScenarioProcessor:
             path = path.resolve()
             
             if not path.exists():
-                canvas.error(f"Project path does not exist: {path}")
                 try:
                     path.mkdir(parents=True, exist_ok=True)
                     canvas.info(f"Created project directory: {path}")
