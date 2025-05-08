@@ -8,7 +8,7 @@ from i2c.db_utils import (
     migrate_knowledge_base,
     add_knowledge_chunks,
     query_context_filtered,
-    SCHEMA_KNOWLEDGE_BASE_V2, 
+    SCHEMA_KNOWLEDGE_BASE, 
     DB_PATH
 )
 from i2c.bootstrap import initialize_environment

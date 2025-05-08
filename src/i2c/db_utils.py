@@ -1,11 +1,14 @@
 # /db_utils.py
 # Enhanced utilities for both Code Context and Knowledge Base systems
-
+'''To reset the database, you can add a --recreate-db flag 
+   just run poetry run i2c --recreate-db when you need to reset the database, 
+   instead of manually deleting the directory.
+'''
 import lancedb
 from pathlib import Path
 import pyarrow as pa
 import pandas as pd
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List
 import json
 from datetime import datetime
 
@@ -15,10 +18,10 @@ try:
 except ImportError:
     # Basic fallback logger
     class FallbackCanvas:
-        def warning(self, msg): print(f"[WARN_DB] {msg}")
-        def error(self, msg): print(f"[ERROR_DB] {msg}")
-        def info(self, msg): print(f"[INFO_DB] {msg}")
-        def success(self, msg): print(f"[SUCCESS_DB] {msg}")
+        def warning(self, msg): print(f"[WARNING]: {msg}")
+        def error(self, msg): print(f"[ERROR]: {msg}")
+        def info(self, msg): print(f"[INFO]: {msg}")
+        def success(self, msg): print(f"[SUCCESS]: {msg}")
     canvas = FallbackCanvas()
 
 # --- Configuration ---
@@ -42,17 +45,8 @@ SCHEMA_CODE_CONTEXT = pa.schema([
     pa.field("language", pa.string()),
 ])
 
-# --- Original Schema for Knowledge Base Table (v1) ---
+# --- Schema for Knowledge Base Table (Unified V2 Schema) ---
 SCHEMA_KNOWLEDGE_BASE = pa.schema([
-    pa.field("source", pa.string()),
-    pa.field("content", pa.string()),
-    pa.field("vector", pa.list_(pa.float32(), list_size=VECTOR_DIMENSION)),
-    pa.field("category", pa.string()),
-    pa.field("last_updated", pa.string()),
-])
-
-# --- Extended Schema for Knowledge Base Table (v2) ---
-SCHEMA_KNOWLEDGE_BASE_V2 = pa.schema([
     pa.field("source", pa.string()),
     pa.field("content", pa.string()),
     pa.field("vector", pa.list_(pa.float32(), list_size=VECTOR_DIMENSION)),
@@ -77,69 +71,124 @@ def get_db_connection() -> Optional[lancedb.db.LanceDBConnection]:
     try:
         return lancedb.connect(str(db_uri))
     except Exception as e:
-        canvas.error(f"[DB] Failed to connect to LanceDB at {db_uri}: {e}")
+        canvas.error(f"Failed to connect to LanceDB at {db_uri}: {e}")
         return None
 
-
+# def get_or_create_table(
+#     db: lancedb.db.LanceDBConnection,
+#     table_name: str,
+#     schema: pa.Schema,
+#     force_recreate: bool = False
+# ) -> Optional[lancedb.table.LanceTable]:
+#     """Gets or creates a LanceDB table with a specific schema.
+    
+#     Args:
+#         db: LanceDB connection
+#         table_name: Name of the table
+#         schema: PyArrow schema defining the table structure
+#         force_recreate: If True, drops and recreates the table even if it exists
+        
+#     Returns:
+#         LanceTable object or None if operation fails
+#     """
+#     try:
+#         # Handle force recreation
+#         if force_recreate and table_name in db.table_names():
+#             canvas.info(f"Dropping existing {table_name} table")
+#             try:
+#                 db.drop_table(table_name)
+#             except Exception as e:
+#                 canvas.warning(f"Error dropping table {table_name}: {e}")
+                
+#         # Check if table exists
+#         if table_name in db.table_names():
+#             tbl = db.open_table(table_name)
+#             # Debug: Print schema equality check details
+#             canvas.info(f"Schema equality check for {table_name}: {tbl.schema == schema}")
+#             canvas.info(f"Schema hash comparison: {hash(str(tbl.schema))} vs {hash(str(schema))}")
+            
+#             # Additional debug for field-by-field comparison
+#             tbl_fields = {f.name: (str(f.type), f.nullable) for f in tbl.schema}
+#             schema_fields = {f.name: (str(f.type), f.nullable) for f in schema}
+            
+#             # Check fields and properties
+#             for name in schema_fields:
+#                 if name not in tbl_fields:
+#                     canvas.error(f"Field {name} missing in table schema")
+#                 elif tbl_fields[name] != schema_fields[name]:
+#                     canvas.error(f"Field {name} differs: table={tbl_fields[name]}, expected={schema_fields[name]}")
+            
+#             # Check the list of field names matches exactly
+#             if set(tbl_fields.keys()) != set(schema_fields.keys()):
+#                 canvas.error(f"Field sets don't match: table has {set(tbl_fields.keys())}, expected {set(schema_fields.keys())}")
+            
+#             # Check for schema compatibility
+#             if tbl.schema != schema:
+#                 canvas.error(f"Table schema: {tbl.schema}")
+#                 canvas.error(f"Expected schema: {schema}")
+#                 canvas.error(f"Schema mismatch for '{table_name}'. Use force_recreate=True to reset.")
+#                 return None
+#             return tbl
+#         else:
+#             canvas.info(f"Creating {table_name} table")
+#             return db.create_table(table_name, schema=schema)
+#     except Exception as e:
+#         canvas.error(f"Open/create table '{table_name}' failed: {e}")
+#         return None
 def get_or_create_table(
     db: lancedb.db.LanceDBConnection,
     table_name: str,
-    schema: pa.Schema
+    schema: pa.Schema,
+    force_recreate: bool = False
 ) -> Optional[lancedb.table.LanceTable]:
     """Gets or creates a LanceDB table with a specific schema."""
     try:
+        # Handle force recreation
+        if force_recreate and table_name in db.table_names():
+            canvas.info(f"Dropping existing {table_name} table")
+            try:
+                db.drop_table(table_name)
+            except Exception as e:
+                canvas.warning(f"Error dropping table {table_name}: {e}")
+                
+        # Check if table exists
         if table_name in db.table_names():
-            tbl = db.open_table(table_name)
-            if tbl.schema != schema:
-                canvas.warning(f"[DB] Schema mismatch for '{table_name}'")
+            try:
+                tbl = db.open_table(table_name)
+            except Exception as e:
+                canvas.error(f"Error opening existing table '{table_name}': {e}")
                 return None
-            return tbl
-        else:
-            canvas.info(f"[DB] Creating table '{table_name}'")
-            return db.create_table(table_name, schema=schema)
-    except Exception as e:
-        canvas.error(f"[DB] Open/create table '{table_name}' failed: {e}")
-        return None
-
-# --- Migration-Enabled Table Getter ---
-
-def get_or_create_table_with_migration(
-    db: lancedb.db.LanceDBConnection,
-    table_name: str,
-    base_schema: pa.Schema,
-    target_schema: pa.Schema
-) -> Optional[lancedb.table.LanceTable]:
-    """Gets or creates a table, migrating schema from base to target if needed."""
-    try:
-        if table_name in db.table_names():
-            tbl = db.open_table(table_name)
-            if tbl.schema == target_schema:
+            
+            # Schema equality check (already passing based on logs)
+            canvas.info(f"Schema equality check for {table_name}: {tbl.schema == schema}")
+            
+            # Check for schema compatibility
+            if tbl.schema != schema:
+                canvas.error(f"Schema mismatch for '{table_name}'. Use force_recreate=True to reset.")
+                return None
+                
+            # Table access check - try to perform a simple operation
+            try:
+                canvas.info(f"Testing table '{table_name}' access...")
+                # Try to get row count or perform a simple query
+                count = tbl.count_rows()
+                canvas.info(f"Table '{table_name}' has {count} rows")
                 return tbl
-            # migrate
-            canvas.info(f"[DB] Migrating '{table_name}' to v2 schema...")
-            df = tbl.to_pandas()
-            rows: List[Dict[str, Any]] = []
-            for _, r in df.iterrows():
-                new_r = {}
-                for f in target_schema.names:
-                    if f in df.columns:
-                        new_r[f] = r[f]
-                    else:
-                        if f == "knowledge_space": new_r[f] = "default"
-                        elif f == "last_updated": new_r[f] = r.get("last_updated", datetime.now().isoformat())
-                        elif f == "metadata_json": new_r[f] = json.dumps({})
-                        else: new_r[f] = None
-                rows.append(new_r)
-            # replace table
-            db.drop_table(table_name)
-            return db.create_table(table_name, data=rows, schema=target_schema)
+            except Exception as e:
+                canvas.error(f"Table '{table_name}' access test failed: {e}")
+                return None
         else:
-            canvas.info(f"[DB] Creating new migrated table '{table_name}'")
-            return db.create_table(table_name, schema=target_schema)
+            canvas.info(f"Creating {table_name} table")
+            try:
+                new_tbl = db.create_table(table_name, schema=schema)
+                canvas.info(f"Successfully created table '{table_name}'")
+                return new_tbl
+            except Exception as e:
+                canvas.error(f"Error creating table '{table_name}': {e}")
+                return None
     except Exception as e:
-        canvas.error(f"[DB] Migration for '{table_name}' failed: {e}")
+        canvas.error(f"Open/create table '{table_name}' failed: {e}")
         return None
-
 # --- Chunk Upsert for Code & Knowledge ---
 
 def add_or_update_chunks(
@@ -149,18 +198,42 @@ def add_or_update_chunks(
     identifier_field: str,
     identifier_value: str,
     chunks: List[Dict[str, Any]]
-) -> None:
+) -> bool:
+    """Add or update chunks in a table, removing existing ones with the same identifier.
+    
+    Args:
+        db: LanceDB connection
+        table_name: Name of the table
+        schema: Schema for the table
+        identifier_field: Field name to use for identifying existing chunks
+        identifier_value: Value of the identifier to match
+        chunks: List of chunk dictionaries to add
+        
+    Returns:
+        True if operation succeeds, False otherwise
+    """
     table = get_or_create_table(db, table_name, schema)
     if table is None:
-        raise ConnectionError(f"Table '{table_name}' inaccessible")
-    # delete old
+        canvas.error(f"Table '{table_name}' inaccessible")
+        return False
+        
+    # Delete old chunks with the same identifier
     try:
         table.delete(f"""{identifier_field} = '{identifier_value.replace("'", "''")}'""")
-    except Exception:
-        pass
-    # insert new
+    except Exception as e:
+        canvas.warning(f"Error deleting existing chunks: {e}")
+        
+    # Insert new chunks if any
     if chunks:
-        table.add(chunks)
+        try:
+            table.add(chunks)
+            canvas.success(f"Added {len(chunks)} chunks to {table_name}")
+            return True
+        except Exception as e:
+            canvas.error(f"Error adding chunks to {table_name}: {e}")
+            return False
+    
+    return True  # No chunks to add is still a success
 
 # --- Basic Query Context ---
 
@@ -170,16 +243,31 @@ def query_context(
     query_vector: List[float],
     limit: int = 5
 ) -> Optional[pd.DataFrame]:
+    """Search for similar contexts using vector similarity.
+    
+    Args:
+        db: LanceDB connection
+        table_name: Name of the table to search
+        query_vector: Vector representation of the query
+        limit: Maximum number of results to return
+        
+    Returns:
+        DataFrame with search results or None if search fails
+    """
     try:
         tbl = db.open_table(table_name)
         exp_dim = tbl.schema.field("vector").type.list_size
+        
+        # Validate vector dimensions
         if len(query_vector) != exp_dim:
             canvas.error(f"Invalid vector length {len(query_vector)} != {exp_dim}")
             return None
-        df = tbl.search(query_vector).select([n for n in tbl.schema.names if n!="vector"]).limit(limit).to_df()
+            
+        # Execute search
+        df = tbl.search(query_vector).select([n for n in tbl.schema.names if n != "vector"]).limit(limit).to_df()
         return df
     except Exception as e:
-        canvas.error(f"[DB] query_context error: {e}")
+        canvas.error(f"query_context error: {e}")
         return None
 
 # --- Enhanced Knowledge API ---
@@ -191,22 +279,47 @@ def query_context_filtered(
     filters: Optional[Dict[str, Any]] = None,
     limit: int = 5
 ) -> Optional[pd.DataFrame]:
+    """Search for similar contexts with additional filters.
+    
+    Args:
+        db: LanceDB connection
+        table_name: Name of the table to search
+        query_vector: Vector representation of the query
+        filters: Dictionary of field:value pairs to filter results
+        limit: Maximum number of results to return
+        
+    Returns:
+        DataFrame with search results or None if search fails
+    """
     try:
         tbl = db.open_table(table_name)
         exp_dim = tbl.schema.field("vector").type.list_size
+        
+        # Validate vector dimensions
         if len(query_vector) != exp_dim:
             canvas.error("Invalid vector length for filtered query")
             return None
+            
+        # Start search query
         q = tbl.search(query_vector)
+        
+        # Add filters if provided
         if filters:
             conds = []
-            for k,v in filters.items():
-                conds.append(f"{k} = '{v}'")
-            q = q.where(" AND ".join(conds))
-        df = q.select([n for n in tbl.schema.names if n!="vector"]).limit(limit).to_df()
+            for k, v in filters.items():
+                if isinstance(v, str):
+                    conds.append(f"{k} = '{v.replace('\'', '\'\'')}'")
+                else:
+                    conds.append(f"{k} = {v}")
+            
+            if conds:
+                q = q.where(" AND ".join(conds))
+        
+        # Execute query
+        df = q.select([n for n in tbl.schema.names if n != "vector"]).limit(limit).to_df()
         return df
     except Exception as e:
-        canvas.error(f"[DB] query_context_filtered error: {e}")
+        canvas.error(f"query_context_filtered error: {e}")
         return None
 
 # --- Knowledge Chunk Convenience ---
@@ -216,152 +329,115 @@ def add_knowledge_chunks(
     chunks: List[Dict[str, Any]],
     knowledge_space: str = "default"
 ) -> bool:
-    tbl = get_or_create_table_with_migration(
-        db,
-        TABLE_KNOWLEDGE_BASE,
-        SCHEMA_KNOWLEDGE_BASE,
-        SCHEMA_KNOWLEDGE_BASE_V2
-    )
+    """Add knowledge chunks to the knowledge base table.
+    
+    Args:
+        db: LanceDB connection
+        chunks: List of chunk dictionaries to add
+        knowledge_space: Namespace for the knowledge chunks
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    tbl = get_or_create_table(db, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE)
     if tbl is None:
+        canvas.error("Failed to access knowledge_base table")
         return False
+        
     prepared = []
     for c in chunks:
+        # Create a copy to avoid modifying the original
         chunk = c.copy()
+        
+        # Set default values for required fields
         chunk.setdefault("knowledge_space", knowledge_space)
         chunk.setdefault("last_updated", datetime.now().isoformat())
+        chunk.setdefault("category", chunk.get("category", "general"))
+        chunk.setdefault("document_type", chunk.get("document_type", "text"))
+        chunk.setdefault("framework", chunk.get("framework", ""))
+        chunk.setdefault("version", chunk.get("version", ""))
+        chunk.setdefault("parent_doc_id", chunk.get("parent_doc_id", ""))
+        chunk.setdefault("chunk_type", chunk.get("chunk_type", "text"))
+        chunk.setdefault("source_hash", chunk.get("source_hash", ""))
+        
+        # Handle metadata
         if "metadata" in chunk and isinstance(chunk["metadata"], dict):
             chunk["metadata_json"] = json.dumps(chunk.pop("metadata"))
         if "metadata_json" not in chunk:
             chunk["metadata_json"] = json.dumps({})
+            
         prepared.append(chunk)
-    tbl.add(prepared)
-    canvas.success(f"[DB] Added {len(prepared)} knowledge chunks")
-    return True
+    
+    # Add to database
+    try:
+        tbl.add(prepared)
+        canvas.success(f"Added {len(prepared)} knowledge chunks")
+        return True
+    except Exception as e:
+        canvas.error(f"Error adding knowledge chunks: {e}")
+        return False
 
 # --- Utilities ---
 
 def list_knowledge_spaces(db: lancedb.db.LanceDBConnection) -> List[str]:
+    """List all knowledge spaces in the knowledge base.
+    
+    Args:
+        db: LanceDB connection
+        
+    Returns:
+        List of knowledge space names
+    """
     try:
         df = db.open_table(TABLE_KNOWLEDGE_BASE).to_pandas()
-        return df.get("knowledge_space", pd.Series(["default"])).unique().tolist()
-    except Exception:
+        if 'knowledge_space' in df.columns:
+            return df['knowledge_space'].unique().tolist()
+        return ["default"]
+    except Exception as e:
+        canvas.warning(f"Error listing knowledge spaces: {e}")
         return ["default"]
 
-
-def migrate_knowledge_base(db: lancedb.db.LanceDBConnection) -> bool:
-    tbl = get_or_create_table_with_migration(
-        db,
-        TABLE_KNOWLEDGE_BASE,
-        SCHEMA_KNOWLEDGE_BASE,
-        SCHEMA_KNOWLEDGE_BASE_V2
-    )
-    return tbl is not None
-# --- New Migration ---
-
-def get_or_create_table_with_migration(
-    db: lancedb.db.LanceDBConnection,
-    table_name: str,
-    base_schema: pa.Schema,
-    target_schema: pa.Schema
-) -> Optional[lancedb.table.LanceTable]:
-    """Gets or creates a table, migrating schema from base to target if needed."""
-    try:
-        if table_name in db.table_names():
-            tbl = db.open_table(table_name)
-            if tbl.schema == target_schema:
-                return tbl
-            
-            # Migration needed
-            canvas.info(f"[DB] Migrating '{table_name}' to v2 schema...")
-            
-            try:
-                # Get current data
-                df = tbl.to_pandas()
-                
-                # Handle empty table case
-                if df.empty:
-                    # For empty tables, just drop and recreate with new schema
-                    canvas.info(f"[DB] Table '{table_name}' is empty, recreating with new schema")
-                    db.drop_table(table_name)
-                    return db.create_table(table_name, schema=target_schema)
-                    
-                # For tables with data, proceed with migration
-                rows = []
-                for _, r in df.iterrows():
-                    new_r = {}
-                    # Copy existing fields
-                    for f in df.columns:
-                        if f in target_schema.names:
-                            new_r[f] = r[f]
-                    
-                    # Add missing fields with defaults
-                    for f in target_schema.names:
-                        if f not in new_r:
-                            if f == "knowledge_space": new_r[f] = "default"
-                            elif f == "document_type": new_r[f] = r.get("category", "unknown")
-                            elif f == "last_updated": new_r[f] = r.get("last_updated", datetime.now().isoformat())
-                            elif f == "metadata_json": new_r[f] = json.dumps({})
-                            elif f == "source_hash": new_r[f] = ""
-                            elif f == "chunk_type": new_r[f] = "text"
-                            else: new_r[f] = ""
-                    
-                    rows.append(new_r)
-                
-                # Replace table
-                db.drop_table(table_name)
-                return db.create_table(table_name, data=rows, schema=target_schema)
-                
-            except Exception as e:
-                canvas.error(f"[DB] Data migration error: {e}")
-                # If migration fails, create empty table with target schema
-                db.drop_table(table_name)
-                return db.create_table(table_name, schema=target_schema)
-                
-        else:
-            canvas.info(f"[DB] Creating new table '{table_name}'")
-            return db.create_table(table_name, schema=target_schema)
-            
-    except Exception as e:
-        canvas.error(f"[DB] Migration for '{table_name}' failed: {e}")
-        return None
-    
 # --- Initialization ---
-def initialize_db() -> Optional[lancedb.db.LanceDBConnection]:
-    """Initialize database, create or migrate tables."""
+def initialize_db(force_recreate: bool = False) -> Optional[lancedb.db.LanceDBConnection]:
+    """Initialize database, create tables if needed.
+    
+    Args:
+        force_recreate: If True, drop and recreate all tables
+        
+    Returns:
+        Database connection or None if initialization fails
+    """
+    # Get database connection
     db = get_db_connection()
     if not db:
-        canvas.error("[DB Init] Connection failed")
+        canvas.error("Database connection failed")
         return None
 
-    code_context_failed = False
-    # --- Optional code_context setup ---
-    try:
-        get_or_create_table(db, TABLE_CODE_CONTEXT, SCHEMA_CODE_CONTEXT)
-    except Exception as e:
-        code_context_failed = True
-        canvas.warning(
-            "[DB Init] code_context table setup issue; proceeding without context: %s",
-            e
-        )
-
-    # --- Critical knowledge_base migration ---
-    try:
-        ok = get_or_create_table_with_migration(
-            db,
-            TABLE_KNOWLEDGE_BASE,
-            SCHEMA_KNOWLEDGE_BASE,
-            SCHEMA_KNOWLEDGE_BASE_V2
-        )
-        if not ok:
-            canvas.error("[DB Init] knowledge_base migration failed")
-            return None
-    except Exception as e:
-        canvas.error(f"[DB Init] knowledge_base table setup issue: {e}")
+    # Initialize code_context table
+    canvas.info("Initializing code_context table...")
+    code_ctx_tbl = get_or_create_table(
+        db, 
+        TABLE_CODE_CONTEXT, 
+        SCHEMA_CODE_CONTEXT,
+        force_recreate=force_recreate
+    )
+    
+    if not code_ctx_tbl:
+        canvas.error("Failed to initialize code_context table")
+        # Continue anyway - we can still work with knowledge_base
+        
+    # Initialize knowledge_base table
+    canvas.info("Initializing knowledge_base table...")
+    kb_tbl = get_or_create_table(
+        db, 
+        TABLE_KNOWLEDGE_BASE, 
+        SCHEMA_KNOWLEDGE_BASE,
+        force_recreate=force_recreate
+    )
+    
+    if not kb_tbl:
+        canvas.error("Failed to initialize knowledge_base table")
         return None
-
-    # Success message reflects whether code_context is available
-    suffix = " (code_context unavailable)" if code_context_failed else ""
-    canvas.success(f"[DB Init] Database ready with Knowledge Base v2{suffix}")
-
-    # You could attach an attribute here: db.context_available = not code_context_failed
+        
+    canvas.success("Database tables created successfully")
     return db

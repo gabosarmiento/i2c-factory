@@ -10,6 +10,16 @@ try:
 except ImportError:
     loaded_embedding_model = None
 
+# If that fails, use the official project-wide embed model getter
+if loaded_embedding_model is None:
+    try:
+        from i2c.workflow.modification.rag_config import get_embed_model
+        loaded_embedding_model = get_embed_model()
+        logging.info("Using embedding model from rag_config.get_embed_model()")
+    except Exception as e:
+        logging.error(f"Failed to load embedding model from rag_config: {e}")
+        # No further fallbacks - we'll just have None and handle the case properly
+        
 try:
     from .context_indexer import ContextIndexer
 except ImportError:
@@ -21,7 +31,7 @@ logging.basicConfig(level=logging.INFO)
 
 class ContextReaderAgent:
     """
-    Agent responsable de lanzar la indexación de contexto de un proyecto.
+    Agent responsible of launching context indexing on a project.
     """
 
     def __init__(

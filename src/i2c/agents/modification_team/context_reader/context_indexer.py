@@ -40,14 +40,14 @@ class ContextIndexer:
         self.db = get_db_connection()
         logger.info(f"DB connection object: {self.db}")
 
-        if self.db:
+        if self.db is not None:
             try:
                 # Ensure storage directory exists
                 db_uri = getattr(self.db, 'uri', None)
                 if db_uri:
                     Path(db_uri).parent.mkdir(parents=True, exist_ok=True)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Error creating database directory: {e}")
 
             # Open or create the embeddings table
             self.table = get_or_create_table(
@@ -55,7 +55,9 @@ class ContextIndexer:
                 TABLE_CODE_CONTEXT,
                 SCHEMA_CODE_CONTEXT,
             )
-            if self.table:
+            
+            # Use explicit None check, not boolean evaluation
+            if self.table is not None:
                 logger.info(f"RAG table ready: {TABLE_CODE_CONTEXT}")
             else:
                 logger.warning(f"Table '{TABLE_CODE_CONTEXT}' unavailable; indexing may fail.")
@@ -68,6 +70,12 @@ class ContextIndexer:
         self.max_file_size = self.config.get('MAX_FILE_SIZE', 100 * 1024)
         self.skip_dirs = set(self.config.get('SKIP_DIRS', []))
         self.workers = self.config.get('WORKERS', os.cpu_count() or 4)
+        
+    def __str__(self):
+        return f"ContextIndexer(project_root={self.project_root}, table={self.table is not None})"
+
+    def __repr__(self):
+        return self.__str__()
 
     def index_project(self) -> dict:
         status = {'files_indexed': 0, 'files_skipped': 0, 'chunks_indexed': 0, 'errors': []}
@@ -78,6 +86,20 @@ class ContextIndexer:
             logger.error(err)
             status['errors'].append(err)
             return status
+        
+        # Log the current state of self.table
+        logger.info(f"self.table at start of index_project: {self.table}")
+        
+        # Try to open the table directly to see if that works
+        try:
+            direct_table = self.db.open_table(TABLE_CODE_CONTEXT)
+            logger.info(f"Direct table open in index_project: {direct_table}")
+            if direct_table and self.table is None:
+                logger.info("Table can be opened directly but self.table is None - reassigning")
+                self.table = direct_table
+        except Exception as e:
+            logger.error(f"Error opening table directly: {e}")
+            
         if not self.table:
             # Try once more to open/create the table
             self.table = get_or_create_table(

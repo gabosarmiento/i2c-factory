@@ -101,7 +101,7 @@ class DocumentationKnowledgeBase(AgentKnowledge):
             vector = self.vector_db.embedder.get_embedding(doc.content)
             
             # Create record for LanceDB
-            # Create record matching the EXACT field names in SCHEMA_KNOWLEDGE_BASE_V2
+            # Create record matching the EXACT field names in SCHEMA_KNOWLEDGE_BASE
             record = {
                 "source": str(path),  # This must match the schema field name exactly
                 "content": doc.content,
@@ -125,7 +125,7 @@ class DocumentationKnowledgeBase(AgentKnowledge):
         # Add records to LanceDB
         try:
             # Use db_utils directly to get a fresh DB connection
-            from i2c.db_utils import get_db_connection, add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE_V2            
+            from i2c.db_utils import get_db_connection, add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE            
             
             db = get_db_connection()
             if not db:
@@ -135,7 +135,7 @@ class DocumentationKnowledgeBase(AgentKnowledge):
             success = add_or_update_chunks(
                 db=db,  # Use the new connection
                 table_name=TABLE_KNOWLEDGE_BASE,
-                schema=SCHEMA_KNOWLEDGE_BASE_V2,
+                schema=SCHEMA_KNOWLEDGE_BASE,
                 identifier_field="source",
                 identifier_value=str(path),
                 chunks=lance_data

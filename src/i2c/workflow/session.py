@@ -135,6 +135,8 @@ def run_session():
 
             canvas.info(f"Preparing new project generation in: {current_project_path}")
 
+ 
+            # Standard approval without visual display
             # Standard approval without visual display
             if budget_manager.request_approval(
                 description="Initial Project Generation",
@@ -144,16 +146,27 @@ def run_session():
                 # Get start cost for operation tracking
                 start_tokens, start_cost = budget_manager.get_session_consumption()
                 
-                ok = route_and_execute(
-                    action_type='generate',
-                    action_detail=current_structured_goal,
-                    current_project_path=current_project_path,
-                    current_structured_goal=current_structured_goal
-                    
-                )
+                # Use the recovery-enabled version
+                try:
+                    from i2c.workflow.orchestrator import route_and_execute_with_recovery
+                    ok = route_and_execute_with_recovery(
+                        action_type='generate',
+                        action_detail=current_structured_goal,
+                        current_project_path=current_project_path,
+                        current_structured_goal=current_structured_goal
+                    )
+                except ImportError:
+                    # Fallback if the recovery function isn't available
+                    ok = route_and_execute(
+                        action_type='generate',
+                        action_detail=current_structured_goal,
+                        current_project_path=current_project_path,
+                        current_structured_goal=current_structured_goal
+                    )
+                
                 if not ok:
                     canvas.error("Action 'generate' failed. Please review logs.")
-                
+       
                 # Calculate operation cost
                 end_tokens, end_cost = budget_manager.get_session_consumption()
                 op_tokens = end_tokens - start_tokens
@@ -186,16 +199,27 @@ def run_session():
                 # Get start cost for operation tracking
                 start_tokens, start_cost = budget_manager.get_session_consumption()
                 
-                ok = route_and_execute(
-                    action_type='modify',
-                    action_detail=command_detail,
-                    current_project_path=current_project_path,
-                    current_structured_goal=current_structured_goal
-                    
-                )
+                # Use the recovery-enabled version
+                try:
+                    from i2c.workflow.orchestrator import route_and_execute_with_recovery
+                    ok = route_and_execute_with_recovery(
+                        action_type='modify',
+                        action_detail=command_detail,
+                        current_project_path=current_project_path,
+                        current_structured_goal=current_structured_goal
+                    )
+                except ImportError:
+                    # Fallback if the recovery function isn't available
+                    ok = route_and_execute(
+                        action_type='modify',
+                        action_detail=command_detail,
+                        current_project_path=current_project_path,
+                        current_structured_goal=current_structured_goal
+                    )
+                
                 if not ok:
                     canvas.error("Action 'modify' failed. Please review logs.")
-                
+                    
                 # Calculate operation cost
                 end_tokens, end_cost = budget_manager.get_session_consumption()
                 op_tokens = end_tokens - start_tokens

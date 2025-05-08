@@ -161,10 +161,10 @@ class CodeModifierAgent(Agent):
         return patterns
 
     def _prepare_modification_prompt(self, 
-                                     modification_step: Dict, 
-                                     project_path: Path, 
-                                     existing_code: str = "",
-                                     retrieved_context: Optional[str] = None) -> str:
+                                 modification_step: Dict, 
+                                 project_path: Path, 
+                                 existing_code: str = "",
+                                 retrieved_context: Optional[str] = None) -> str:
         """
         Constructs a comprehensive prompt for code modification/creation that effectively
         uses retrieved context.
@@ -190,10 +190,25 @@ class CodeModifierAgent(Agent):
             imports = self._extract_imports_from_context(retrieved_context)
             patterns = self._extract_coding_patterns(retrieved_context)
         
+        # Detect language from file extension for better code generation
+        language = "python"  # Default to Python
+        if file_rel_path:
+            if file_rel_path.endswith('.js'):
+                language = "javascript"
+            elif file_rel_path.endswith('.html'):
+                language = "html"
+            elif file_rel_path.endswith('.ts'):
+                language = "typescript"
+            elif file_rel_path.endswith('.java'):
+                language = "java"
+            elif file_rel_path.endswith('.go'):
+                language = "go"
+        
         # --- Section 1: Project and Task Information ---
         prompt = f"# Project and Task Information\n"
         prompt += f"Project Path: {project_path}\n"
         prompt += f"File to {action}: {file_rel_path}\n"
+        prompt += f"File Language: {language}\n"  # Added language specification
         prompt += f"Task Description (What): {what_to_do}\n"
         prompt += f"Implementation Details (How): {how_to_do_it}\n\n"
 
@@ -252,17 +267,29 @@ class CodeModifierAgent(Agent):
             prompt += f"3. Specific implementation details: {how_to_do_it}\n"
             prompt += f"4. Follow the project's coding style and patterns from context\n"
         
-        # --- Section 4: Quality Check Instructions ---
+        # --- Section 4: Enhanced Quality Check Instructions ---
         prompt += "\n# Quality Check Requirements\n"
         prompt += "Before finalizing your code, verify that it:\n"
-        prompt += "1. Implements all required functionality completely\n"
-        prompt += "2. Follows consistent style with project context\n"
-        prompt += "3. Has appropriate error handling\n"
-        prompt += "4. Uses similar patterns to those in the context\n"
-        prompt += "5. Includes necessary imports (use context patterns when relevant)\n"
+        prompt += "1. Has valid syntax with no compilation or runtime errors\n"  # Enhanced emphasis on errors
+        prompt += "2. Implements all required functionality completely\n"
+        prompt += "3. Follows consistent style with project context\n"
+        prompt += "4. Has appropriate error handling for all operations\n"  # Strengthened error handling requirement
+        prompt += "5. Includes proper documentation (docstrings, comments)\n"  # Added documentation emphasis
+        prompt += "6. Uses similar patterns to those in the context\n"
+        prompt += "7. Includes all necessary imports (use context patterns when relevant)\n"
+        prompt += "8. Contains no undefined references or missing dependencies\n"  # Added check for undefined references
+        
+        # --- Section 5: Critical Reliability Requirements ---
+        prompt += "\n# Critical Reliability Requirements\n"  # New section for reliability
+        prompt += f"1. The code MUST be syntactically valid {language} code with no errors\n"
+        prompt += "2. All referenced functions, classes, and variables must be properly defined\n"
+        prompt += "3. All imports must be correct and available in the project\n"
+        prompt += "4. Error handling must be included for all operations that could fail\n"
+        prompt += "5. The code must be directly executable without manual fixes\n"
         
         prompt += "\n# Output Format\n"
-        prompt += "Return ONLY the complete source code for the file, with no explanations or markdown."
+        prompt += "Return ONLY the complete source code for the file, with no explanations or markdown formatting.\n"
+        prompt += "The code must be valid syntax with no errors.\n"
         
         return prompt
 
@@ -372,7 +399,41 @@ class CodeModifierAgent(Agent):
                 modified_code = "\n".join(lines[start_idx:])
             """
 
+            # Add code validation before returning
             if modified_code:
+                # Basic validation based on language
+                if file_rel_path.endswith('.py'):
+                    try:
+                        import ast
+                        ast.parse(modified_code)
+                        print(f"      ✅ Generated Python code passes syntax validation.")
+                    except SyntaxError as e:
+                        print(f"      ⚠️ Warning: Generated Python code has syntax errors: {e}")
+                        try:
+                            # Try to fix common syntax issues
+                            from i2c.workflow.generation import fix_common_python_errors, generate_fallback_template
+                            modified_code = fix_common_python_errors(modified_code)
+                            
+                            # Validate the fixed code
+                            try:
+                                ast.parse(modified_code)
+                                print(f"      ✅ Fixed Python code passes syntax validation.")
+                            except SyntaxError:
+                                # Fall back to a template if fixes didn't work
+                                print(f"      ⚠️ Warning: Falling back to template for {file_rel_path}")
+                                modified_code = generate_fallback_template(file_rel_path)
+                        except ImportError:
+                            # Can't import fix functions, do basic fixes
+                            print(f"      ⚠️ Warning: Could not import fix functions.")
+                
+                elif file_rel_path.endswith(('.js', '.jsx')):
+                    try:
+                        import esprima
+                        esprima.parseScript(modified_code)
+                        print(f"      ✅ Generated JavaScript code passes syntax validation.")
+                    except Exception as e:
+                        print(f"      ⚠️ Warning: Generated JavaScript code has syntax errors: {e}")
+                
                 print(f"      ✅ Generated modified/new code for {file_rel_path} ({len(modified_code)} chars).")
                 return modified_code
             else:

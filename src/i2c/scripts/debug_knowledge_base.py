@@ -5,8 +5,7 @@ initialize_environment()
 from i2c.db_utils import (
     get_db_connection,
     TABLE_KNOWLEDGE_BASE,
-    SCHEMA_KNOWLEDGE_BASE,
-    SCHEMA_KNOWLEDGE_BASE_V2
+    SCHEMA_KNOWLEDGE_BASE
 )
 import pyarrow as pa
 
@@ -34,7 +33,7 @@ if TABLE_KNOWLEDGE_BASE in db.table_names():
             
         # Compare with target schema
         print("\nTarget schema (V2):")
-        for field in SCHEMA_KNOWLEDGE_BASE_V2:
+        for field in SCHEMA_KNOWLEDGE_BASE:
             print(f"  - {field.name}: {field.type}")
             
         # Try to get data
@@ -55,7 +54,7 @@ else:
     
     # Try to create it
     try:
-        tbl = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE_V2)
+        tbl = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE)
         print(f"Created new table with V2 schema: {tbl}")
     except Exception as e:
         print(f"Error creating table: {e}")

@@ -17,7 +17,7 @@ from i2c.db_utils import (
     TABLE_CODE_CONTEXT,
     SCHEMA_CODE_CONTEXT,
     TABLE_KNOWLEDGE_BASE,
-    SCHEMA_KNOWLEDGE_BASE_V2
+    SCHEMA_KNOWLEDGE_BASE
 )
 from i2c.cli.controller import canvas
 
@@ -78,7 +78,7 @@ def repair_database_tables():
     
     try:
         canvas.info(f"Creating knowledge_base table...")
-        kb_tbl = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE_V2)
+        kb_tbl = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE)
         canvas.success(f"Created knowledge_base table successfully")
     except Exception as e:
         canvas.error(f"Failed to create knowledge_base table: {e}")
