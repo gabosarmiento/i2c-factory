@@ -7,14 +7,19 @@ from pathlib import Path
 from typing import Dict, Optional, Any, List, Set
 
 from agno.agent import Agent
+from i2c.tools.neurosymbolic.semantic_tool import SemanticGraphTool
 from builtins import llm_highest  # Use high-capacity model for code modification
 
 class CodeModifierAgent(Agent):
     """Applies planned code changes to existing or new files, utilizing provided RAG context."""
     def __init__(self, **kwargs):
+        # Add semantic tool to existing tools
+        semantic_tool = SemanticGraphTool()
+        
         super().__init__(
             name="CodeModifier",
             model=llm_highest,
+            tools=[semantic_tool],
             description="Generates modified or new code based on a specific plan step and relevant context.",
             instructions=[
                 "You are an expert Code Modification Agent.",
@@ -294,155 +299,41 @@ class CodeModifierAgent(Agent):
         return prompt
 
     def modify_code(self, modification_step: Dict, project_path: Path, retrieved_context: Optional[str] = None) -> Optional[str]:
-        """
-        Generates the new/modified code content for a single step in the plan, using RAG context.
-
-        Args:
-            modification_step: A dictionary from the planner's output.
-            project_path: The root path of the project.
-            retrieved_context: Optional string containing relevant code snippets from RAG.
-
-        Returns:
-            The full code content for the modified/new file, or None on failure.
-        """
-        action = modification_step.get('action', '').lower()
-        file_rel_path = modification_step.get('file')
+        # Initialize semantic tool with project path
+        self.tools[0].initialize(project_path)
         
-        if not all([action, file_rel_path]):
-            print(f"   ❌ [CodeModifierAgent] Invalid modification step received: {modification_step}")
-            return None
-
-        if action == 'delete':
-            # This case is handled before calling modify_code now, but keep for safety
-            print(f"   ⚪ [CodeModifierAgent] 'delete' action should not reach modify_code method for {file_rel_path}.")
-            return None
-
-        print(f"   -> Applying '{action}' to '{file_rel_path}': {modification_step.get('what', '')}")
-
-        # Retrieve existing code if we're modifying a file
-        existing_code = ""
-        full_file_path = project_path / file_rel_path
-        if action == 'modify':
-            if full_file_path.is_file():
-                try:
-                    existing_code = full_file_path.read_text(encoding='utf-8')
-                    print(f"      Read existing code ({len(existing_code)} chars).")
-                except Exception as e:
-                    print(f"      ⚠️ Warning: Could not read existing file {file_rel_path} for modification: {e}")
-                    action = 'create'  # Fallback to create if read fails
-            else:
-                print(f"      ⚠️ Warning: File {file_rel_path} not found for modification. Treating as 'create'.")
-                action = 'create'  # Treat as create if file doesn't exist
-
-        # Prepare the prompt with all necessary context
+        # Get enhanced semantic context
+        file_path = modification_step.get('file')
+        semantic_context = self.tools[0].get_context_for_file(file_path)
+        
+        # Enhance retrieved context with semantic information
+        enhanced_context = self._enhance_context(retrieved_context, semantic_context)
+        
+        # Create prompt with enhanced context
         prompt = self._prepare_modification_prompt(
-            modification_step=modification_step,
-            project_path=project_path,
-            existing_code=existing_code,
-            retrieved_context=retrieved_context
+            modification_step, project_path, existing_code, enhanced_context
         )
-
-        try:
-            # Use direct agent.run() 
-            response = self.run(prompt)
-            modified_code = response.content if hasattr(response, 'content') else str(response)
-
-            # Basic cleaning
-            modified_code = modified_code.strip()
+        
+        # Generate initial code
+        response = self.run(prompt)
+        modified_code = self._extract_code_from_response(response)
+        
+        # Validate the modification
+        validation = self.tools[0].validate_modification(
+            file_path, 
+            modification_step.get('action'),
+            modified_code
+        )
+        
+        # If validation failed, try to fix
+        if not validation['valid']:
+            # Create a fixing prompt
+            fixing_prompt = self._create_fixing_prompt(modified_code, validation)
+            # Run again
+            fix_response = self.run(fixing_prompt)
+            modified_code = self._extract_code_from_response(fix_response)
             
-            # Enhanced cleanup of code fences and other artifacts
-            if modified_code.startswith("```") and modified_code.endswith("```"):
-                # Handle language-specific code blocks or plain code blocks
-                lines = modified_code.splitlines()
-                
-                # Check if first line contains language identifier
-                first_line = lines[0].strip().lower()
-                start_idx = 1  # Default starting line (skipping opening ```)
-                
-                if first_line.startswith("```"):
-                    # Extract possible language identifier
-                    language_spec = first_line[3:].strip()
-                    if language_spec:  # If there's a language specifier
-                        start_idx = 1  # Skip first line with language
-                    else:
-                        # Just remove backticks from first line
-                        lines[0] = lines[0][3:].strip()
-                        start_idx = 0
-                
-                # Remove closing backticks
-                end_idx = len(lines)
-                if lines[-1].strip() == "```":
-                    end_idx = -1
-                elif lines[-1].endswith("```"):
-                    lines[-1] = lines[-1][:-3].strip()
-                
-                # Extract code content without fences
-                if end_idx == -1:
-                    lines = lines[start_idx:-1]
-                else:
-                    lines = lines[start_idx:]
-                
-                modified_code = "\n".join(lines).strip()
-            
-            # Remove any explanatory text before or after the code
-            # This is a more aggressive attempt to isolate just the code content
-            # (Only use if needed - can sometimes be too aggressive)
-            """
-            if "# " in modified_code and not file_rel_path.endswith((".py", ".sh", ".md")):
-                # Try to find the first line that looks like code and not a comment
-                lines = modified_code.splitlines()
-                start_idx = 0
-                for i, line in enumerate(lines):
-                    if not line.strip().startswith("# ") and line.strip():
-                        start_idx = i
-                        break
-                modified_code = "\n".join(lines[start_idx:])
-            """
-
-            # Add code validation before returning
-            if modified_code:
-                # Basic validation based on language
-                if file_rel_path.endswith('.py'):
-                    try:
-                        import ast
-                        ast.parse(modified_code)
-                        print(f"      ✅ Generated Python code passes syntax validation.")
-                    except SyntaxError as e:
-                        print(f"      ⚠️ Warning: Generated Python code has syntax errors: {e}")
-                        try:
-                            # Try to fix common syntax issues
-                            from i2c.workflow.generation import fix_common_python_errors, generate_fallback_template
-                            modified_code = fix_common_python_errors(modified_code)
-                            
-                            # Validate the fixed code
-                            try:
-                                ast.parse(modified_code)
-                                print(f"      ✅ Fixed Python code passes syntax validation.")
-                            except SyntaxError:
-                                # Fall back to a template if fixes didn't work
-                                print(f"      ⚠️ Warning: Falling back to template for {file_rel_path}")
-                                modified_code = generate_fallback_template(file_rel_path)
-                        except ImportError:
-                            # Can't import fix functions, do basic fixes
-                            print(f"      ⚠️ Warning: Could not import fix functions.")
-                
-                elif file_rel_path.endswith(('.js', '.jsx')):
-                    try:
-                        import esprima
-                        esprima.parseScript(modified_code)
-                        print(f"      ✅ Generated JavaScript code passes syntax validation.")
-                    except Exception as e:
-                        print(f"      ⚠️ Warning: Generated JavaScript code has syntax errors: {e}")
-                
-                print(f"      ✅ Generated modified/new code for {file_rel_path} ({len(modified_code)} chars).")
-                return modified_code
-            else:
-                print(f"      ⚠️ LLM returned empty content for {file_rel_path}.")
-                raise ValueError(f"LLM returned empty content for {file_rel_path}")
-
-        except Exception as e:
-            print(f"   ❌ Error generating modified code for {file_rel_path}: {e}")
-            raise e  # Re-raise so the caller knows it failed
-
+        return modified_code
+    
 # Instantiate the agent for easy import
 code_modifier_agent = CodeModifierAgent()
