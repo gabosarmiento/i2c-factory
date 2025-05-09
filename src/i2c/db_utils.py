@@ -308,7 +308,8 @@ def query_context_filtered(
             conds = []
             for k, v in filters.items():
                 if isinstance(v, str):
-                    conds.append(f"{k} = '{v.replace('\'', '\'\'')}'")
+                    escaped_v = v.replace("'", "''")
+                    conds.append(f"{k} = '{escaped_v}'")
                 else:
                     conds.append(f"{k} = {v}")
             

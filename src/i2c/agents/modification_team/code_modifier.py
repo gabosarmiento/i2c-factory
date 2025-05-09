@@ -224,52 +224,36 @@ class CodeModifierAgent(Agent):
         return "\n\n".join(parts)
 
     def _extract_code_from_response(self, response: str) -> str:
-        """
-        Extract code from an LLM response, removing any explanations or markdown formatting.
+        """Extract code from the response, removing markdown and explanations."""
+        import re
         
-        Args:
-            response: Raw response from LLM that might contain code with explanations
-            
-        Returns:
-            Cleaned code content without markdown or explanations
-        """
         # First try to extract code from markdown code blocks
-        code_blocks = re.findall(r'```(?:python|javascript|java|typescript|go|html)?\n(.*?)\n```', response, re.DOTALL)
+        code_blocks = re.findall(r'```(?:python)?\n(.*?)\n```', response, re.DOTALL)
         if code_blocks:
             return code_blocks[0].strip()
-            
-        # If no code blocks found, check if the entire response might be code
-        # Remove any starting/ending explanations that are clearly not code
-        lines = response.split('\n')
-        start_idx = 0
-        end_idx = len(lines)
         
-        # Find where code likely starts (skipping explanatory text)
-        for i, line in enumerate(lines):
-            if (line.startswith('import ') or 
-                line.startswith('from ') or 
-                line.startswith('class ') or 
-                line.startswith('def ') or
-                line.startswith('#!') or
-                line.startswith('package ') or
-                line.startswith('public ') or
-                line.startswith('function ') or
-                line.startswith('const ') or
-                line.startswith('let ') or
-                line.startswith('var ') or
-                line.startswith('<!DOCTYPE') or
-                line.startswith('<html')):
-                start_idx = i
+        # If no code blocks, assume the entire response is the function
+        response = response.strip()
+        
+        # Look for import statements at the beginning and remove them
+        import_lines = []
+        function_lines = []
+        response_lines = response.splitlines()
+        
+        # Find where the actual function definition starts
+        func_start_idx = -1
+        for i, line in enumerate(response_lines):
+            if line.strip().startswith('def '):
+                func_start_idx = i
                 break
         
-        # Find where code likely ends (before concluding explanation)
-        for i in range(len(lines) - 1, start_idx, -1):
-            line = lines[i].strip()
-            if line and not line.startswith('```') and not line.startswith('I hope'):
-                end_idx = i + 1
-                break
+        if func_start_idx >= 0:
+            # Keep only the function definition and its body
+            function_lines = response_lines[func_start_idx:]
+            return '\n'.join(function_lines)
         
-        return '\n'.join(lines[start_idx:end_idx])
+        # Failed to find function definition, return the whole response
+        return response
 
     def _create_fixing_prompt(self, code: str, validation_result: Dict) -> str:
         """
@@ -329,9 +313,9 @@ Return ONLY the complete fixed source code with no explanations or markdown form
         if not file_path:
             raise ValueError("No file path provided in modification step")
         
-        # Initialize semantic graph tool 
+        # Initialize semantic graph tool ONLY for the target file
         semantic_tool: SemanticGraphTool = self.tools[0]
-        semantic_tool.initialize(project_path)
+        semantic_tool.initialize(project_path, target_file=file_path)
         
         # If the file exists, read its content
         full_file_path = project_path / file_path
@@ -351,10 +335,10 @@ Return ONLY the complete fixed source code with no explanations or markdown form
             modification_step, project_path, existing_code, enhanced_context
         )
         response = self.run(prompt)
+        
         # Extract the content from the RunResponse object
         response_content = response.content if hasattr(response, 'content') else str(response)
         modified_code = self._extract_code_from_response(response_content)
-        
         # Run validations
         # 1) Semantic validation
         sem_val = semantic_tool.validate_modification(
@@ -455,3 +439,49 @@ Return ONLY the complete fixed source code with no explanations or markdown form
 
 # Instantiate the agent for easy import
 code_modifier_agent = CodeModifierAgent()
+
+# ── PATCH‑RETURN WRAPPER ──────────────────────────────────────────────
+# Place this AFTER the entire class CodeModifierAgent definition.
+
+from dataclasses import dataclass
+import difflib
+from pathlib import Path
+
+@dataclass
+class Patch:
+    file_path: str          # repo‑relative path
+    diff_text: str          # unified diff
+
+# 1) Preserve the original monolithic implementation
+CodeModifierAgent._modify_code_full = CodeModifierAgent.modify_code
+
+# 2) Helper to build a unified diff
+def _make_diff(original: str, modified: str, rel_path: str) -> str:
+    return "".join(
+        difflib.unified_diff(
+            original.splitlines(keepends=True),
+            modified.splitlines(keepends=True),
+            fromfile=rel_path,
+            tofile=rel_path,
+            lineterm=""
+        )
+    )
+
+# 3) New method that returns Patch
+def _modify_code_patch(self, step, project_path, retrieved_context=None):
+    file_path = Path(project_path) / step["file"]
+    original   = file_path.read_text(encoding="utf-8")
+
+    # Call the original full‑file logic
+    full_text  = self._modify_code_full(step, project_path, retrieved_context)
+
+    # If nothing changed, or validation failed and dict returned, just bubble it up
+    if not isinstance(full_text, str) or full_text.strip() == original.strip():
+        return full_text     # could be None or the old dict with errors
+
+    diff_text = _make_diff(original, full_text, step["file"])
+    return Patch(step["file"], diff_text)
+
+# 4) Monkey‑patch the class
+CodeModifierAgent.modify_code = _modify_code_patch
+# ──────────────────────────────────────────────────────────────────────
