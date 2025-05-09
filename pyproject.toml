@@ -34,6 +34,7 @@ mcp                   = "^1.7.1"
 setuptools            = "^80.3.1"
 jsonschema            = "^4.23.0"
 esprima               = "^4.0.1"
+libcst = "^1.7.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest      = "^7.0.0"
