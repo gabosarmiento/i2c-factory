@@ -1,40 +1,93 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, Depends, status
+from pydantic import BaseModel, EmailStr
+from typing import List, Optional
+from datetime import datetime
 
+# Database session dependency
 from sqlalchemy.orm import Session
+from .database import get_db
 
-import crud, schemas
-from database import get_db
-
+# Router setup
 router = APIRouter(prefix="/users", tags=["users"])
 
-@router.post("/", response_model=schemas.User)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_email(db, email=user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    return crud.create_user(db=db, user=user)
+# Models
+class UserBase(BaseModel):
+    name: str
+    email: EmailStr
+    
+class UserCreate(UserBase):
+    password: str
+    
+class User(UserBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+    
+    class Config:
+        orm_mode = True
 
-@router.get("/", response_model=list[schemas.User])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return crud.get_users(db, skip=skip, limit=limit)
+# User repository functions
+def get_user_by_email(db: Session, email: str):
+    return db.query(User).filter(User.email == email).first()
 
-@router.get("/{user_id}", response_model=schemas.User)
-def read_user(user_id: int, db: Session = Depends(get_db)):
-    db_user = crud.get_user(db, user_id=user_id)
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
+def create_user(db: Session, user: UserCreate):
+    # In a real app, hash the password first
+    db_user = User(
+        name=user.name,
+        email=user.email,
+        hashed_password=user.password
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
     return db_user
 
-@router.patch("/{user_id}", response_model=schemas.User, status_code=status.HTTP_200_OK)
-def patch_user(user_id: int, user: schemas.UserUpdate, db: Session = Depends(get_db)):
-    updated = crud.update_user(db, user_id, user)
-    if not updated:
-        raise HTTPException(status_code=404, detail="User not found")
-    return updated
+def get_users(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(User).offset(skip).limit(limit).all()
 
-@router.delete("/{user_id}", response_model=schemas.User, status_code=status.HTTP_200_OK)
-def remove_user(user_id: int, db: Session = Depends(get_db)):
-    deleted = crud.delete_user(db, user_id)
-    if not deleted:
+def get_user(db: Session, user_id: int):
+    return db.query(User).filter(User.id == user_id).first()
+
+def update_user(db: Session, user_id: int, user: UserBase):
+    db_user = get_user(db, user_id)
+    if not db_user:
+        return None
+    
+    for key, value in user.dict().items():
+        setattr(db_user, key, value)
+    
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def delete_user(db: Session, user_id: int):
+    db_user = get_user(db, user_id)
+    if not db_user:
+        return None
+    
+    db.delete(db_user)
+    db.commit()
+    return db_user
+
+# API Endpoints
+@router.post("/", response_model=User, status_code=status.HTTP_201_CREATED)
+def create_user_endpoint(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = get_user_by_email(db, email=user.email)
+    if db_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+    return create_user(db=db, user=user)
+
+@router.get("/", response_model=List[User])
+def read_users_endpoint(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    users = get_users(db, skip=skip, limit=limit)
+    return users
+
+@router.get("/{user_id}", response_model=User)
+def read_user_endpoint(user_id: int, db: Session = Depends(get_db)):
+    db_user = get_user(db, user_id=user_id)
+    if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return deleted
+    return db_user
