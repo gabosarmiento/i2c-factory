@@ -45,17 +45,35 @@ def _run_manager_team(
     Serialize the step (+ optional RAG context), send to Manager team,
     return a `Patch` or error dict.
     """
+    # Instantiate the ManagerAgent and call its predict() entrypoint directly
     team = _ensure_manager_team(project_path)
+    manager = team.members[0]  # build_code_modification_team puts Manager first
+    from agno.agent import Message
+    payload = json.dumps({
+        "modification_step": modification_step,
+        "retrieved_context": retrieved_context,
+    }, indent=2)
 
-    payload = json.dumps(
-        {
-            "modification_step": modification_step,
-            "retrieved_context": retrieved_context,
-        },
-        indent=2,
-    )
+    # Call the ManagerAgent.predict() directly to get the full reply
+    reply = manager.predict([Message(role="user", content=payload)])
+ 
+    # team = _ensure_manager_team(project_path)
 
-    reply = team.chat(payload)  # Leader’s text
+    # payload = json.dumps(
+    #     {
+    #         "modification_step": modification_step,
+    #         "retrieved_context": retrieved_context,
+    #     },
+    #     indent=2,
+    # )
+
+    # Leader’s text 
+    # response = team.run(payload, stream=False)
+    # # Extract the actual string reply from the TeamRunResponse
+    # reply = response.content
+    # run_iter = team.run(payload, stream=True)
+    # first = next(run_iter)
+    # reply = first.content
 
     try:
         diff = reply.split("## Patch", 1)[1].strip().split("\n##", 1)[0]

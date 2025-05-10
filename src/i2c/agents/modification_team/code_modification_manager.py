@@ -141,18 +141,19 @@ class ModifyCodeInteractor:
 ###########################################################################
 # ADAPTERS LAYER – wrap Agno Agents so they satisfy the ports
 ###########################################################################
+import os
 from agno.agent import Agent, Message  # imported *only* here
 from agno.tools import tool
 from agno.models.groq import Groq
-from i2c.config import EMBEDDING_MODEL, MIN_THRESHOLD
 from i2c.tools.neurosymbolic.semantic_tool import SemanticGraphTool
 import json
-from builtins import llm_highest, llm_middle
+from builtins import llm_xs, llm_middle
 from dataclasses import asdict
 from i2c.agents.modification_team.domain.modification_payload import ModPayload 
 import difflib, json, pathlib
 import pydantic
-
+EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL_NAME', 'all-MiniLM-L6-v2')
+MIN_THRESHOLD = os.getenv('MIN_THRESHOLD', 0)
 class _AgentPortAdapter:
     """Base helper that turns an Agno Agent into a port implementation."""
 
@@ -217,7 +218,7 @@ class ModifierAdapter(_AgentPortAdapter, IModifier):
             f"Here is the user request:\n{request.user_prompt}\n\n"
             f"Here is analysis context:\n{analysis.details}"
         )
-        raw_reply = self._ask(prompt)
+        
 
         # --- Parse reply --------------------------------------------------
         raw_reply = self._ask(prompt)
@@ -226,7 +227,7 @@ class ModifierAdapter(_AgentPortAdapter, IModifier):
             data = json.loads(raw_reply)
             rel_path = data["file_path"]
             modified_src = data["modified"]
-        except Exception as e:
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
             return ModificationPlan(
                 diff_hints=json.dumps({"error": "UNPARSEABLE_MODIFIER_REPLY", "raw": raw_reply})
             )
@@ -303,24 +304,25 @@ class DiffingAdapter(_AgentPortAdapter, IDiffing):
     def diff(self, request: ModificationRequest, plan: ModificationPlan) -> Patch:
         import difflib, json, pathlib
         # Validate that diff_hints is a proper ModPayload JSON
+        if not isinstance(plan.diff_hints, str):
+            return Patch(unified_diff="# DiffingAdapter error: diff_hints is not a string")
+        
         try:
-            data = json.loads(plan.diff_hints)
-            payload_obj = pydantic.TypeAdapter(ModPayload).validate_python(data)
+            payload = json.loads(plan.diff_hints)
+            # Use the relative path for headers, not the absolute path
+            rel = payload["file_path"]
+            original = payload["original"].splitlines(keepends=True)
+            modified = payload["modified"].splitlines(keepends=True)
         except Exception as exc:
             # Reject invalid payloads → empty diff so upstream can handle gracefully
             return Patch(unified_diff=f"# DiffingAdapter error: {exc}")
 
-        # Safe to unwrap now
-        file_path = pathlib.Path(request.project_root, payload_obj.file_path).as_posix()
-        original = payload_obj.original.splitlines(keepends=True)
-        modified = payload_obj.modified.splitlines(keepends=True)
-
         diff_lines = difflib.unified_diff(
             original,
             modified,
-            fromfile=file_path + " (original)",
-            tofile=file_path + " (modified)",
-            lineterm="",
+            fromfile=rel + " (original)",
+            tofile=rel + " (modified)",
+            lineterm="\n",
         )
         return Patch(unified_diff="".join(diff_lines))
 
@@ -374,15 +376,6 @@ class DocumentationAdapter(_AgentPortAdapter, IDocumentation):
 ###########################################################################
 from agno.team import Team
 
-# --- Wire SemanticGraphTool into the Agno team as a “knowledge” resource
-@tool()
-def get_callers(agent: Agent, function_name: str) -> str:
-    """
-    Return the list of callers of `function_name` from the pre-built semantic graph.
-    """
-    sem: SemanticGraphTool = agent.team_session_state["semantic_graph_tool"]
-    callers = sem.get_callers(function_name)
-    return json.dumps({"callers": callers})
 
 # ––– Import legacy concrete agents (existing implementation) –––
 from i2c.agents.modification_team.function_modification_team import (
@@ -400,7 +393,7 @@ class AnalyzerAgent(Agent):
     def __init__(self):
         super().__init__(
             name="Code Analyzer",
-            model=llm_highest,
+            model=llm_xs,
             description="Inspects existing code and pinpoints exactly where a change should occur, producing a structured analysis.",
             tools=[extract_function, analyze_code_with_semantic_graph],
             instructions=[
@@ -446,7 +439,7 @@ class ModifierAgent(Agent):
     def __init__(self):
         super().__init__(
             name="Code Modifier",
-            model=llm_highest,
+            model=llm_xs,
             description="Generates modified or new code based on Analyzer output and user intent, adhering to project conventions.",
             tools=[
                 modify_function_content,
@@ -502,7 +495,7 @@ class ValidatorAgent(Agent):
     def __init__(self):
         super().__init__(
             name="Code Validator",
-            model=llm_highest,
+            model=llm_xs,
             description="Checks syntax, style, and semantic safety of the proposed code change, returning a pass/fail verdict and reasons.",
             tools=[validate_modification],
             instructions=[
@@ -608,6 +601,16 @@ class ManagerAgent(Agent):
             documentation=DocumentationAdapter(DocsAgent()),
         )
 
+    # --- Wire SemanticGraphTool into the Agno team as a “knowledge” resource
+    @tool()
+    def get_callers(agent: Agent, function_name: str) -> str:
+        """
+        Return the list of callers of `function_name` from the pre-built semantic graph.
+        """
+        sem: SemanticGraphTool = agent.team_session_state["semantic_graph_tool"]
+        callers = sem.get_callers(function_name)
+        return json.dumps({"callers": callers})
+
     # Agno entry point ----------------------------------------------------
     def predict(self, messages: List[Message]) -> str:  # noqa: D401 – imperative form
         # 0) Build the request
@@ -620,7 +623,7 @@ class ManagerAgent(Agent):
         # 2) Immediately sanity-check that diff_hints is valid ModPayload JSON
         try:
             ModPayload(**json.loads(plan.diff_hints))
-        except Exception as e:
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
             return (
                 "## Validation\n"
                 "FAILED • Modifier produced invalid payload • "
@@ -659,14 +662,12 @@ def build_code_modification_team(project_path: Path | str, **kwargs ) -> Team:
     return Team(
         name="Code‑Modification Team (Manager‑Clean) ",
         mode="coordinate",
-        model=llm_middle, 
+        model=llm_xs, 
         members=[manager],
         instructions=[
             "Your goal is to safely modify code per user request, flag ripple-risks, and produce a unified diff."
         ],
         session_state={ "risk_map": {}, "semantic_graph_tool": sem_tool },
-        tools=[get_callers],
-        messages_to_members={manager.name: "*"},
         enable_agentic_context=False,
         share_member_interactions=False, # Prevent sharing intermediate outputs between agents
         show_members_responses=False,    # Prevent raw responses from leaking
