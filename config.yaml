@@ -5,6 +5,7 @@ EMBEDDING_MODEL: all-MiniLM-L6-v2
 MAX_FILE_SIZE: 102400          # bytes
 WORKERS: 8
 SKIP_DIRS: [.git, __pycache__, .venv, node_modules]
+MIN_THRESHOLD: 0
 
 # ── reflective agent settings ──────────────────────────────────────
 reflective:

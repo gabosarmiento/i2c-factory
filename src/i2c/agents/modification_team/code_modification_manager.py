@@ -142,6 +142,11 @@ class ModifyCodeInteractor:
 # ADAPTERS LAYER – wrap Agno Agents so they satisfy the ports
 ###########################################################################
 from agno.agent import Agent, Message  # imported *only* here
+from agno.tools import tool
+from agno.models.groq import Groq
+from i2c.config import EMBEDDING_MODEL, MIN_THRESHOLD
+from i2c.tools.neurosymbolic.semantic_tool import SemanticGraphTool
+import json
 from builtins import llm_highest, llm_middle
 from dataclasses import asdict
 from i2c.agents.modification_team.domain.modification_payload import ModPayload 
@@ -179,6 +184,9 @@ class AnalyzerAdapter(_AgentPortAdapter, IAnalyzer):
             ensure_ascii=False,
             indent=2,
         )
+        # cache ripple list for Validator to read directly
+        ripple = json.loads(dep_json).get("ripple_risk", [])
+        self._agent.team_session_state["risk_map"] = ripple
         return AnalysisResult(details=combined)
 
 
@@ -259,12 +267,8 @@ class ValidatorAdapter(_AgentPortAdapter, IValidator):
         msgs = [base]
         ok = "PASSED" in base.upper()
 
-        # ---- Ripple-effect check -------------------------------------------
-        import json
-        try:
-            deps = json.loads(analysis.details)["dependencies"]["ripple_risk"]
-        except Exception:
-            deps = []
+        # ---- Ripple-effect check (cached) -------------------------------------------
+        deps = self._agent.team_session_state.get("risk_map", [])
 
         if deps:
             ok = False
@@ -369,6 +373,16 @@ class DocumentationAdapter(_AgentPortAdapter, IDocumentation):
 # FRAMEWORK LAYER – Agno Team wrapper (depends on everything above)
 ###########################################################################
 from agno.team import Team
+
+# --- Wire SemanticGraphTool into the Agno team as a “knowledge” resource
+@tool()
+def get_callers(agent: Agent, function_name: str) -> str:
+    """
+    Return the list of callers of `function_name` from the pre-built semantic graph.
+    """
+    sem: SemanticGraphTool = agent.team_session_state["semantic_graph_tool"]
+    callers = sem.get_callers(function_name)
+    return json.dumps({"callers": callers})
 
 # ––– Import legacy concrete agents (existing implementation) –––
 from i2c.agents.modification_team.function_modification_team import (
@@ -626,17 +640,35 @@ class ManagerAgent(Agent):
 
         return reply    
 
-
+    def before_cycle(self, cycle_idx: int):
+        remaining = self.team_session_state.get("remaining_budget", 0.0)
+        logger.info(f"🪙 Budget check before step {cycle_idx}: ${remaining:.2f} left")
+        if remaining < MIN_THRESHOLD:
+            raise RuntimeError(f"Budget exhausted before modification step {cycle_idx}")
 ###########################################################################
 
 
 # Public factory used by adapter ------------------------------------------
 
-def build_code_modification_team(project_path: Path | str) -> Team:
+def build_code_modification_team(project_path: Path | str, **kwargs ) -> Team:
+    
+    
     manager = ManagerAgent(Path(project_path))
+    # build one shared SemanticGraphTool (it handles graph + validators internally)
+    sem_tool = SemanticGraphTool(project_path=Path(project_path))
     return Team(
         name="Code‑Modification Team (Manager‑Clean) ",
         mode="coordinate",
-        members=[manager],  # Only leader receives user messages
+        model=llm_middle, 
+        members=[manager],
+        instructions=[
+            "Your goal is to safely modify code per user request, flag ripple-risks, and produce a unified diff."
+        ],
+        session_state={ "risk_map": {}, "semantic_graph_tool": sem_tool },
+        tools=[get_callers],
         messages_to_members={manager.name: "*"},
+        enable_agentic_context=False,
+        share_member_interactions=False, # Prevent sharing intermediate outputs between agents
+        show_members_responses=False,    # Prevent raw responses from leaking
+        success_criteria="Patch is valid, ripple-risks are addressed, and docs are updated if needed."
     )
