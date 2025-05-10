@@ -38,6 +38,7 @@ import logging
 
 
 
+
 @dataclass(frozen=True)
 class ModificationRequest:
     project_root: Path
@@ -184,15 +185,88 @@ class ValidatorAdapter(_AgentPortAdapter, IValidator):
 
 
 class DiffingAdapter(_AgentPortAdapter, IDiffing):
+    """Adapter that asks DiffingAgent to compute a minimal unified diff.
+
+    Expects the *ModifierAgent* to have written a JSON payload into
+    `ModificationPlan.diff_hints` with the following structure::
+
+        {
+          "file_path": "relative/to/project/foo.py",
+          "original": "
+...original source...
+",
+          "modified": "
+...new source...
+"
+        }
+
+    If that contract is not met we return an *empty* Patch so the
+    validator can still run and raise a helpful error.
+    """
+
     def diff(self, request: ModificationRequest, plan: ModificationPlan) -> Patch:
-        text = self._ask("Create minimal unified diff for changes:\n" + plan.diff_hints)
-        return Patch(unified_diff=text)
+        import difflib, json, pathlib
 
+        try:
+            payload = json.loads(plan.diff_hints)
+            file_path = pathlib.Path(request.project_root, payload["file_path"]).as_posix()
+            original = payload["original"].splitlines(keepends=True)
+            modified = payload["modified"].splitlines(keepends=True)
+        except Exception as exc:
+            # Any parsing failure → empty diff so upstream can handle gracefully
+            return Patch(unified_diff=f"# DiffingAgent error: {exc}")
 
+        diff_lines = difflib.unified_diff(
+            original,
+            modified,
+            fromfile=file_path + " (original)",
+            tofile=file_path + " (modified)",
+            lineterm="",
+        )
+        return Patch(unified_diff="".join(diff_lines))
+
+import re
+import textwrap
+from typing import List
 class DocumentationAdapter(_AgentPortAdapter, IDocumentation):
+    """Generate a human-readable *changelog snippet* from the unified diff,
+    without using an LLM."""
+    
+    _HUNK_RE = re.compile(r"^@@ .* @@")
+
     def document(self, request: ModificationRequest, patch: Patch) -> DocumentationUpdate:
-        text = self._ask("Update docs according to patch:\n" + patch.unified_diff)
-        return DocumentationUpdate(summary=text)
+        # If there's no diff at all, bail out early
+        if not patch.unified_diff.strip():
+            return DocumentationUpdate(
+                summary="*(No changes detected – no documentation update required)*"
+            )
+
+        # Split into lines correctly
+        lines: List[str] = patch.unified_diff.splitlines()
+        file_path: str | None = None
+        entries: List[str] = []
+
+        for line in lines:
+            # e.g. "--- path/to/file (original)"
+            if line.startswith("--- ") and " (original)" in line:
+                file_path = line.split(" (original)")[0][4:].strip()
+            elif self._HUNK_RE.match(line):
+                hunk_desc = line.replace("@@", "").strip()
+                if file_path:
+                    entries.append(f"* **{file_path}** – {hunk_desc}")
+
+        if not entries:
+            entries.append("* Minor internal refactor; no user-visible impact.")
+
+        # Join with real newlines
+        md = "\n".join(entries)
+        md_wrapped = textwrap.dedent(f"""
+        ### Changelog
+        {md}
+        """).strip()
+
+        return DocumentationUpdate(summary=md_wrapped)
+
 ###########################################################################
 
 
