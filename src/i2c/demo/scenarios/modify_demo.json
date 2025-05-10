@@ -1,0 +1,8 @@
+[
+  {
+    "type": "modification",
+    "project_path": "./examples/todo_app",
+    "prompt": "Add a debug print to get_users()",
+    "dry_run": true
+  }
+]

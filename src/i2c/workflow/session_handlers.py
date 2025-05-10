@@ -14,7 +14,7 @@ from i2c.cli.utils.documentation_type_selector import get_document_type
 from i2c.workflow.utils import sanitize_filename, ensure_project_path
 from builtins import llm_middle
 import hashlib
-import datetime
+from datetime import datetime
 from i2c.workflow.visual_helpers import (
     show_help_message,
     show_project_plan
@@ -647,7 +647,6 @@ def ingest_documentation(
             
         try:
             import hashlib
-            from datetime import datetime
             import json
             canvas.info("✅ Standard libraries imported successfully")
         except ImportError as e:

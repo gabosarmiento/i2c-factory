@@ -46,21 +46,33 @@ class ContextIndexer:
                 db_uri = getattr(self.db, 'uri', None)
                 if db_uri:
                     Path(db_uri).parent.mkdir(parents=True, exist_ok=True)
+                    
+                # Open or create the embeddings table - with robust retries
+                for attempt in range(3):  # Try up to 3 times
+                    self.table = get_or_create_table(
+                        self.db,
+                        TABLE_CODE_CONTEXT,
+                        SCHEMA_CODE_CONTEXT,
+                    )
+                    
+                    if self.table is not None:
+                        # Verify the table is accessible by trying a simple operation
+                        try:
+                            # Try to get the schema or row count to verify it's working
+                            _ = self.table.schema
+                            logger.info(f"RAG table ready and verified: {TABLE_CODE_CONTEXT}")
+                            break  # Table is good, exit retry loop
+                        except Exception as verify_err:
+                            logger.warning(f"Table verification failed on attempt {attempt+1}: {verify_err}")
+                            # Reset table reference and try again
+                            self.table = None
+                            
+                # Final check after all attempts
+                if self.table is None:
+                    logger.error(f"Failed to initialize table after multiple attempts")
             except Exception as e:
                 logger.error(f"Error creating database directory: {e}")
-
-            # Open or create the embeddings table
-            self.table = get_or_create_table(
-                self.db,
-                TABLE_CODE_CONTEXT,
-                SCHEMA_CODE_CONTEXT,
-            )
-            
-            # Use explicit None check, not boolean evaluation
-            if self.table is not None:
-                logger.info(f"RAG table ready: {TABLE_CODE_CONTEXT}")
-            else:
-                logger.warning(f"Table '{TABLE_CODE_CONTEXT}' unavailable; indexing may fail.")
+                self.table = None
         else:
             logger.error("No DB connection: disabling RAG indexer.")
             self.table = None

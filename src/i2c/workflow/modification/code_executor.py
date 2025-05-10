@@ -4,7 +4,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 # Import necessary agent INSTANCES
-from i2c.agents.modification_team import code_modifier_agent
+#from i2c.agents.modification_team import code_modifier_agent
+# replace legacy code modifier agent
+from i2c.workflow.modification.code_modifier_adapter import apply_modification
+
 # Import RAG retrieval function for per-step context
 from .rag_retrieval import retrieve_context_for_step
 # Import CLI controller
@@ -76,11 +79,16 @@ def execute_modification_steps(
 
             # Call modifier agent, passing the specific retrieved context
             try:
-                modified_content = code_modifier_agent.modify_code(
+                patch_or_err = apply_modification(
                     modification_step=step,
                     project_path=project_path,
-                    retrieved_context=retrieved_context_step_str
+                    retrieved_context=retrieved_context_step_str,
                 )
+    
+                # Patch → store unified diff; error dict → raise
+                if isinstance(patch_or_err, dict):  # error
+                    raise RuntimeError(patch_or_err.get("error"))
+                modified_content = patch_or_err.unified_diff
                 
                 if modified_content is not None:
                     modified_code_map[file_rel_path] = modified_content

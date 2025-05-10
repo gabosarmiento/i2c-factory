@@ -4,7 +4,7 @@ import os
 import types
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
+from i2c.tools.neurosymbolic.validators import TypeValidator, DependencyValidator, PatternValidator
 from agno.tools import Function, Toolkit
 
 class SemanticGraphTool(Toolkit):

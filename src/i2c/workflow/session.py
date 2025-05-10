@@ -129,9 +129,12 @@ def run_session():
             current_project_path = ensure_project_path(DEFAULT_OUTPUT_DIR_BASE, final_name)
 
             # Index (empty dir) using the class-based agent
-            reader_agent = ContextReaderAgent(project_path=current_project_path)
-            status = reader_agent.index_project_context()
-            canvas.info(f"Indexing Status: {status}")
+            if current_project_path.exists() and any(current_project_path.glob("*")):  # Only index if directory has files
+                reader_agent = ContextReaderAgent(project_path=current_project_path)
+                status = reader_agent.index_project_context()
+                canvas.info(f"Indexing Status: {status}")
+            else: 
+                canvas.info("Skipping initial indexing for empty directory...")
 
             canvas.info(f"Preparing new project generation in: {current_project_path}")
 

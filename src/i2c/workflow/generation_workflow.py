@@ -48,6 +48,8 @@ class GenerationWorkflow(Workflow):
         # Step 5: Write Files to Disk
         yield from self.file_writing_phase(project_path)
         
+        # Step 6: Index files for RAG
+        yield from self.index_files_phase(project_path)
         # Final status
         success = bool(self.session_state.get("code_map"))
         canvas.end_process(f"Generation cycle for {project_path.name} {'completed successfully' if success else 'failed'}")
@@ -238,5 +240,34 @@ class GenerationWorkflow(Workflow):
             canvas.error(f"Error during file writing step: {e}")
             yield RunResponse(
                 content=f"❌ File writing failed: {e}",
+                extra_data={"error": str(e)}
+            )
+            
+    def index_files_phase(self, project_path: Path) -> Iterator[RunResponse]:
+        """Index generated files for RAG retrieval."""
+        canvas.step("Indexing code for RAG context...")
+        
+        try:
+            from i2c.agents.modification_team.context_reader.context_reader_agent import ContextReaderAgent
+            reader_agent = ContextReaderAgent(project_path)
+            status = reader_agent.index_project_context()
+            
+            if status.get('errors'):
+                canvas.warning(f"⚠️ Indexing completed with errors: {status.get('errors')}")
+                yield RunResponse(
+                    content=f"⚠️ Code indexing completed with issues",
+                    extra_data={"indexing_status": status}
+                )
+            else:
+                canvas.success(f"✅ Indexed {status.get('files_indexed')} files ({status.get('chunks_indexed')} chunks) for RAG context")
+                yield RunResponse(
+                    content=f"📚 Indexed {status.get('files_indexed')} files for context",
+                    extra_data={"indexing_status": status}
+                )
+                
+        except Exception as e:
+            canvas.error(f"❌ Error during code indexing: {e}")
+            yield RunResponse(
+                content=f"❌ Code indexing failed: {e}",
                 extra_data={"error": str(e)}
             )

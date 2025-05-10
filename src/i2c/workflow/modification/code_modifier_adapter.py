@@ -1,110 +1,102 @@
 # src/i2c/workflow/modification/code_modifier_adapter.py
 """
-Adapter module to provide backward compatibility when migrating from CodeModifierAgent 
-to the new SafeFunctionModifier system.
+Adapter that decides, at runtime, which code‑modification engine to call.
 
-This module exposes functions that match the original API but use the new implementation.
+• If a mock is provided → use legacy `ModificationManager` (unit‑test speed).
+• Otherwise             → use the new Manager‑orchestrated coordinate team.
 """
 
-from pathlib import Path
-from typing import Dict, Optional, Union, Callable
+from __future__ import annotations
 
-# Import the new manager
-from i2c.agents.modification_team.modification_manager import ModificationManager
+import json
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Union
+
+from agno.team import Team                       
 from i2c.agents.modification_team.patch import Patch
 
-def apply_modification(
-    modification_step: Dict, 
-    project_path: Path, 
-    retrieved_context: Optional[str] = None,
-    mock_function_modifier: Optional[Callable] = None
+# ---------------------------------------------------------------------------
+# Lazy cache so we don’t rebuild a team for every step
+_team_cache: dict[str, Team] = {}
+# ---------------------------------------------------------------------------
+
+
+def _ensure_manager_team(project_path: Path) -> Team:
+    """
+    Build (or fetch) the coordinate‑mode team driven by ManagerAgent.
+    """
+    key = str(project_path.resolve())
+    if key not in _team_cache:
+        from i2c.agents.modification_team.code_modification_manager import (
+            build_code_modification_team,
+        )
+
+        _team_cache[key] = build_code_modification_team(project_path)
+
+    return _team_cache[key]
+
+
+def _run_manager_team(
+    modification_step: Dict,
+    project_path: Path,
+    retrieved_context: Optional[str],
 ) -> Union[Patch, Dict]:
     """
-    Backward-compatible function to apply a modification.
-    Replacement for direct calls to code_modifier_agent.modify_code
-    
-    Args:
-        modification_step: Dict containing modification details
-        project_path: Base path of the project
-        retrieved_context: Optional RAG context
-        mock_function_modifier: Optional mock function for testing
-        
-    Returns:
-        Patch object or error dictionary
+    Serialize the step (+ optional RAG context), send to Manager team,
+    return a `Patch` or error dict.
     """
-    manager = ModificationManager(project_path, mock_function_modifier)
-    return manager.process_modification(modification_step, retrieved_context)
+    team = _ensure_manager_team(project_path)
+
+    payload = json.dumps(
+        {
+            "modification_step": modification_step,
+            "retrieved_context": retrieved_context,
+        },
+        indent=2,
+    )
+
+    reply = team.chat(payload)  # Leader’s text
+
+    try:
+        diff = reply.split("## Patch", 1)[1].strip().split("\n##", 1)[0]
+        return Patch(unified_diff=diff)
+    except Exception:
+        return {"error": "UNPARSEABLE_MANAGER_REPLY", "raw_reply": reply}
+
+
+# ---------------------------------------------------------------------------
+# Public API – signatures unchanged
+# ---------------------------------------------------------------------------
+
+
+def apply_modification(
+    modification_step: Dict,
+    project_path: Path,
+    retrieved_context: Optional[str] = None,
+    mock_function_modifier: Optional[Callable] = None,
+) -> Union[Patch, Dict]:
+    """Entry‑point the rest of the workflow calls."""
+    # A) mock path for tests
+    if mock_function_modifier is not None:
+        from i2c.agents.modification_team.modification_manager import (
+            ModificationManager,
+        )
+
+        manager = ModificationManager(project_path, mock_function_modifier)
+        return manager.process_modification(modification_step, retrieved_context)
+
+    # B) real path → Manager team
+    return _run_manager_team(modification_step, project_path, retrieved_context)
+
 
 def apply_modification_batch(
-    modifications: list[Dict], 
-    project_path: Path, 
+    modifications: List[Dict],
+    project_path: Path,
     retrieved_context: Optional[str] = None,
-    mock_function_modifier: Optional[Callable] = None
-) -> list[Union[Patch, Dict]]:
-    """
-    Apply multiple modifications in batch.
-    
-    Args:
-        modifications: List of modification step dictionaries
-        project_path: Base path of the project
-        retrieved_context: Optional RAG context
-        mock_function_modifier: Optional mock function for testing
-        
-    Returns:
-        List of Patch objects or error dictionaries
-    """
-    manager = ModificationManager(project_path, mock_function_modifier)
-    results = []
-    
-    for step in modifications:
-        result = manager.process_modification(step, retrieved_context)
-        results.append(result)
-        
-    return results
-
-# Testing utilities
-
-class MockRunResponse:
-    """Mock response object to use in tests."""
-    def __init__(self, content):
-        self.content = content
-
-def create_default_mock_function():
-    """
-    Create a default mock function for testing.
-
-    Returns:
-        A function that can be used as mock_function_modifier in tests
-    """
-    def mock_function(prompt):
-        """
-        Default mock implementation that generates simple function responses.
-        """
-        import re
-        # Extract function name from prompt
-        function_name_match = re.search(r'def\s+(\w+)', prompt)
-        function_name = function_name_match.group(1) if function_name_match else "unknown_function"
-
-        # Generate a simple response
-        if "add" in prompt.lower() or "create" in prompt.lower():
-            return MockRunResponse(f"""```python
-def {function_name}(a, b):
-    \"\"\"Test function created by mock.\"\"\"
-    return a + b
-```""")
-        elif "modify" in prompt.lower() or "update" in prompt.lower():
-            return MockRunResponse(f"""```python
-def {function_name}(a, b=None):
-    \"\"\"Test function modified by mock.\"\"\"
-    if b is None:
-        return a
-    return a + b
-```""")
-        else:
-            return MockRunResponse(f"""```python
-def {function_name}(x):
-    \"\"\"Default test function from mock.\"\"\"
-    return x
-```""")
-
-    return mock_function
+    mock_function_modifier: Optional[Callable] = None,
+) -> List[Union[Patch, Dict]]:
+    """Loop over `apply_modification` for convenience."""
+    return [
+        apply_modification(step, project_path, retrieved_context, mock_function_modifier)
+        for step in modifications
+    ]

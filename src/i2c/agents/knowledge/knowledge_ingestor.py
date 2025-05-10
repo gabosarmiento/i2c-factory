@@ -2,7 +2,6 @@
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 import hashlib
-from datetime import datetime
 
 from agno.embedder.sentence_transformer import SentenceTransformerEmbedder
 from i2c.agents.budget_manager import BudgetManagerAgent
@@ -173,7 +172,7 @@ class KnowledgeIngestorAgent(ContextAwareOperator):
         from i2c.db_utils import get_db_connection, add_knowledge_chunks
         import json
         import hashlib
-        from datetime import datetime
+        import datetime as _dt
 
         # Get file hash for deduplication
         try:
@@ -224,7 +223,7 @@ class KnowledgeIngestorAgent(ContextAwareOperator):
                     "content": text,
                     "vector": vector,
                     "category": document_type,
-                    "last_updated": datetime.now().isoformat(),
+                    "last_updated": _dt.datetime.now().isoformat(),
                     "knowledge_space": self.knowledge_space,
                     "document_type": document_type,
                     "framework": metadata.get("framework", ""),
