@@ -135,6 +135,7 @@ def get_db_connection() -> Optional[lancedb.db.LanceDBConnection]:
 #     except Exception as e:
 #         canvas.error(f"Open/create table '{table_name}' failed: {e}")
 #         return None
+
 def get_or_create_table(
     db: lancedb.db.LanceDBConnection,
     table_name: str,
@@ -154,41 +155,33 @@ def get_or_create_table(
         # Check if table exists
         if table_name in db.table_names():
             try:
+                # Try to open the table
                 tbl = db.open_table(table_name)
-            except Exception as e:
-                canvas.error(f"Error opening existing table '{table_name}': {e}")
-                return None
-            
-            # Schema equality check (already passing based on logs)
-            canvas.info(f"Schema equality check for {table_name}: {tbl.schema == schema}")
-            
-            # Check for schema compatibility
-            if tbl.schema != schema:
-                canvas.error(f"Schema mismatch for '{table_name}'. Use force_recreate=True to reset.")
-                return None
-                
-            # Table access check - try to perform a simple operation
-            try:
-                canvas.info(f"Testing table '{table_name}' access...")
-                # Try to get row count or perform a simple query
-                count = tbl.count_rows()
-                canvas.info(f"Table '{table_name}' has {count} rows")
+                canvas.info(f"Opened existing table: {table_name}")
                 return tbl
             except Exception as e:
-                canvas.error(f"Table '{table_name}' access test failed: {e}")
-                return None
+                canvas.error(f"Error opening existing table '{table_name}': {e}")
+                # Try to create it instead of returning None
+                canvas.info(f"Attempting to create table '{table_name}' after open failure")
+                try:
+                    return db.create_table(table_name, schema=schema)
+                except Exception as create_err:
+                    canvas.error(f"Error creating table after open failure: {create_err}")
+                    return None
         else:
+            # Create new table
             canvas.info(f"Creating {table_name} table")
             try:
-                new_tbl = db.create_table(table_name, schema=schema)
-                canvas.info(f"Successfully created table '{table_name}'")
-                return new_tbl
+                tbl = db.create_table(table_name, schema=schema)
+                canvas.info(f"Created new table: {table_name}")
+                return tbl
             except Exception as e:
                 canvas.error(f"Error creating table '{table_name}': {e}")
                 return None
     except Exception as e:
         canvas.error(f"Open/create table '{table_name}' failed: {e}")
         return None
+    
 # --- Chunk Upsert for Code & Knowledge ---
 
 def add_or_update_chunks(
@@ -199,42 +192,71 @@ def add_or_update_chunks(
     identifier_value: str,
     chunks: List[Dict[str, Any]]
 ) -> bool:
-    """Add or update chunks in a table, removing existing ones with the same identifier.
-    
-    Args:
-        db: LanceDB connection
-        table_name: Name of the table
-        schema: Schema for the table
-        identifier_field: Field name to use for identifying existing chunks
-        identifier_value: Value of the identifier to match
-        chunks: List of chunk dictionaries to add
-        
-    Returns:
-        True if operation succeeds, False otherwise
-    """
-    table = get_or_create_table(db, table_name, schema)
-    if table is None:
-        canvas.error(f"Table '{table_name}' inaccessible")
-        return False
-        
-    # Delete old chunks with the same identifier
+    """Add or update chunks in a table, removing existing ones with the same identifier."""
     try:
-        table.delete(f"""{identifier_field} = '{identifier_value.replace("'", "''")}'""")
-    except Exception as e:
-        canvas.warning(f"Error deleting existing chunks: {e}")
-        
-    # Insert new chunks if any
-    if chunks:
-        try:
-            table.add(chunks)
-            canvas.success(f"Added {len(chunks)} chunks to {table_name}")
-            return True
-        except Exception as e:
-            canvas.error(f"Error adding chunks to {table_name}: {e}")
+        # Make sure database is connected
+        if db is None:
+            canvas.error("Database connection is None")
             return False
+            
+        # Verify table existence
+        table_names = db.table_names()
+        canvas.info(f"Available tables: {table_names}")
+        
+        # Get or create table
+        table = None
+        if table_name in table_names:
+            # Try to open existing table
+            try:
+                table = db.open_table(table_name)
+                canvas.info(f"Opened existing table: {table_name}")
+            except Exception as e:
+                canvas.error(f"Error opening existing table: {e}")
+                # Try to create it
+                try:
+                    table = db.create_table(table_name, schema=schema)
+                    canvas.info(f"Created new table: {table_name}")
+                except Exception as create_err:
+                    canvas.error(f"Error creating table: {create_err}")
+        else:
+            # Create new table
+            try:
+                table = db.create_table(table_name, schema=schema)
+                canvas.info(f"Created new table: {table_name}")
+            except Exception as e:
+                canvas.error(f"Error creating table: {e}")
+                
+        # Check if table is available
+        if table is None:
+            canvas.error(f"Table '{table_name}' inaccessible")
+            return False
+            
+        # Delete old chunks with the same identifier
+        try:
+            # Make sure to escape single quotes in SQL query
+            escaped_value = identifier_value.replace("'", "''")
+            query = f"{identifier_field} = '{escaped_value}'"
+            canvas.info(f"Deleting with query: {query}")
+            table.delete(query)
+        except Exception as e:
+            canvas.warning(f"Error deleting existing chunks: {e}")
+            
+        # Insert new chunks if any
+        if chunks:
+            try:
+                canvas.info(f"Adding {len(chunks)} chunks to {table_name}")
+                table.add(chunks)
+                canvas.success(f"Added {len(chunks)} chunks to {table_name}")
+                return True
+            except Exception as e:
+                canvas.error(f"Error adding chunks to {table_name}: {e}")
+                return False
+        
+        return True  # No chunks to add is still a success
+    except Exception as e:
+        canvas.error(f"Error in add_or_update_chunks: {e}")
+        return False
     
-    return True  # No chunks to add is still a success
-
 # --- Basic Query Context ---
 
 def query_context(

@@ -29,6 +29,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+# Updated ContextReaderAgent class
 class ContextReaderAgent:
     """
     Agent responsible of launching context indexing on a project.
@@ -42,29 +43,25 @@ class ContextReaderAgent:
         self.project_path = project_path
         self.progress_callback = progress_callback
 
-        # Carga del modelo de embeddings (puede ser None)
+        # Load embedding model
         self.embedding_model: Any | None = loaded_embedding_model
         if not self.embedding_model:
-            logger.warning("No se cargó modelo de embedding; RAG fallará luego.")
+            logger.warning("No embedding model loaded; RAG will fail later.")
 
-        # Instancia el indexer si la clase está disponible
-        if ContextIndexer:
-            try:
-                self.indexer = ContextIndexer(self.project_path)
-            except Exception as e:
-                logger.error(f"Error al crear ContextIndexer: {e}", exc_info=True)
-                self.indexer = None
-        else:
-            logger.error("Clase ContextIndexer no encontrada.")
+        # Initialize the indexer - don't create table here
+        try:
+            self.indexer = ContextIndexer(self.project_path)
+        except Exception as e:
+            logger.error(f"Error creating ContextIndexer: {e}", exc_info=True)
             self.indexer = None
 
     def index_project_context(
-        self,
-        project_path: Optional[Path] = None,
-    ) -> dict:
+    self,
+    project_path: Optional[Path] = None,
+) -> dict:
         """
-        Valida project_path y arranca la indexación.
-        Devuelve un dict con files_indexed, files_skipped, chunks_indexed y errors.
+        Validates project_path and starts indexing.
+        Returns a dict with files_indexed, files_skipped, chunks_indexed and errors.
         """
         path = project_path or self.project_path
         if path is None or not path.exists() or not path.is_dir():
@@ -78,27 +75,37 @@ class ContextReaderAgent:
             }
 
         if not self.indexer:
-            err = "ContextIndexer unavailable."
-            logger.error(err)
-            return {
-                "files_indexed": 0,
-                "files_skipped": 0,
-                "chunks_indexed": 0,
-                "errors": [err],
-            }
+            # Try to create indexer again if it was None
+            try:
+                self.indexer = ContextIndexer(path)
+            except Exception as e:
+                err = f"ContextIndexer unavailable: {e}"
+                logger.error(err)
+                return {
+                    "files_indexed": 0,
+                    "files_skipped": 0,
+                    "chunks_indexed": 0,
+                    "errors": [err],
+                }
 
-        # Callback de inicio
+        # Start callback
         if self.progress_callback:
             try:
                 self.progress_callback("start", {"project_path": str(path)})
             except Exception as e:
                 logger.warning(f"start-callback failed: {e}")
 
-        # Llama al indexer
+        # Call the indexer
         try:
+            logger.info(f"Starting indexing of {path}")
             status = self.indexer.index_project()
+            logger.info(f"Indexing completed with status: {status}")
         except Exception as e:
-            logger.error(f"Indexing error for {path}: {e}", exc_info=True)
+            # Log the detailed error trace
+            import traceback
+            logger.error(f"Error during context indexing: {e}")
+            logger.error(traceback.format_exc())
+            
             status = {
                 "files_indexed": 0,
                 "files_skipped": 0,
@@ -106,7 +113,7 @@ class ContextReaderAgent:
                 "errors": [str(e)],
             }
 
-        # Callback de fin
+        # Finish callback
         if self.progress_callback:
             try:
                 self.progress_callback("finish", status)
