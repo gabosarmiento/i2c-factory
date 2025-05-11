@@ -36,6 +36,8 @@ def _safe_json_loads(text: str) -> dict | None:
         # Try to parse the JSON
         parsed = json.loads(text)
         
+        if "error" in parsed:
+            raise ValueError(f"Agent error: {parsed['error']}")
         # Handle case where we have a JSON with a "prompt" field
         if isinstance(parsed, dict) and "prompt" in parsed:
             prompt_content = parsed["prompt"]

@@ -10,7 +10,7 @@ class PatchApplier:
     def apply_patch(self, patch: Patch) -> None:
         """Apply unified diff via `git apply --cached` then write to wc."""
         patch_file = self.repo_root / ".tmp_patch.diff"
-        patch_file.write_text(patch.diff_text, encoding="utf-8")
+        patch_file.write_text(patch.unified_diff, encoding="utf-8")
         try:
             subprocess.run(["git", "apply", str(patch_file)], check=True, cwd=self.repo_root)
         finally:

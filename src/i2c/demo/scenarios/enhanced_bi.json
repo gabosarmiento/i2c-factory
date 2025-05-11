@@ -1,0 +1,100 @@
+[
+  {
+    "name": "Introduction",
+    "type": "narration",
+    "message": "Welcome to the Smart Feedback System demo! We'll transform a basic feedback API into an intelligent analysis platform using clean architecture and Agno agents.",
+    "pause": 3
+  },
+  {
+    "name": "Start With Existing Feedback App",
+    "type": "initial_generation",
+    "prompt": "We're starting with a basic FastAPI feedback collection system. The app has endpoints to post feedback and retrieve feedback by user, with simple in-memory storage.",
+    "expected_files": [
+      "main.py",
+      "models.py",
+      "README.md"
+    ]
+  },
+  {
+    "name": "Refactor to Clean Architecture",
+    "type": "modification",
+    "prompt": "Refactor the application to follow clean architecture principles. Create domain entities, use cases, adapters, and framework layers. Move the feedback storage to an adapter, and create proper use cases for adding and retrieving feedback.",
+    "expected_changes": [
+      "src/domain/entities/feedback.py",
+      "src/use_cases/add_feedback.py",
+      "src/use_cases/get_feedback.py",
+      "src/adapters/feedback_repository.py",
+      "src/adapters/fastapi_adapter.py",
+      "src/framework/main.py"
+    ]
+  },
+  {
+    "name": "Add Sentiment Analysis Agent",
+    "type": "modification",
+    "prompt": "Add a sentiment analysis capability using an Agno agent. Create a domain entity for sentiment results, a use case for analyzing sentiment, and an adapter that uses the Agno agent. Update the feedback endpoints to include sentiment scores.",
+    "expected_changes": [
+      "src/domain/entities/sentiment_result.py",
+      "src/use_cases/analyze_sentiment.py",
+      "src/adapters/sentiment_agent_adapter.py",
+      "src/framework/agent_factory.py"
+    ]
+  },
+  {
+    "name": "Add Feedback Categorization",
+    "type": "modification",
+    "prompt": "Add functionality to categorize feedback into types (feature request, bug report, compliment, complaint) using an Agno agent. Maintain clean architecture by adding appropriate domain entities, use cases, and adapters.",
+    "expected_changes": [
+      "src/domain/entities/category.py",
+      "src/use_cases/categorize_feedback.py",
+      "src/adapters/categorization_agent_adapter.py"
+    ]
+  },
+  {
+    "name": "Add Response Generator",
+    "type": "modification",
+    "prompt": "Add an automatic response generator that creates appropriate responses based on the feedback's sentiment and category. Follow clean architecture principles and use an Agno agent for generating responses.",
+    "expected_changes": [
+      "src/domain/entities/response.py",
+      "src/use_cases/generate_response.py",
+      "src/adapters/response_agent_adapter.py",
+      "src/framework/endpoints/responses.py"
+    ]
+  },
+  {
+    "name": "Add Analytics Dashboard",
+    "type": "modification",
+    "prompt": "Create a simple dashboard endpoint that uses the collected feedback data to generate insights. Include sentiment trends, category distribution, and common themes. Use an Agno agent for the analysis while maintaining clean architecture.",
+    "expected_changes": [
+      "src/domain/entities/insight.py",
+      "src/use_cases/generate_insights.py",
+      "src/adapters/insight_agent_adapter.py",
+      "src/framework/endpoints/dashboard.py"
+    ]
+  },
+  {
+    "name": "Add Documentation and Tests",
+    "type": "modification",
+    "prompt": "Add comprehensive documentation that explains the clean architecture approach and how the Agno agents are integrated. Include tests that demonstrate how each layer can be tested in isolation.",
+    "expected_changes": [
+      "docs/ARCHITECTURE.md",
+      "tests/domain/test_entities.py",
+      "tests/use_cases/test_analyze_sentiment.py",
+      "tests/adapters/test_agent_adapters.py"
+    ]
+  },
+  {
+    "name": "Add Demo Script",
+    "type": "modification",
+    "prompt": "Create a demo script that shows the system in action. The script should post sample feedback items, retrieve them with sentiment and category analysis, generate automatic responses, and show the analytics dashboard.",
+    "expected_changes": [
+      "demo.py",
+      "sample_data.json"
+    ]
+  },
+  {
+    "name": "Conclusion",
+    "type": "narration",
+    "message": "We've transformed a simple feedback collection API into an intelligent feedback analysis platform with sentiment analysis, categorization, automatic responses, and analytics - all while maintaining clean architecture principles that make the system modular, testable, and maintainable.",
+    "pause": 5
+  }
+]

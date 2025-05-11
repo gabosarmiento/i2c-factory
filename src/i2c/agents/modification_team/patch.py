@@ -4,4 +4,10 @@ from dataclasses import dataclass
 @dataclass
 class Patch:
     file_path: str          # repo‑relative path (routers/users.py)
-    diff_text: str          # unified diff (git-style)
+    unified_diff: str          # unified diff (git-style)
+    
+    # Add a compatibility property
+    @property
+    def unified_text(self) -> str:
+        """Backward compatibility for existing code."""
+        return self.unified_diff

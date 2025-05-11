@@ -16,6 +16,8 @@ from i2c.cli.controller import canvas
 def execute_modification_steps(
     modification_plan, project_path, db, embed_model
 ) -> Tuple[Dict[str, str], List[Path]]:
+    print(f"=== EXECUTE_MODIFICATION_STEPS CALLED ===")
+    print(f"Plan steps: {len(modification_plan)}")
     """
     Iterates through the plan, retrieves context for each step, calls the modifier,
     and collects results.

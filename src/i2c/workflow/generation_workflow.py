@@ -246,16 +246,20 @@ class GenerationWorkflow(Workflow):
     def index_files_phase(self, project_path: Path) -> Iterator[RunResponse]:
         """Index generated files for RAG retrieval."""
         canvas.step("Indexing code for RAG context...")
-        
+
         try:
             from i2c.agents.modification_team.context_reader.context_reader_agent import ContextReaderAgent
+
+            # ✅ DO NOT recreate LanceDB tables here
+            # Just index the project using the agent
             reader_agent = ContextReaderAgent(project_path)
             status = reader_agent.index_project_context()
-            
+
+            # ⚠️ Warn but don't fail if there were errors
             if status.get('errors'):
-                canvas.warning(f"⚠️ Indexing completed with errors: {status.get('errors')}")
+                canvas.warning(f"\u26a0\ufe0f Indexing completed with errors: {status.get('errors')}")
                 yield RunResponse(
-                    content=f"⚠️ Code indexing completed with issues",
+                    content=f"\u26a0\ufe0f Code indexing completed with issues",
                     extra_data={"indexing_status": status}
                 )
             else:
@@ -264,10 +268,11 @@ class GenerationWorkflow(Workflow):
                     content=f"📚 Indexed {status.get('files_indexed')} files for context",
                     extra_data={"indexing_status": status}
                 )
-                
+
         except Exception as e:
             canvas.error(f"❌ Error during code indexing: {e}")
             yield RunResponse(
                 content=f"❌ Code indexing failed: {e}",
                 extra_data={"error": str(e)}
             )
+            

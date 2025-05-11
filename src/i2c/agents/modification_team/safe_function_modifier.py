@@ -853,7 +853,7 @@ Return the complete function code (starting with 'def {func_name}'):
         updated_content = file_path.read_text(encoding='utf-8')
         
         # Generate the diff
-        diff_text = "".join(
+        unified_text = "".join(
             difflib.unified_diff(
                 original_content.splitlines(keepends=True),
                 updated_content.splitlines(keepends=True),
@@ -863,7 +863,7 @@ Return the complete function code (starting with 'def {func_name}'):
             )
         )
         
-        return Patch(file_path_str, diff_text)
+        return Patch(file_path_str, unified_text)
 
 # Instantiate the agent for easy importing
 safe_function_modifier_agent = SafeFunctionModifierAgent()

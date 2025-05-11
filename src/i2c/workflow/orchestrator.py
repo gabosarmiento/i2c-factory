@@ -111,6 +111,10 @@ def route_and_execute(
     Returns:
         bool: Success status
     """
+    """Routes action to appropriate workflows using WorkflowController."""
+    print(f"=== ROUTE_AND_EXECUTE CALLED ===")
+    print(f"Action type: {action_type}")
+    print(f"Action detail: {action_detail}")
     try:
         # Create workflow controller for this action
         controller = WorkflowController(
