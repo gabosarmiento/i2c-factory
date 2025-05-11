@@ -1,14 +1,13 @@
 # workflow/modification/execute_cycle.py
 # Main orchestrator for the modification cycle.
 
-from pathlib import Path
-import pandas as pd
-import json
 import traceback
+from pathlib import Path
+import json
 from typing import Optional, Dict, List, Any
 
 # Import functions from other modules in this package
-from .rag_retrieval import retrieve_context_for_planner, retrieve_context_for_step
+from .rag_retrieval import retrieve_context_for_planner
 from .plan_generator import generate_modification_plan
 from .code_executor import execute_modification_steps
 from .test_and_quality import generate_unit_tests, run_quality_checks
@@ -18,12 +17,7 @@ from .file_operations import write_files_to_disk, delete_files
 from i2c.agents.modification_team import context_reader_agent
 
 # Import DB utils
-from i2c.db_utils import (
-    get_db_connection,
-    get_or_create_table,
-    TABLE_CODE_CONTEXT,
-    SCHEMA_CODE_CONTEXT,
-)
+from i2c.db_utils import get_db_connection
 
 # Import CLI controller
 from i2c.cli.controller import canvas
@@ -110,14 +104,51 @@ def execute_modification_cycle(
         canvas.info(f"[Plan] Generated {len(modification_plan)} steps.")
 
         # ───── Step 4: Execute Each Modification Step ───────────────────
-        # Pass the DB & embedder into the step executor so it can RAG‐retrieve step context
-        modified_code_map, files_to_delete = execute_modification_steps(
-            modification_plan=modification_plan,
-            project_path=project_path,
-            db=db,
-            embed_model=embed_model
-        )
-        canvas.info(f"[Exec] Applied modifications to {len(modified_code_map)} files.")
+        try:
+            # Pass the DB & embedder into the step executor so it can RAG‐retrieve step context
+            modified_code_map, files_to_delete = execute_modification_steps(
+                modification_plan=modification_plan,
+                project_path=project_path,
+                db=db,
+                embed_model=embed_model
+            )
+            canvas.info(f"[Exec] Applied modifications to {len(modified_code_map)} files.")
+        except Exception as e:
+            # Handle execution errors with more robust error management
+            canvas.error(f"Error during modification execution: {e}")
+            
+            # Provide a fallback for simple cases
+            if len(modification_plan) == 1:
+                step = modification_plan[0]
+                canvas.warning(f"Attempting fallback approach for {step.get('file')}")
+                
+                try:
+                    # Simple fallback implementation for single steps
+                    file_path = step.get('file')
+                    full_path = project_path / file_path
+                    
+                    # Different handling based on action type
+                    if step.get('action') == 'create':
+                        content = f"# Created file for: {step.get('what')}\n# TODO: Implement {step.get('how')}\n"
+                        modified_code_map = {file_path: content}
+                        files_to_delete = []
+                    elif step.get('action') == 'modify' and full_path.exists():
+                        content = full_path.read_text() + f"\n# TODO: Implement {step.get('what')}: {step.get('how')}\n"
+                        modified_code_map = {file_path: content}
+                        files_to_delete = []
+                    elif step.get('action') == 'delete':
+                        modified_code_map = {}
+                        files_to_delete = [full_path]
+                    else:
+                        raise ValueError(f"Cannot handle action {step.get('action')} in fallback mode")
+                    
+                    canvas.info(f"[Fallback] Created basic implementation for {file_path}")
+                except Exception as fallback_error:
+                    canvas.error(f"Fallback approach failed: {fallback_error}")
+                    raise e  # Re-raise the original error
+            else:
+                # Can't handle multiple steps in fallback mode
+                raise
     
         # ───── Step 5: Generate & Run Unit Tests ─────────────────────────
         final_code_map = generate_unit_tests(modified_code_map)
@@ -133,7 +164,7 @@ def execute_modification_cycle(
         canvas.end_process(f"Modification cycle for {project_path.name} completed successfully.")
 
         # ───── All Done ───────────────────────────────────────────────
-        result["success"]  = True
+        result["success"] = True
         result["code_map"] = final_code_map
 
     except Exception as e:

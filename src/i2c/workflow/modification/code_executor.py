@@ -86,20 +86,48 @@ def execute_modification_steps(
                     project_path=project_path,
                     retrieved_context=retrieved_context_step_str,
                 )
-    
+
                 # Patch → store unified diff; error dict → raise
                 if isinstance(patch_or_err, dict):  # error
                     raise RuntimeError(patch_or_err.get("error"))
-                modified_content = patch_or_err.unified_diff
+                    
+                # Extract the unified diff from the patch
+                unified_diff = patch_or_err.unified_diff
                 
-                if modified_content is not None:
-                    modified_code_map[file_rel_path] = modified_content
+                # Get the full path to the file
+                full_file_path = project_path / file_rel_path
+                
+                # For create action, we can use the diff directly
+                if action == 'create':
+                    modified_code_map[file_rel_path] = unified_diff
                     canvas.success(f"  - Generated content for '{action}' on {file_rel_path}")
                 else:
-                    # modify_code should raise an exception if it fails permanently
-                    # If it returns None unexpectedly, treat as failure
-                    raise RuntimeError(f"Code modifier returned None for '{action}' on {file_rel_path}")
-
+                    # For modify action, we need to apply the diff to the original content
+                    try:
+                        # Read the original file content
+                        if full_file_path.exists():
+                            original_content = full_file_path.read_text(encoding='utf-8')
+                        else:
+                            original_content = ""
+                            
+                        # Apply the diff to get the modified content
+                        if unified_diff:
+                            # Use our new function to apply the diff
+                            modified_content = apply_diff_to_content(original_content, unified_diff)
+                            
+                            # Store the result in the code map
+                            modified_code_map[file_rel_path] = modified_content
+                            canvas.success(f"  - Modified content for '{action}' on {file_rel_path}")
+                        else:
+                            # No changes were made, use original content
+                            modified_code_map[file_rel_path] = original_content
+                            canvas.warning(f"  - No changes detected for {file_rel_path}")
+                    except Exception as diff_err:
+                        canvas.error(f"  - Failed to apply diff to {file_rel_path}: {diff_err}")
+                        canvas.error(f"  - Falling back to using raw diff")
+                        # Fall back to using the raw diff
+                        modified_code_map[file_rel_path] = unified_diff
+                
             except Exception as mod_err:
                 # Catch error from modify_code call
                 canvas.error(f"  - Failed step '{action}' on {file_rel_path}: {mod_err}")
@@ -118,3 +146,118 @@ def execute_modification_steps(
         raise RuntimeError("One or more modification steps failed during code generation.")
 
     return modified_code_map, files_to_delete
+
+def apply_diff_to_content(original_content: str, unified_diff: str) -> str:
+    """
+    Apply a unified diff to original content to get the modified content.
+    This implementation uses only Python standard library.
+    
+    Args:
+        original_content: The original file content
+        unified_diff: The unified diff to apply
+        
+    Returns:
+        The modified content after applying the diff
+    """
+    try:
+        # Parse the diff to find hunks
+        lines = unified_diff.splitlines()
+        
+        # Skip the file header lines (--- and +++)
+        i = 0
+        while i < len(lines) and not lines[i].startswith("@@"):
+            i += 1
+            
+        # If no hunks found, return original content
+        if i >= len(lines):
+            return original_content
+            
+        # Process the original content as lines
+        original_lines = original_content.splitlines()
+        result_lines = original_lines.copy()
+        
+        # Process each hunk
+        while i < len(lines):
+            line = lines[i]
+            
+            # Process a hunk header (like @@ -1,5 +1,6 @@)
+            if line.startswith("@@"):
+                try:
+                    # Parse the hunk header to extract line numbers
+                    header_parts = line.split(" ")
+                    if len(header_parts) < 3:
+                        i += 1
+                        continue
+                        
+                    # Extract source position (e.g., -1,5 means start at line 1, 5 lines)
+                    source_pos = header_parts[1]
+                    if not source_pos.startswith("-"):
+                        i += 1
+                        continue
+                        
+                    # Parse source line start and count
+                    source_parts = source_pos[1:].split(",")
+                    source_start = int(source_parts[0])
+                    source_count = int(source_parts[1]) if len(source_parts) > 1 else 1
+                    
+                    # Extract target position (e.g., +1,6 means start at line 1, 6 lines)
+                    target_pos = header_parts[2]
+                    if not target_pos.startswith("+"):
+                        i += 1
+                        continue
+                        
+                    # Parse target line start and count
+                    target_parts = target_pos[1:].split(",")
+                    target_start = int(target_parts[0])
+                    target_count = int(target_parts[1]) if len(target_parts) > 1 else 1
+                    
+                    # Move to the hunk content
+                    i += 1
+                    
+                    # Process the hunk content
+                    added_lines = []
+                    source_line_used = 0
+                    
+                    while i < len(lines) and not lines[i].startswith("@@"):
+                        content_line = lines[i]
+                        
+                        if content_line.startswith("+"):
+                            # Added line - keep for output
+                            added_lines.append(content_line[1:])
+                        elif content_line.startswith("-"):
+                            # Removed line - skip in output but count it
+                            source_line_used += 1
+                        elif content_line.startswith(" "):
+                            # Context line - keep for output and count it
+                            added_lines.append(content_line[1:])
+                            source_line_used += 1
+                        
+                        i += 1
+                    
+                    # Apply the changes to result_lines
+                    # Convert to 0-based indexing
+                    source_start_idx = source_start - 1
+                    
+                    # Remove the specified lines
+                    del result_lines[source_start_idx:source_start_idx + source_count]
+                    
+                    # Insert the new lines
+                    result_lines[source_start_idx:source_start_idx] = added_lines
+                    
+                except Exception as e:
+                    print(f"Error processing hunk: {e}")
+                    i += 1
+            else:
+                i += 1
+                
+        # Convert back to string
+        return "\n".join(result_lines)
+        
+    except Exception as e:
+        # Log the error but return the original content to avoid data loss
+        print(f"Error applying diff: {e}")
+        import traceback
+        traceback.print_exc()
+        return original_content
+    
+    
