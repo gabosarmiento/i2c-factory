@@ -1,6 +1,0 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-pydantic>=2.0
-pydantic-settings
-email-validator 

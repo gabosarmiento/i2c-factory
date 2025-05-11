@@ -1,9 +1,12 @@
+# workflow/modification/execute_cycle.py
 # Main orchestrator for the modification cycle.
 
 from pathlib import Path
 import pandas as pd
 import json
 import traceback
+from typing import Optional, Dict, List, Any
+
 # Import functions from other modules in this package
 from .rag_retrieval import retrieve_context_for_planner, retrieve_context_for_step
 from .plan_generator import generate_modification_plan
@@ -29,31 +32,73 @@ def execute_modification_cycle(
     user_request: str,
     project_path: Path,
     language: str,
-    db,                           # LanceDBConnection
-    embed_model                  # SentenceTransformerEmbedder
+    db=None,                      # LanceDBConnection
+    embed_model=None,             # SentenceTransformerEmbedder
+    retrieved_context=None        # Optional pre-retrieved context
 ) -> dict:
     """
     Runs the full cycle for modifying an existing project using RAG.
-    Returns a dict with keys: success (bool), language (str), code_map (dict).
+    
+    Args:
+        user_request: The user's modification request
+        project_path: Path to the project
+        language: Programming language of the project
+        db: Optional LanceDB connection for RAG
+        embed_model: Optional embedding model for RAG
+        retrieved_context: Optional pre-retrieved RAG context
+        
+    Returns:
+        dict: Result with keys: success (bool), language (str), code_map (dict)
     """
     canvas.start_process(f"Modification Cycle for: {project_path.name}")
     result = {"success": False, "language": language, "code_map": None}
 
     try:
-        # ───── Step 1: Validate DB ─────────────────────────
+        # ───── Step 1: Validate or Initialize DB ─────────────────────────
         if db is None:
-            raise ConnectionError("No DB connection passed to modification cycle.")
-        canvas.info(f"[DB] Using LanceDBConnection: {type(db)}")
+            canvas.info("No DB connection provided, attempting to initialize...")
+            try:
+                db = get_db_connection()
+                if db is None:
+                    canvas.warning("Unable to initialize database connection. RAG will be limited.")
+            except Exception as e:
+                canvas.warning(f"Error initializing database: {e}")
+        else:
+            canvas.info(f"[DB] Using provided LanceDBConnection")
+        
+        # ───── Step 1b: Validate or Initialize Embedding Model ──────────
+        if embed_model is None:
+            canvas.info("No embedding model provided, attempting to initialize...")
+            try:
+                from i2c.workflow.modification.rag_config import get_embed_model
+                embed_model = get_embed_model()
+                if embed_model is None:
+                    canvas.warning("Unable to initialize embedding model. RAG will be limited.")
+            except Exception as e:
+                canvas.warning(f"Error initializing embedding model: {e}")
+        else:
+            canvas.info(f"[RAG] Using provided embedding model")
 
-        # ───── Step 2: Retrieve Planner Context via RAG ─────
-        planner_ctx = retrieve_context_for_planner(
-            user_request=user_request,
-            db=db,
-            embed_model=embed_model
-        )
-        canvas.info(f"[RAG] Planner context retrieved.")
+        # ───── Step 2: Retrieve Planner Context via RAG ─────────────────
+        planner_ctx = retrieved_context or ""  # Use provided context if available
+        if not planner_ctx and db is not None and embed_model is not None:
+            try:
+                planner_ctx = retrieve_context_for_planner(
+                    user_request=user_request,
+                    db=db,
+                    embed_model=embed_model
+                )
+                canvas.info(f"[RAG] Planner context retrieved: {len(planner_ctx.split()) if planner_ctx else 0} words")
+            except Exception as e:
+                canvas.warning(f"[RAG] Error retrieving planner context: {e}")
+                planner_ctx = ""
+        else:
+            if retrieved_context:
+                canvas.info(f"[RAG] Using provided context: {len(retrieved_context.split())} words")
+            else:
+                canvas.warning("[RAG] Skipping context retrieval due to missing components")
 
-        # ───── Step 3: Generate Modification Plan ──────────
+        # ───── Step 3: Generate Modification Plan ──────────────────────
         modification_plan = generate_modification_plan(
             user_request=user_request,
             retrieved_context_plan=planner_ctx,
@@ -64,7 +109,7 @@ def execute_modification_cycle(
             raise RuntimeError("Planning returned no steps.")
         canvas.info(f"[Plan] Generated {len(modification_plan)} steps.")
 
-        # ───── Step 4: Execute Each Modification Step ──────
+        # ───── Step 4: Execute Each Modification Step ───────────────────
         # Pass the DB & embedder into the step executor so it can RAG‐retrieve step context
         modified_code_map, files_to_delete = execute_modification_steps(
             modification_plan=modification_plan,
@@ -74,20 +119,20 @@ def execute_modification_cycle(
         )
         canvas.info(f"[Exec] Applied modifications to {len(modified_code_map)} files.")
     
-        # ───── Step 5: Generate & Run Unit Tests ──────────
+        # ───── Step 5: Generate & Run Unit Tests ─────────────────────────
         final_code_map = generate_unit_tests(modified_code_map)
         canvas.info(f"[Tests] Generated/ran tests for {len(final_code_map)} modules.")
 
-        # ───── Step 6: Quality Checks ──────────────────────
+        # ───── Step 6: Quality Checks ───────────────────────────────────
         if not run_quality_checks(final_code_map):
             canvas.warning("[Quality] Some quality checks failed—continuing anyway.")
 
-        # ───── Step 7: Write Files & Cleanup ───────────────
+        # ───── Step 7: Write Files & Cleanup ────────────────────────────
         write_files_to_disk(final_code_map, project_path)
         delete_files(files_to_delete, project_path)
         canvas.end_process(f"Modification cycle for {project_path.name} completed successfully.")
 
-        # ───── All Done ────────────────────────────────────
+        # ───── All Done ───────────────────────────────────────────────
         result["success"]  = True
         result["code_map"] = final_code_map
 

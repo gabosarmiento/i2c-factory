@@ -36,7 +36,7 @@ MAX_RAG_RESULTS_MODIFIER = 3  # Context chunks for modifier (per step)
 def retrieve_combined_context(
     query_text: str,
     db: Any,                  # LanceDBConnection
-    embed_model: SentenceTransformerEmbedder,         # SentenceTransformerEmbedder
+    embed_model: Any,         # SentenceTransformerEmbedder
     code_limit: int = MAX_RAG_RESULTS_PLANNER,
     knowledge_limit: int = MAX_RAG_RESULTS_MODIFIER,
 ) -> Dict[str, str]:
@@ -45,7 +45,23 @@ def retrieve_combined_context(
     """
     try:
         # 1) embed the query
-        vector, _ = embed_model.get_embedding_and_usage(query_text)
+        # For retrieve_combined_context:
+        try:
+            # Check if it has encode method (standard for SentenceTransformer)
+            if hasattr(embed_model, 'encode'):
+                vector = embed_model.encode(query_text)
+            # Check if the model has get_embedding_and_usage method (Agno custom)
+            elif hasattr(embed_model, 'get_embedding_and_usage'):
+                vector, _ = embed_model.get_embedding_and_usage(query_text)
+            else:
+                canvas.error(f"Unknown embedding model type: {type(embed_model)}")
+                return {"code_context": "", "knowledge_context": ""}
+                
+            if vector is None:
+                return {"code_context": "", "knowledge_context": ""}
+        except Exception as e:
+            canvas.error(f"Error generating embedding: {str(e)}")
+            return {"code_context": "", "knowledge_context": ""}
 
         # 2) retrieve from code_context
         code_ctx = ""
@@ -116,7 +132,7 @@ def _format_rag_results(rag_results: pd.DataFrame, context_description: str, max
 def retrieve_context_for_planner(
     user_request: str,
     db: Any,                         # LanceDBConnection
-    embed_model: SentenceTransformerEmbedder
+    embed_model: Any                # Could be SentenceTransformerEmbedder or other type
 ) -> str:
     """
     Generates embedding for user request and retrieves context for the planner.
@@ -135,10 +151,23 @@ def retrieve_context_for_planner(
     if not query_text:
         return "No relevant context could be retrieved for planning."
 
-    # 1) Embed
-    vector, _ = embed_model.get_embedding_and_usage(query_text)
-    # skip only if embedding actually failed
-    if vector is None:
+    # 1) Embed - handle different embedding model types
+    try:
+        # Check if it has encode method (standard for SentenceTransformer)
+        if hasattr(embed_model, 'encode'):
+            vector = embed_model.encode(query_text)
+        # Check if the model has get_embedding_and_usage method (Agno custom)
+        elif hasattr(embed_model, 'get_embedding_and_usage'):
+            vector, _ = embed_model.get_embedding_and_usage(query_text)
+        else:
+            canvas.error(f"Unknown embedding model type: {type(embed_model)}")
+            return "No relevant context could be retrieved for planning."
+            
+        # Skip only if embedding actually failed
+        if vector is None:
+            return "No relevant context could be retrieved for planning."
+    except Exception as e:
+        canvas.error(f"Error generating embedding: {str(e)}")
         return "No relevant context could be retrieved for planning."
 
     # 2) Query LanceDB for planner context
@@ -173,8 +202,21 @@ def retrieve_context_for_step(step: dict, db, embed_model: Any) -> Optional[str]
 
     for query_text in query_texts:
         # 1) Embed
-        vector, _ = embed_model.get_embedding_and_usage(query_text)
-        if vector is None:
+        try:
+            # Check if it has encode method (standard for SentenceTransformer)
+            if hasattr(embed_model, 'encode'):
+                vector = embed_model.encode(query_text)
+            # Check if the model has get_embedding_and_usage method (Agno custom)
+            elif hasattr(embed_model, 'get_embedding_and_usage'):
+                vector, _ = embed_model.get_embedding_and_usage(query_text)
+            else:
+                canvas.error(f"Unknown embedding model type: {type(embed_model)}")
+                continue
+                
+            if vector is None:
+                continue
+        except Exception as e:
+            canvas.error(f"Error generating embedding: {str(e)}")
             continue
 
         # 2) Query LanceDB

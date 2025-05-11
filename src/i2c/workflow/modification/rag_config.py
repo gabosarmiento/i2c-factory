@@ -1,3 +1,4 @@
+# workflow/modification/rag_config.py
 """Tiny accessors so any code (or tests) can obtain the RAG resources."""
 
 from pathlib import Path

@@ -420,20 +420,55 @@ class ScenarioProcessor:
              
     def _process_modification_step(self, step: Dict[str, Any]) -> None:
         """
-        Process a modification step - modify an existing project
+        Process a modification step - modify an existing project with RAG context
         
         Args:
             step: The modification step configuration
         """
+        # Add diagnostic logging
+        canvas.info("=" * 40)
+        canvas.info(f"PROCESSING MODIFICATION STEP: {step.get('prompt', 'Unknown')}")
+        canvas.info("=" * 40)
+    
         if not (self.current_project_path and self.current_structured_goal):
             canvas.warning("No active project. Cannot apply modification.")
             return
-            
+                
         prompt = step.get("prompt", "")
         if not prompt:
             canvas.warning("Modification step has empty prompt. Skipping...")
             return
-            
+        
+        # Get language from structured goal
+        language = self.current_structured_goal.get('language', 'python')
+        
+        # Ensure project is indexed for RAG
+        if hasattr(self, 'reader_agent') and self.reader_agent:
+            try:
+                canvas.info("Ensuring project is indexed for RAG context...")
+                status = self.reader_agent.index_project_context()
+                canvas.info(f"RAG indexing status: {status}")
+                
+                # Get DB and embed model for RAG
+                from i2c.db_utils import get_db_connection
+                from i2c.workflow.modification.rag_config import get_embed_model
+                
+                db = get_db_connection()
+                embed_model = get_embed_model()
+                
+                if not db or not embed_model:
+                    canvas.warning("Failed to initialize RAG components")
+                    db = None
+                    embed_model = None
+            except Exception as e:
+                canvas.warning(f"Error preparing RAG context: {e}")
+                db = None
+                embed_model = None
+        else:
+            canvas.warning("No reader agent available. RAG context will not be used.")
+            db = None
+            embed_model = None
+        
         # Standard approval without visual display
         if self.budget_manager.request_approval(
             description=f"Project Modification ({prompt[:20]}...)",
@@ -443,17 +478,31 @@ class ScenarioProcessor:
             # Get start cost for operation tracking
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
             
-            # Call route_and_execute without budget_manager
-            ok = route_and_execute(
-                action_type='modify',
-                action_detail=prompt,
-                current_project_path=self.current_project_path,
-                current_structured_goal=self.current_structured_goal
-            )
-            
-            if not ok:
-                canvas.error("Action 'modify' failed. Please review logs.")
-                canvas.warning("Continuing with scenario despite modification failure...")
+            # Use execute_modification_cycle directly instead of route_and_execute
+            try:
+                from i2c.workflow.modification.execute_cycle import execute_modification_cycle
+                
+                # Call the cycle with all required parameters
+                result = execute_modification_cycle(
+                    user_request=prompt,
+                    project_path=self.current_project_path,
+                    language=language,
+                    db=db,
+                    embed_model=embed_model
+                )
+                
+                if result.get("success", False):
+                    canvas.success(f"Modification successful: {len(result.get('code_map', {}))} files modified")
+                    ok = True
+                else:
+                    canvas.error("Modification failed")
+                    ok = False
+                    
+            except Exception as e:
+                canvas.error(f"Error in modification cycle: {e}")
+                import traceback
+                canvas.error(traceback.format_exc())
+                ok = False
             
             # Calculate operation cost manually if no tokens were tracked
             end_tokens, end_cost = self.budget_manager.get_session_consumption()
@@ -493,6 +542,7 @@ class ScenarioProcessor:
                 op_cost = end_cost - start_cost
             
             # Show operation cost
+            from i2c.cli.budget_display import show_operation_cost
             show_operation_cost(
                 operation=f"Project Modification ({prompt[:20]}...)",
                 tokens=op_tokens,

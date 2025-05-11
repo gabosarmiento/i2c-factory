@@ -34,7 +34,7 @@ try:
     from agno.document.reader.text_reader import TextReader
     
     # Then import our custom components
-    from i2c.lean_knowledge_ingest import add_document_to_knowledge_base, MyEmbedder
+    from i2c.scripts.lean_knowledge_ingest import add_document_to_knowledge_base, MyEmbedder
     from i2c.db_utils import get_db_connection, query_context, query_context_filtered
     from sentence_transformers import SentenceTransformer
     
