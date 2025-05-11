@@ -302,29 +302,39 @@ class DiffingAdapter(_AgentPortAdapter, IDiffing):
     """
 
     def diff(self, request: ModificationRequest, plan: ModificationPlan) -> Patch:
-        import difflib, json, pathlib
-        # Validate that diff_hints is a proper ModPayload JSON
-        if not isinstance(plan.diff_hints, str):
-            return Patch(unified_diff="# DiffingAdapter error: diff_hints is not a string")
-        
+        import difflib, json
+
         try:
-            payload = json.loads(plan.diff_hints)
-            # Use the relative path for headers, not the absolute path
-            rel = payload["file_path"]
-            original = payload["original"].splitlines(keepends=True)
-            modified = payload["modified"].splitlines(keepends=True)
+            payloads = json.loads(plan.diff_hints)
+            if isinstance(payloads, dict):
+                payloads = [payloads]
+            elif not isinstance(payloads, list):
+                raise ValueError("diff_hints must be a JSON object or list of objects")
+
+            diffs = []
+
+            for i, payload in enumerate(payloads):
+                try:
+                    rel = payload["file_path"]
+                    original = payload["original"].splitlines(keepends=True)
+                    modified = payload["modified"].splitlines(keepends=True)
+
+                    diff = difflib.unified_diff(
+                        original,
+                        modified,
+                        fromfile=rel + " (original)",
+                        tofile=rel + " (modified)",
+                        lineterm="\n"
+                    )
+                    diffs.append(f"# === Diff for {rel} ===\n" + "".join(diff))
+                except Exception as item_exc:
+                    diffs.append(f"# ⚠️ Skipped invalid patch entry {i}: {item_exc}")
+
+            return Patch(unified_diff="\n\n".join(diffs))
+
         except Exception as exc:
-            # Reject invalid payloads → empty diff so upstream can handle gracefully
             return Patch(unified_diff=f"# DiffingAdapter error: {exc}")
 
-        diff_lines = difflib.unified_diff(
-            original,
-            modified,
-            fromfile=rel + " (original)",
-            tofile=rel + " (modified)",
-            lineterm="\n",
-        )
-        return Patch(unified_diff="".join(diff_lines))
 
 import re
 import textwrap
