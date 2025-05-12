@@ -758,62 +758,63 @@ class ModifierAgent(Agent):
         )
 
     def predict(self, messages: List[Message]) -> str:
-        """
-        Process input messages and generate professional-grade code modifications.
-
-        This method performs comprehensive analysis of:
-        1. The modification request
-        2. Existing code (if available)
-        3. Test cases (to infer requirements)
-        4. Project context and patterns
-
-        It then produces high-quality code that meets or exceeds modern best practices.
-        """
+        """Process input messages and return modified code."""
         prompt = messages[-1].content if messages else ""
         try:
-            # --- STEP 1: EXTRACT REQUEST DETAILS ---
-            # Parse the input to get file path and modification details
+            # Extract request data
             request_data = self._extract_request_data(prompt)
             file_path = request_data.get("file_path", "unknown.py")
             what = request_data.get("what", "")
             how = request_data.get("how", "")
             project_path = request_data.get("project_path")
-
-            # --- STEP 2: ANALYZE PROJECT CONTEXT ---
-            # Gather file content and project information
-            project_analysis = self._analyze_project_context(project_path, file_path)
-            original_content = project_analysis.get("original_content", "")
-            test_data = project_analysis.get("test_data", {})
-            project_patterns = project_analysis.get("project_patterns", {})
-
-            # --- STEP 3: DETERMINE MODIFICATION STRATEGY ---
-            # Based on file type, request, and project context
+            
+            # Get original content
+            original_content = ""
+            if project_path and file_path:
+                try:
+                    full_path = project_path / file_path
+                    if full_path.exists():
+                        original_content = full_path.read_text(encoding='utf-8')
+                        print(f"Read original file '{file_path}' ({len(original_content)} chars)")
+                    else:
+                        print(f"File does not exist: {full_path}")
+                except Exception as e:
+                    print(f"Error reading file '{file_path}': {e}")
+            
+            # Determine language based on file extension
             file_extension = Path(file_path).suffix.lower()
-            language = self._determine_language(file_extension)
-            modification_type = self._determine_modification_type(
-                what, how, original_content, file_path
-            )
-
-            # --- STEP 4: IMPLEMENT MODIFICATION ---
-            # Generate professional-grade code implementation
-            modified_content = self._implement_modification(
-                modification_type=modification_type,
-                language=language,
-                file_path=file_path,
-                original_content=original_content,
-                what=what,
-                how=how,
-                test_data=test_data,
-                project_patterns=project_patterns
-            )
-
-            # --- STEP 5: RETURN RESULT ---
-            return json.dumps({
-                "file_path": file_path,
-                "original": original_content,
-                "modified": modified_content
-            })
-
+            language = "python" if file_extension == ".py" else "unknown"
+            
+            # Apply appropriate modifications
+            if language == "python":
+                # Apply generic Python modification
+                modified_content = self._generic_python_modification(file_path, original_content, what, how)
+                
+                # Important: Don't append comments about the modification
+                # modified_content += f"\n\n# Updated: {what}\n# Details: {how}\n"
+                
+                # Return the result without appending comments
+                return json.dumps({
+                    "file_path": file_path,
+                    "original": original_content,
+                    "modified": modified_content
+                })
+            else:
+                # For non-Python files, append a comment in appropriate format
+                comment_marker = "#"
+                if file_extension in [".js", ".ts"]:
+                    comment_marker = "//"
+                elif file_extension in [".html", ".xml"]:
+                    modified_content = original_content + f"\n<!-- Updated: {what} - {how} -->\n"
+                else:
+                    modified_content = original_content + f"\n{comment_marker} Updated: {what}\n{comment_marker} Details: {how}\n"
+                    
+                return json.dumps({
+                    "file_path": file_path,
+                    "original": original_content,
+                    "modified": modified_content
+                })
+                
         except Exception as e:
             import traceback
             print(f"ModifierAgent error: {e}")
@@ -822,7 +823,7 @@ class ModifierAgent(Agent):
                 "error": str(e),
                 "modification_failed": True
             })
-
+    
     def _extract_request_data(self, prompt: str) -> Dict[str, Any]:
         """
         Extract structured data from the incoming request.
@@ -1154,16 +1155,369 @@ class ModifierAgent(Agent):
         return result
 
     def _generic_python_modification(self, file_path: str, original_content: str, what: str, how: str) -> str:
-        """Generic implementation for Python file modifications."""
-        # Make simple improvements to the file
+        """
+        Implement specific Python modifications based on request keywords.
+        """
+        # Check for specific modification types based on keywords
+        keywords = (what + " " + how).lower()
+        
+        # Case 1: Type hint modifications
+        if "type" in keywords or "type hint" in keywords or "type safety" in keywords:
+            return self._enhance_type_hints(original_content, file_path)
+        
+        # Case 2: Code style improvements
+        elif "style" in keywords or "linter" in keywords or "pep8" in keywords or "flake8" in keywords:
+            return self._improve_code_style(original_content)
+        
+        # Case 3: Performance optimizations
+        elif "performance" in keywords or "optimize" in keywords or "list comprehension" in keywords:
+            return self._optimize_code(original_content)
+        
+        # Case 4: Null handling improvements
+        elif "null" in keywords or "none" in keywords or "safe" in keywords:
+            return self._improve_null_handling(original_content)
+            
+        # Default: Apply minimal improvements
+        return self._apply_general_improvements(original_content)
+        
+    def _enhance_type_hints(self, original_content: str, file_path: str) -> str:
+        """
+        Enhance type hints in Python code to improve type safety.
+        """
+        import re
+        
+        # First, analyze the file to determine what type hints to add/improve
         lines = original_content.splitlines()
         
-        # Handle specific keywords
-        if "style" in what.lower() or "linter" in how.lower():
-            return self._ensure_code_style_compliance(original_content)
+        # Find imports and ensure typing is imported
+        has_typing_import = False
+        for line in lines:
+            if line.startswith("from typing import") or line.startswith("import typing"):
+                has_typing_import = True
+                # Check what's imported and enhance if needed
+                if "from typing import" in line:
+                    # Add commonly needed types if not present
+                    needed_types = ["List", "Dict", "Optional", "Union", "Any"]
+                    existing_types = re.findall(r'from typing import (.*)', line)[0]
+                    missing_types = [t for t in needed_types if t not in existing_types]
+                    if missing_types:
+                        line = line.rstrip(',')  # Remove trailing comma if any
+                        if line.endswith("import"):
+                            line += " " + ", ".join(needed_types)
+                        else:
+                            line += ", " + ", ".join(missing_types)
+                break
         
-        # Default: return original with a comment
-        return original_content + f"\n\n# Updated: {what}\n# Details: {how}\n"
+        # Add typing import if missing
+        if not has_typing_import:
+            lines.insert(0, "from typing import List, Dict, Optional, Union, Any")
+            
+        # Enhance function signatures with type hints
+        for i, line in enumerate(lines):
+            if line.lstrip().startswith("def "):
+                # Check if it already has a return type hint
+                if "->" not in line:
+                    # Add appropriate return type hint based on function behavior
+                    if "return []" in ''.join(lines[i:i+10]):
+                        lines[i] = line.rstrip(':') + " -> List[Any]:"
+                    elif "return {" in ''.join(lines[i:i+10]):
+                        lines[i] = line.rstrip(':') + " -> Dict[str, Any]:"
+                    elif "return " in ''.join(lines[i:i+10]):
+                        lines[i] = line.rstrip(':') + " -> Any:"
+                    else:
+                        lines[i] = line.rstrip(':') + " -> None:"
+                
+                # Enhance parameter type hints
+                match = re.search(r'def\s+\w+\s*\((.*?)\)', line)
+                if match:
+                    params = match.group(1).split(',')
+                    enhanced_params = []
+                    
+                    for param in params:
+                        param = param.strip()
+                        if not param:
+                            continue
+                            
+                        # Skip if already has type hint
+                        if ':' in param:
+                            enhanced_params.append(param)
+                            continue
+                        
+                        # Handle self parameter
+                        if param == 'self':
+                            enhanced_params.append('self')
+                            continue
+                        
+                        # Infer appropriate type hint based on parameter name
+                        param_name = param.strip()
+                        if param_name in ['data', 'items', 'list', 'array']:
+                            enhanced_params.append(f"{param_name}: List[Any]")
+                        elif param_name in ['options', 'config', 'settings', 'params']:
+                            enhanced_params.append(f"{param_name}: Dict[str, Any]")
+                        elif param_name in ['name', 'key', 'id', 'text', 'string']:
+                            enhanced_params.append(f"{param_name}: str")
+                        elif param_name in ['count', 'index', 'size', 'length']:
+                            enhanced_params.append(f"{param_name}: int")
+                        elif param_name.endswith('_list'):
+                            enhanced_params.append(f"{param_name}: List[Any]")
+                        elif param_name.endswith('_dict'):
+                            enhanced_params.append(f"{param_name}: Dict[str, Any]")
+                        else:
+                            enhanced_params.append(f"{param_name}: Any")
+                    
+                    # Replace the old parameter section with enhanced one
+                    enhanced_param_str = ", ".join(enhanced_params)
+                    new_line = re.sub(r'\((.*?)\)', f'({enhanced_param_str})', line)
+                    lines[i] = new_line
+        
+        # Enhance variable annotations
+        for i, line in enumerate(lines):
+            # Add type hints to variable declarations like x = []
+            if " = [" in line and ":" not in line:
+                var_name = line.split("=")[0].strip()
+                if var_name and not var_name.startswith(('#', '"', "'")):
+                    lines[i] = f"{var_name}: List[Any] = {line.split('=')[1].strip()}"
+            # Add type hints to variable declarations like x = {}
+            elif " = {" in line and ":" not in line:
+                var_name = line.split("=")[0].strip()
+                if var_name and not var_name.startswith(('#', '"', "'")):
+                    lines[i] = f"{var_name}: Dict[str, Any] = {line.split('=')[1].strip()}"
+        
+        return "\n".join(lines)
+
+    def _improve_code_style(self, original_content: str) -> str:
+        """
+        Improve code style according to PEP 8 guidelines.
+        """
+        import re
+        
+        lines = original_content.splitlines()
+        improved_lines = []
+        
+        # Fix basic style issues
+        for line in lines:
+            # Remove trailing whitespace
+            line = line.rstrip()
+            
+            # Convert tabs to spaces (4 spaces per tab)
+            line = line.replace('\t', '    ')
+            
+            # Ensure proper spacing around operators
+            line = re.sub(r'([^\s])([+\-*/=<>!]=*|%)([^\s])', r'\1 \2 \3', line)
+            
+            # Ensure proper spacing after commas
+            line = re.sub(r',([^\s])', r', \1', line)
+            
+            improved_lines.append(line)
+        
+        # Ensure proper blank lines between top-level declarations
+        i = 0
+        while i < len(improved_lines):
+            line = improved_lines[i]
+            
+            # Add blank lines before top-level function/class definitions
+            if line.startswith(('def ', 'class ')) and i > 0:
+                if i > 1 and not improved_lines[i-1] == '' and not improved_lines[i-2] == '':
+                    improved_lines.insert(i, '')
+                    improved_lines.insert(i, '')
+                    i += 2
+            
+            # Ensure only single blank line between method definitions
+            if line.startswith('    def ') and i > 1:
+                if improved_lines[i-1] == '' and improved_lines[i-2] == '':
+                    improved_lines.pop(i-1)  # Remove extra blank line
+                    i -= 1
+            
+            i += 1
+        
+        # Fix docstring format
+        for i, line in enumerate(improved_lines):
+            if '"""' in line and i < len(improved_lines) - 1:
+                # Multi-line docstring that doesn't follow conventions
+                if not line.strip().endswith('"""') and not improved_lines[i+1].strip().startswith('    '):
+                    # Indent properly
+                    for j in range(i+1, len(improved_lines)):
+                        if '"""' in improved_lines[j]:
+                            break
+                        improved_lines[j] = '    ' + improved_lines[j].lstrip()
+        
+        return "\n".join(improved_lines)
+
+    def _optimize_code(self, original_content: str) -> str:
+        """
+        Optimize Python code for performance and readability.
+        """
+        import re
+        
+        lines = original_content.splitlines()
+        result_lines = []
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i]
+            
+            # Convert loops to list comprehensions
+            if line.strip().startswith('result = []') or line.strip().startswith('output = []'):
+                var_name = line.split('=')[0].strip()
+                
+                # Look for a for loop after the list initialization
+                if i+1 < len(lines) and 'for' in lines[i+1]:
+                    # Basic loop with append pattern
+                    for_line = lines[i+1].strip()
+                    if for_line.startswith('for ') and i+2 < len(lines):
+                        
+                        # Check for pattern like: for x in data: \n    result.append(x)
+                        append_line = lines[i+2].strip()
+                        if append_line.startswith(f'{var_name}.append('):
+                            loop_var = for_line.split('for ')[1].split(' in ')[0].strip()
+                            iterable = for_line.split(' in ')[1].split(':')[0].strip()
+                            
+                            # Extract the expression being appended
+                            append_expr = append_line.split('.append(')[1].rsplit(')', 1)[0].strip()
+                            
+                            # Create list comprehension
+                            new_line = f"{var_name} = [{append_expr} for {loop_var} in {iterable}]"
+                            result_lines.append(new_line)
+                            
+                            # Skip the original loop lines
+                            i += 3
+                            continue
+            
+            # Convert if/append patterns to filtered list comprehensions
+            elif 'for ' in line and ' in ' in line and ':' in line and i+1 < len(lines):
+                for_line = line.strip()
+                next_line = lines[i+1].strip()
+                
+                if next_line.startswith('if ') and i+2 < len(lines):
+                    if_line = next_line
+                    append_line = lines[i+2].strip()
+                    
+                    if '.append(' in append_line:
+                        # Extract components
+                        loop_var = for_line.split('for ')[1].split(' in ')[0].strip()
+                        iterable = for_line.split(' in ')[1].split(':')[0].strip()
+                        condition = if_line.split('if ')[1].split(':')[0].strip()
+                        
+                        # Get the variable being appended to
+                        var_name = append_line.split('.append(')[0].strip()
+                        
+                        # Extract the expression being appended
+                        append_expr = append_line.split('.append(')[1].rsplit(')', 1)[0].strip()
+                        
+                        # Create filtered list comprehension
+                        new_line = f"{var_name} = [{append_expr} for {loop_var} in {iterable} if {condition}]"
+                        
+                        # Look backwards to find the list initialization
+                        for j in range(i-1, -1, -1):
+                            if lines[j].strip().startswith(f"{var_name} = []"):
+                                # Replace the initialization with our comprehension
+                                result_lines.pop()  # Remove the initialization
+                                result_lines.append(new_line)
+                                # Skip the original loop lines
+                                i += 3
+                                break
+                        else:
+                            # If initialization not found, just add the new line
+                            result_lines.append(new_line)
+                            i += 3
+                        continue
+            
+            # Optimize unnecessary temporary variables
+            elif ' = ' in line and i+1 < len(lines) and 'return ' in lines[i+1]:
+                var_name = line.split(' = ')[0].strip()
+                expr = line.split(' = ')[1].strip()
+                
+                next_line = lines[i+1].strip()
+                if next_line == f'return {var_name}':
+                    # Replace with direct return
+                    result_lines.append(f'return {expr}')
+                    i += 2
+                    continue
+            
+            # Add the unchanged line
+            result_lines.append(line)
+            i += 1
+        
+        return "\n".join(result_lines)
+
+    def _improve_null_handling(self, original_content: str) -> str:
+        """
+        Improve handling of None/null values in Python code.
+        """
+        import re
+        
+        lines = original_content.splitlines()
+        result_lines = []
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i]
+            
+            # Improve null checks in if statements
+            if 'if ' in line and ' is None' in line:
+                # Check if it's a standalone null check
+                if line.strip() == 'if data is None:' and i+1 < len(lines):
+                    next_line = lines[i+1].strip()
+                    
+                    # Common pattern: if data is None: return []
+                    if next_line == 'return []':
+                        # Check for a better way to handle this case
+                        if 'Optional' not in original_content:
+                            # Add type hint to emphasize Optional
+                            for j, l in enumerate(lines):
+                                if 'def ' in l and 'data' in l:
+                                    def_line = l
+                                    if ': ' not in def_line and 'data' in def_line:
+                                        # Add type hint for data parameter
+                                        modified = re.sub(r'\b(data)\b(?!\s*:)', r'data: Optional[List[Any]]', def_line)
+                                        lines[j] = modified
+                                    break
+                        
+                        # Keep the null check as is - it's a good practice
+                        result_lines.append(line)
+                        result_lines.append(lines[i+1])
+                        i += 2
+                        continue
+            
+            # Improve one-line null checks
+            elif ' if ' in line and ' else ' in line:
+                # Pattern: x if x is not None else default
+                matches = re.search(r'(.*) if (.*) is not None else (.*)', line)
+                if matches:
+                    expr = matches.group(1).strip()
+                    var = matches.group(2).strip()
+                    default = matches.group(3).strip()
+                    
+                    # If expr and var are the same, this is a good null check
+                    if expr == var:
+                        # Keep it - this is a good pattern
+                        result_lines.append(line)
+                        i += 1
+                        continue
+            
+            # Add the unchanged line
+            result_lines.append(line)
+            i += 1
+        
+        return "\n".join(result_lines)
+
+    def _apply_general_improvements(self, original_content: str) -> str:
+        """
+        Apply a combination of general improvements to Python code.
+        """
+        # Start with type hint enhancements
+        improved = self._enhance_type_hints(original_content, "")
+        
+        # Then apply style improvements
+        improved = self._improve_code_style(improved)
+        
+        # Then optimize the code
+        improved = self._optimize_code(improved)
+        
+        # Finally, improve null handling
+        improved = self._improve_null_handling(improved)
+        
+        return improved
 
     def _generic_modification(self, file_path: str, original_content: str, what: str, how: str) -> str:
         """Generic implementation for any file type."""
