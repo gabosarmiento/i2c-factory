@@ -790,6 +790,9 @@ class ModifierAgent(Agent):
                 # Apply generic Python modification
                 modified_content = self._generic_python_modification(file_path, original_content, what, how)
                 
+                # Run a final code cleaning pass to fix common issues
+                modified_content = self._clean_python_code(modified_content, file_path)
+                
                 # Important: Don't append comments about the modification
                 # modified_content += f"\n\n# Updated: {what}\n# Details: {how}\n"
                 
@@ -1179,7 +1182,113 @@ class ModifierAgent(Agent):
             
         # Default: Apply minimal improvements
         return self._apply_general_improvements(original_content)
+    
+    def _clean_python_code(self, content: str, file_path: str) -> str:
+        """
+        Conservative cleaning pass that fixes obvious issues without restructuring.
+        """
+        # Skip empty files or very short content
+        if not content or len(content) < 10:
+            return content
+            
+        # Special handling for test files
+        if "test_" in file_path:
+            return self._clean_test_file(content)
         
+        import re
+        lines = content.splitlines()
+        clean_lines = []
+        
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            
+            # Fix redundant conditions like "if x is not None or x is None"
+            if 'if ' in line and 'is not None or' in line and 'is None' in line:
+                pattern = r'if\s+(\w+)\s+is\s+not\s+None\s+or\s+(\w+)\s+is\s+None'
+                match = re.search(pattern, line)
+                if match and match.group(1) == match.group(2):
+                    # This condition is redundant (always true)
+                    indent = len(line) - len(line.lstrip())
+                    # Keep the indented block but remove the condition
+                    j = i + 1
+                    while j < len(lines) and (not lines[j].strip() or len(lines[j]) - len(lines[j].lstrip()) > indent):
+                        clean_lines.append(lines[j])
+                        j += 1
+                    i = j
+                    continue
+            
+            # Add the line
+            clean_lines.append(line)
+            i += 1
+        
+        return "\n".join(clean_lines)
+
+    def _clean_test_file(self, content: str) -> str:
+        """
+        Very conservative cleaning for test files - just removes duplicate unittest.main() calls.
+        """
+        # Skip empty or very short files
+        if not content or len(content) < 10:
+            return content
+            
+        lines = content.splitlines()
+        result = []
+        
+        # Count unittest.main() occurrences and __name__ == '__main__' blocks
+        main_calls = 0
+        name_blocks = 0
+        
+        # First pass - count occurrences
+        for line in lines:
+            if line.strip() == "unittest.main()":
+                main_calls += 1
+            elif line.strip() in ["if __name__ == '__main__':", 'if __name__ == "__main__":', "if __name__ == \"__main__\":"]:
+                name_blocks += 1
+        
+        # Second pass - clean up the file
+        in_main_block = False
+        for i, line in enumerate(lines):
+            strip_line = line.strip()
+            
+            # Handle __name__ == '__main__' blocks
+            if strip_line in ["if __name__ == '__main__':", 'if __name__ == "__main__":', "if __name__ == \"__main__\":"]:
+                # Only keep the last one
+                if i == len(lines) - 2 and lines[i+1].strip() == "unittest.main()":
+                    # This is the final block with unittest.main()
+                    result.append(line)
+                    in_main_block = True
+                elif name_blocks <= 1:
+                    # Only one block exists, keep it
+                    result.append(line)
+                    in_main_block = True
+                else:
+                    # Skip duplicate blocks
+                    name_blocks -= 1
+                    in_main_block = True
+                    continue
+                    
+            # Handle unittest.main() calls
+            elif strip_line == "unittest.main()":
+                # Only keep the last one in each block
+                if in_main_block and main_calls <= 1:
+                    result.append(line)
+                elif i == len(lines) - 1:  # Last line
+                    result.append(line)
+                else:
+                    main_calls -= 1
+                    
+            # End of main block
+            elif in_main_block and strip_line and len(line) - len(line.lstrip()) <= len(lines[i-1]) - len(lines[i-1].lstrip()):
+                in_main_block = False
+                result.append(line)
+                
+            # Normal line
+            else:
+                result.append(line)
+        
+        return "\n".join(result)
+
     def _enhance_type_hints(self, original_content: str, file_path: str) -> str:
         """
         Enhance type hints in Python code to improve type safety.
