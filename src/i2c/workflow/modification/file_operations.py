@@ -3,18 +3,45 @@
 from pathlib import Path
 from i2c.cli.controller import canvas # For logging
 
+# In file_operations.py, modify the write_files_to_disk function:
+
 def write_files_to_disk(code_map: dict[str, str], destination_dir: Path):
-    """Writes the generated/modified code content to disk."""
+    """Writes the generated/modified code content to disk with integrity checks."""
     canvas.step("Writing files to disk...")
     saved_count = 0
+    
     try:
         destination_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Add debug logging
+        canvas.info(f"Files to write: {len(code_map)}")
+        for rel_path, content in code_map.items():
+            canvas.info(f"Content length for {rel_path}: {len(content)} chars")
+        
         for relative_path_str, content in code_map.items():
             full_path = destination_dir / relative_path_str
+            
+            # Skip empty or near-empty content if the file already exists
+            if full_path.exists() and len(content.strip()) < 5:
+                canvas.warning(f"   ⚠️ Skipping write of empty content to existing file: {full_path}")
+                continue
+                
             canvas.info(f"   -> Writing {full_path} ({len(content)} chars)")
+            
             try:
                 # Ensure parent directories for the file exist
                 full_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # If the file exists but the content is just a comment/placeholder
+                # and the original file has substantial content, preserve the original
+                if full_path.exists():
+                    original_content = full_path.read_text(encoding='utf-8')
+                    is_placeholder = content.strip().startswith("#") and len(content.strip().splitlines()) <= 3
+                    has_substantial_original = len(original_content) > 100
+                    
+                    if is_placeholder and has_substantial_original:
+                        canvas.warning(f"   ⚠️ Preserving original content - new content appears to be just a placeholder")
+                        content = original_content + f"\n\n# Updated: {content}"
                 
                 # Check if content is a diff format and extract actual content
                 if content.startswith("# === Diff for") or (content.startswith("---") and "+++ " in content):
@@ -24,6 +51,11 @@ def write_files_to_disk(code_map: dict[str, str], destination_dir: Path):
                         # For existing files
                         original_content = full_path.read_text(encoding='utf-8')
                         modified_content = apply_diff_to_content(original_content, content)
+                        
+                        # Safety check - don't replace substantive content with empty
+                        if len(modified_content.strip()) < 5 and len(original_content.strip()) > 100:
+                            canvas.warning(f"   ⚠️ Diff would result in empty file - preserving original")
+                            modified_content = original_content
                     else:
                         # For new files, extract content after +++ line
                         if "def square" not in content and "square function" in content:

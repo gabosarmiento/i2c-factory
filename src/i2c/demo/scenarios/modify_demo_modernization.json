@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Intro: Function Modernization Demo",
+    "type": "narration",
+    "project_name": "legacy_function_project",
+    "message": "Welcome to the Function Modernization demo. We'll refactor a legacy Python function using I2C Factory."
+  },
+  {
+    "name": "Analyze Project Context",
+    "type": "initial_generation",
+    "prompt": "Analyze the existing function 'process' in legacy_function.py and identify modernization opportunities, such as type hints, list comprehensions, and safe null handling."
+  },
+  {
+    "name": "Modernize Function Implementation",
+    "type": "modification",
+    "prompt": "Refactor the 'process' function to use type hints, list comprehensions, and safe null handling while preserving its original behavior."
+  },
+  {
+    "name": "Validation of Refactor",
+    "type": "modification",
+    "prompt": "Validate the refactored function for correctness, type safety, and code style compliance."
+  },
+  {
+    "name": "Outro",
+    "type": "narration",
+    "message": "This concludes the Function Modernization demo. We transformed legacy code into modern, clean, and maintainable Python following best practices."
+  }
+]
