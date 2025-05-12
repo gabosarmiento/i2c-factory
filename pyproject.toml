@@ -41,6 +41,7 @@ scipy = {version = "^1.15.3", allow-prereleases = true}
 pytest      = "^7.0.0"
 pytest-mock = "^3.8.0"
 reportlab   = "^4.4.0"
+pytest-cov = "^6.1.1"
 
 [tool.poetry.scripts]
 i2c = "i2c.__main__:main"

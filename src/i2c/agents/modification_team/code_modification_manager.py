@@ -626,6 +626,8 @@ class AnalyzerAgent(Agent):
                 "- Ensure the JSON output is machine-readable and strictly adheres to the specified structure for seamless integration with the Code Modification Agent."
             ],
         )
+        if self.team_session_state is None:
+            self.team_session_state = {}
         
     def predict(self, messages: List[Message]) -> str:
         """Process input messages and return analysis results."""
@@ -756,6 +758,8 @@ class ModifierAgent(Agent):
                 "relevant to the project."
             ],
         )
+        if self.team_session_state is None:
+            self.team_session_state = {}
 
     def predict(self, messages: List[Message]) -> str:
         """Process input messages and return modified code."""
@@ -3202,6 +3206,8 @@ class ValidatorAgent(Agent):
                 "- Your judgment is final—only perfect code passes."
             ],
         )
+        if self.team_session_state is None:
+            self.team_session_state = {}
         
     def predict(self, messages: List[Message]) -> str:
         """Process input messages and validate code changes."""
@@ -3283,12 +3289,13 @@ class ManagerAgent(Agent):
         logger.info(">>> 🔥  ManagerAgent HAS BEEN INSTANTIATED  🔥 <<<")
         self._project_path = project_path
         
-        # Initialize team_session_state if it doesn't exist
-        if not hasattr(self, 'team_session_state') or self.team_session_state is None:
+        # Ensure team_session_state is initialized (for isolated runs)
+        if self.team_session_state is None:
             self.team_session_state = {}
-        
-        # Now safe to assign
-        self.team_session_state["project_path"] = str(project_path)
+
+        # Only set project_path if it is not already defined
+        self.team_session_state.setdefault("project_path", str(project_path))
+
             
         # Wire concrete agents into port adapters
         self._interactor = ModifyCodeInteractor(
@@ -3403,7 +3410,7 @@ class ManagerAgent(Agent):
 
 
 # Public factory used by adapter ------------------------------------------
-def build_code_modification_team(project_path: Path | str, **kwargs) -> Team:
+def build_code_modification_team(project_path: Path | str, session_state=None, **kwargs) -> Team:
     print(f"Building code modification team for: {project_path}")
     print(f"Kwargs: {kwargs}")
     
@@ -3416,28 +3423,37 @@ def build_code_modification_team(project_path: Path | str, **kwargs) -> Team:
     print(f"DB provided: {db is not None}")
     print(f"Embed model provided: {embed_model is not None}")
     
+    # Use provided session_state or initialize defaults
+    session_state = session_state or {
+        "risk_map": {},
+        "semantic_graph_tool": None,  # will be set below
+        "project_path": str(project_path),
+        "db": db,
+        "embed_model": embed_model
+    }
+    
+    # Always update critical context keys (without overwriting the session dict itself)
+    session_state.setdefault("risk_map", {})
+    session_state["semantic_graph_tool"] = SemanticGraphTool(project_path=project_path)
+    session_state["project_path"] = str(project_path)
+    if db is not None:
+        session_state["db"] = db
+    if embed_model is not None:
+        session_state["embed_model"] = embed_model
+
     # Create the manager
     manager = ManagerAgent(project_path)
-    
-    # Build semantic graph tool
-    sem_tool = SemanticGraphTool(project_path=project_path)
-    
-    # Create the team without trying to set session states directly
+
+    # Build the team
     return Team(
-        name="Code‑Modification Team (Manager‑Clean) ",
+        name="Code‑Modification Team (Manager‑Clean)",
         mode="coordinate",
         model=llm_highest, 
-        members=[manager],  # Only include the manager
+        members=[manager],
         instructions=[
             "Your goal is to safely modify code per user request, flag ripple-risks, and produce a unified diff."
         ],
-        session_state={ 
-            "risk_map": {}, 
-            "semantic_graph_tool": sem_tool,
-            "project_path": str(project_path),
-            "db": db,
-            "embed_model": embed_model
-        },
+        session_state=session_state,
         enable_agentic_context=True,
         share_member_interactions=True,
         show_members_responses=False,
