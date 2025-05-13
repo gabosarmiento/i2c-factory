@@ -65,7 +65,38 @@ class CodeOrchestrationAgent(Agent):
         self.sre_team = None
 
     def _initialize_reflective_operators(self):
-        self.plan_refinement_operator = None
+        """Initialize reflective operators (PlanRefinementOperator, IssueResolutionOperator)"""
+        shared_session = self.team_session_state
+        budget_manager = shared_session.get("budget_manager")
+        rag_table = shared_session.get("rag_table")
+        embed_model = shared_session.get("embed_model")
+
+        if not all (k in self.team_session_state for k in ["budget_manager", "rag_table", "embed_model"]):
+            raise ValueError("Missing one of budget_manager, rag_table, embed_model in session state")
+
+        from i2c.agents.reflective.plan_refinement_operator import PlanRefinementOperator
+        from i2c.agents.reflective.issue_resolution_operator import IssueResolutionOperator
+
+        # Instantiate Plan Refinement Operator
+        self.plan_refinement_operator = PlanRefinementOperator(
+            budget_manager=budget_manager,
+            rag_table=rag_table,
+            embed_model=embed_model
+        )
+
+        # Instantiate Issue Resolution Operator
+        self.issue_resolution_operator = IssueResolutionOperator(
+            budget_manager=budget_manager,
+            max_reasoning_steps=3
+        )
+
+        # Optional: Log initialization
+        from i2c.cli.controller import canvas
+        canvas.info(f"Budget Manager: {budget_manager}")
+        canvas.info(f"RAG Table: {rag_table}")
+        canvas.info(f"Embed Model: {embed_model}")
+        canvas.info("Reflective operators initialized successfully")
+
        
     async def execute(self, objective: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -223,16 +254,6 @@ class CodeOrchestrationAgent(Agent):
         self.quality_team = build_quality_team(session_state=shared_session)
         self.sre_team = build_sre_team(session_state=shared_session)
 
-        # Initialize reflective operators from session
-        budget_manager = shared_session.get("budget_manager")
-        rag_table = shared_session.get("rag_table")
-        embed_model = shared_session.get("embed_model")
-
-        self.plan_refinement_operator = PlanRefinementOperator(
-            budget_manager=budget_manager,
-            rag_table=rag_table,
-            embed_model=embed_model
-        )
 
     async def _analyze_project_context(self, project_path: Path, task: str) -> Dict[str, Any]:
         """Analyze project context using the knowledge team"""
@@ -376,20 +397,99 @@ class CodeOrchestrationAgent(Agent):
         return sre_results
     
     async def _refine_based_on_feedback(
-        self, plan: Dict[str, Any], quality_results: Dict[str, Any], sre_results: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Refine the modification plan based on validation feedback"""
-        # Track this step in the reasoning trajectory
-        self._add_reasoning_step("Plan Refinement", 
-                               "Refining plan based on validation feedback")
-        
-        # This is a placeholder - implement actual Reflective Operator integration
+    self, plan: Dict[str, Any], quality_results: Dict[str, Any], sre_results: Dict[str, Any]
+) -> Dict[str, Any]:
+        self._add_reasoning_step("Plan Refinement", "Refining plan based on validation feedback")
+
+        issues = []
+        issues.extend(quality_results.get('issues', []))
+        issues.extend(sre_results.get('issues', []))
+
+        if not hasattr(self, 'plan_refinement_operator'):
+            raise RuntimeError("PlanRefinementOperator not initialized")
+
+        user_request = f"Refine plan to address: {', '.join(issues)}"
+
+        success, result = self.plan_refinement_operator.execute(
+            initial_plan=json.dumps(plan),
+            user_request=user_request,
+            project_path=self.team_session_state.get("project_path", ""),
+            language=self._detect_primary_language(plan)
+        )
+
         refinement_result = {
-            "reflection": "Identified issues that need to be addressed",
-            "refined_plan": plan  # In a real implementation, this would be an updated plan
+            "reflection": "Identified issues and refined plan accordingly",
+            "refined_plan": result.get("plan") if success else plan,
+            "success": success
         }
-        
+
+        self._add_reasoning_step("Plan Refinement", f"Refinement {'succeeded' if success else 'failed'}", success=success)
+
         return refinement_result
+
+    async def _fix_test_failures(self, test_failures: List[Dict], modified_files: Dict[str, str]) -> Dict[str, Any]:
+        self._add_reasoning_step("Issue Resolution", f"Resolving {len(test_failures)} test failures")
+
+        results = {"fixed": [], "unfixed": []}
+
+        if not hasattr(self, 'issue_resolution_operator'):
+            raise RuntimeError("IssueResolutionOperator not initialized")
+
+        for failure in test_failures:
+            file_path = failure.get("file_path")
+            if file_path and file_path in modified_files:
+                file_content = modified_files[file_path]
+
+                success, result = self.issue_resolution_operator.execute(
+                    test_failure=failure,
+                    file_content=file_content,
+                    file_path=file_path,
+                    language=self._detect_language_from_file(file_path),
+                    project_path=Path(self.team_session_state.get("project_path", ""))
+                )
+
+                if success:
+                    modified_files[file_path] = result.get("fixed_content", file_content)
+                    results["fixed"].append({
+                        "file": file_path,
+                        "original_error": failure.get("error_message", "Unknown error"),
+                        "patch": result.get("patch", "")
+                    })
+                else:
+                    results["unfixed"].append({
+                        "file": file_path,
+                        "error": failure.get("error_message", "Unknown error"),
+                        "reason": result.get("error", "Unknown reason")
+                    })
+
+        success = len(results["unfixed"]) == 0
+        self._add_reasoning_step("Issue Resolution", f"Fixed {len(results['fixed'])} of {len(test_failures)} issues", success=success)
+
+        return results
+
+    async def _execute_with_recovery(self, plan: Dict[str, Any], max_attempts: int = 3) -> Dict[str, Any]:
+        """Execute modifications with automatic recovery attempts"""
+        for attempt in range(1, max_attempts + 1):
+            # Execute the current plan
+            result = await self._execute_modifications(plan)
+            
+            # Check for success
+            if result.get("success", False):
+                return result
+            
+            # If failed and we have more attempts, try to recover
+            if attempt < max_attempts:
+                self._add_reasoning_step("Recovery Attempt", 
+                                    f"Modification failed, attempting recovery (attempt {attempt}/{max_attempts})")
+                
+                # Use the appropriate reflective operator to fix the issue
+                recovery_plan = await self._generate_recovery_plan(result, plan)
+                
+                # Update the plan for the next attempt
+                plan = recovery_plan
+        
+        # If we've exhausted all attempts, return the last result
+        return result
     
     def _make_final_decision(
         self, 

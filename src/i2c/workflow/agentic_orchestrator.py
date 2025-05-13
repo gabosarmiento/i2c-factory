@@ -29,16 +29,20 @@ async def execute_agentic_evolution(objective: Dict[str, Any], project_path: Pat
     # Initialize session state with key information
     initial_session_state = {
         "project_path": str(project_path),
-        "objective": objective,
+        "objective": objective,    
         "reasoning_trajectory": [],
         "start_time": datetime.datetime.now().isoformat()
     }
 
     # Add embedding model if available
     try:
-        from i2c.workflow.modification.rag_config import get_embed_model
-        embed_model = get_embed_model()
-        initial_session_state["embed_model"] = embed_model
+        from i2c.agents.budget_manager import get_budget_manager
+        from i2c.workflow.modification.rag_config import get_embed_model, get_rag_table
+        
+        initial_session_state["embed_model"] = get_embed_model()
+        initial_session_state["rag_table"] = get_rag_table()
+        initial_session_state["budget_manager"] = get_budget_manager()
+        
     except ImportError:
         canvas.warning("Embedding model not available - continuing without RAG capabilities")
 
@@ -48,7 +52,6 @@ async def execute_agentic_evolution(objective: Dict[str, Any], project_path: Pat
 
     # Execute the objective
     canvas.info(f"Executing objective: {objective.get('task', 'No task specified')}")
-    
     result = await orchestration_team.arun(
         message=Message(role="user", content=json.dumps(objective))
     )
