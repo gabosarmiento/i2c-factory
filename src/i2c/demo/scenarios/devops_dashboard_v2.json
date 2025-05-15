@@ -1,0 +1,160 @@
+[
+  {
+    "name": "Introduction",
+    "type": "narration",
+    "message": "This scenario will enhance the existing DevOps Dashboard backend by adding missing components and implementing a frontend. We'll focus on filling gaps in the current implementation while maintaining architectural consistency.",
+    "pause": 3
+  },
+  {
+    "name": "Add Frontend Foundation",
+    "type": "generation",
+    "prompt": "Create the foundational React TypeScript frontend for the DevOps Dashboard. The frontend should connect to the existing backend API endpoints for metrics and alerts. Include a main Dashboard component, MetricsDisplay component, and AlertsPanel component. Set up the project with proper TypeScript configuration, React Router for navigation, and a modern UI library like Material-UI or Chakra UI. Create the basic layout with navigation, content area, and responsive design.",
+    "expected_files": [
+      "frontend/src/App.tsx",
+      "frontend/src/index.tsx",
+      "frontend/src/components/Dashboard/Dashboard.tsx",
+      "frontend/src/components/Metrics/MetricsDisplay.tsx",
+      "frontend/src/components/Alerts/AlertsPanel.tsx",
+      "frontend/src/services/api.ts",
+      "frontend/package.json",
+      "frontend/tsconfig.json"
+    ]
+  },
+  {
+    "name": "Implement WebSocket Service",
+    "type": "modification",
+    "prompt": "Add WebSocket support to the existing backend structure to enable real-time metric updates. Create a WebSocket service that integrates with the existing metrics service for pushing updates. Then update the frontend to connect to this WebSocket service for real-time data reception. The implementation should maintain the current architectural patterns with repository-service-controller separation. Include proper error handling and reconnection logic.",
+    "expected_changes": [
+      "backend/services/websocket_service.py",
+      "backend/routes/websocket.py",
+      "frontend/src/services/websocket.ts",
+      "frontend/src/hooks/useRealTimeMetrics.ts",
+      "frontend/src/components/Metrics/RealTimeMetricsChart.tsx"
+    ]
+  },
+  {
+    "name": "Complete Authentication System",
+    "type": "modification",
+    "prompt": "Implement a complete authentication system using JWT tokens. The system should include user registration, login, password reset, and role-based access control (RBAC). Update the existing user models and services to support these features. On the frontend, create login/registration forms and an authentication context to manage the user session. Implement proper token storage, refresh logic, and secure routes.",
+    "expected_changes": [
+      "backend/services/auth_service.py",
+      "backend/routes/auth.py",
+      "backend/models/user.py",
+      "backend/schemas/auth.py",
+      "frontend/src/components/Auth/Login.tsx",
+      "frontend/src/components/Auth/Register.tsx",
+      "frontend/src/contexts/AuthContext.tsx",
+      "frontend/src/hooks/useAuth.ts",
+      "frontend/src/services/auth.ts"
+    ]
+  },
+  {
+    "name": "Enhance Metrics Visualization",
+    "type": "modification",
+    "prompt": "Create advanced visualization components for the metrics data. Implement time-series charts, gauge charts, and status indicators. The charts should support zooming, time range selection, and comparison of multiple metrics. Add a metric dashboard builder that allows users to customize their view. Include data aggregation functionality in the backend metrics service to support these visualizations.",
+    "expected_changes": [
+      "backend/services/metric_aggregation_service.py",
+      "backend/routes/metric_aggregation.py",
+      "frontend/src/components/Charts/TimeSeriesChart.tsx",
+      "frontend/src/components/Charts/GaugeChart.tsx",
+      "frontend/src/components/Charts/StatusIndicator.tsx",
+      "frontend/src/components/Dashboard/DashboardBuilder.tsx",
+      "frontend/src/hooks/useMetricsData.ts"
+    ]
+  },
+  {
+    "name": "Implement Alert Management System",
+    "type": "modification",
+    "prompt": "Enhance the existing alert system to allow users to configure alert rules, notification channels, and view alert history. Create frontend components for alert configuration and history viewing. Update the backend alert service to support these features and implement a notification dispatcher that can send alerts via email, webhook, or in-app notifications.",
+    "expected_changes": [
+      "backend/services/notification_service.py",
+      "backend/repositories/notification_repository.py",
+      "backend/models/notification.py",
+      "backend/schemas/notification.py", 
+      "frontend/src/components/Alerts/AlertConfiguration.tsx",
+      "frontend/src/components/Alerts/AlertHistory.tsx",
+      "frontend/src/components/Alerts/NotificationSettings.tsx",
+      "frontend/src/services/alerts.ts"
+    ]
+  },
+  {
+    "name": "Add System Health Monitoring",
+    "type": "modification",
+    "prompt": "Implement system health monitoring for the dashboard application itself. The system should track API performance, database connection status, and external service dependencies. Create a health check endpoint that provides this information and a frontend admin view to display system health statistics. Include the ability to configure warning thresholds for system metrics.",
+    "expected_changes": [
+      "backend/services/health_service.py",
+      "backend/routes/health.py",
+      "frontend/src/components/Admin/SystemHealth.tsx",
+      "frontend/src/services/health.ts",
+      "frontend/src/hooks/useSystemHealth.ts"
+    ]
+  },
+  {
+    "name": "Organize Test Structure",
+    "type": "modification",
+    "prompt": "Reorganize the existing tests into a dedicated test directory with proper separation of unit, integration, and end-to-end tests. Add test fixtures, mocks, and increase test coverage. Implement frontend tests using React Testing Library or Jest. Update the CI/CD configuration to run all tests and generate coverage reports.",
+    "expected_changes": [
+      "tests/unit/services/test_metric_service.py",
+      "tests/unit/services/test_alert_service.py",
+      "tests/integration/routes/test_metrics.py",
+      "tests/integration/routes/test_alerts.py",
+      "frontend/src/tests/components/Dashboard.test.tsx",
+      "frontend/src/tests/components/Alerts.test.tsx",
+      ".github/workflows/ci.yml"
+    ]
+  },
+  {
+    "name": "Add Database Migration System",
+    "type": "modification",
+    "prompt": "Implement a database migration system to manage schema changes. Use Alembic with SQLAlchemy to create migration scripts for the existing models. Create an initial migration for the current schema and ensure that the application handles database upgrades gracefully. Update documentation to include database setup and migration instructions.",
+    "expected_changes": [
+      "alembic.ini",
+      "migrations/env.py",
+      "migrations/versions/initial_migration.py",
+      "docs/database.md"
+    ]
+  },
+  {
+    "name": "Complete Documentation",
+    "type": "modification",
+    "prompt": "Complete the existing documentation by adding comprehensive API documentation, architecture diagrams showing data flow, detailed setup instructions, and user guides. Include information about real-time updates, authentication, and alert configuration. Create diagrams showing the integration between frontend and backend components.",
+    "expected_changes": [
+      "docs/api.md",
+      "docs/architecture.md",
+      "docs/setup.md",
+      "docs/user_guide.md",
+      "docs/diagrams/system_architecture.png",
+      "docs/diagrams/data_flow.png",
+      "docs/diagrams/component_interaction.png"
+    ]
+  },
+  {
+    "name": "Add Dependency Management",
+    "type": "modification",
+    "prompt": "Create proper dependency management files for both backend and frontend. For the backend, add requirements.txt with specific version constraints for all dependencies. For the frontend, ensure package.json has all necessary dependencies with appropriate version ranges. Include separate development and production configurations.",
+    "expected_changes": [
+      "requirements.txt",
+      "requirements-dev.txt",
+      "frontend/package.json"
+    ]
+  },
+  {
+    "name": "Enhance Docker Configuration",
+    "type": "modification",
+    "prompt": "Enhance the existing Docker configuration to support both development and production environments. Create separate Docker Compose files for development and production. Include proper environment variable configuration, volume management for persistence, and health checks. Add documentation on how to use the Docker setup.",
+    "expected_changes": [
+      "Dockerfile",
+      "docker-compose.yml",
+      "docker-compose.dev.yml",
+      "docker-compose.prod.yml",
+      ".env.example",
+      "docs/docker.md"
+    ]
+  },
+  {
+    "name": "Conclusion",
+    "type": "narration",
+    "message": "We've now enhanced the DevOps Dashboard with all missing components including the frontend implementation, WebSocket support for real-time updates, authentication system, advanced visualizations, improved alert management, system health monitoring, organized tests, database migrations, comprehensive documentation, and proper dependency management. The application now provides a complete solution for DevOps monitoring with a focus on maintainability and extensibility.",
+    "pause": 5
+  }
+]

@@ -250,7 +250,17 @@ class CodeOrchestrationAgent(Agent):
 
         # Initialize teams with shared session state
         self.knowledge_team = build_knowledge_team(session_state=shared_session)
-        self.modification_team = build_code_modification_team(project_path=project_path, session_state=shared_session)
+        # Use new enhanced modification team 
+        self.modification_team = build_code_modification_team(
+            project_path=project_path, 
+            session_state=shared_session,
+            config={
+                "enable_security_scanning": True,
+                "strict_validation": True,
+                "detailed_documentation": True,
+                "analysis_depth": "deep"
+            }
+        )
         self.quality_team = build_quality_team(session_state=shared_session)
         self.sre_team = build_sre_team(session_state=shared_session)
 

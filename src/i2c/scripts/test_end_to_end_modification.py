@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 import sys
 import traceback
+import json
 
 # Add your project to the sys.path if needed
 # sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -36,16 +37,31 @@ def test_end_to_end_modification():
         setup_test_project(test_dir)
         
         # 2. Run the modification cycle
-        user_request = "Add a title parameter to the greet function with a default value of None"
+        user_request = {
+            "file": "test_module.py",
+            "action": "modify",
+            "what": "Change function signature",
+            "how": "Replace 'def greet(name):' with 'def greet(name, title=None):' and update the return statement to include title"
+        }
         print(f"\nRunning modification with request: '{user_request}'")
         
         # Get DB and embed model for RAG
         db = get_db_connection()
         embed_model = get_embed_model()
         
+        # Test the ModifierAgent directly
+        from i2c.agents.modification_team.code_modification_manager import ModifierAgent
+        from agno.agent import Message
+        
+        print("\n--- Testing ModifierAgent directly ---")
+        agent = ModifierAgent()
+        prompt = "You are the Code Modifier.\nFile: test_module.py\nTask: Add title parameter\nDetails: Add optional title parameter"
+        response = agent.predict([Message(role="user", content=prompt)])
+        print(f"Agent direct response: {response}")
+        print("\n--- End of direct test ---\n")
         # Execute the modification cycle
         result = execute_modification_cycle(
-            user_request=user_request,
+            user_request=json.dumps(user_request),  # Convert dict to JSON string
             project_path=test_dir,
             language="python",
             db=db,

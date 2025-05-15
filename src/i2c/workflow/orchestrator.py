@@ -20,7 +20,7 @@ def route_and_execute_with_recovery(
     action_detail: any,
     current_project_path: Path,
     current_structured_goal: dict | None,
-    max_retries: int = 2  # Allow for retries
+    max_retries: int = 0  # Allow for retries
 ) -> bool:
     """Enhanced route_and_execute with error recovery"""
     from i2c.cli.controller import canvas

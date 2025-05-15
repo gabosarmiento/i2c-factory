@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Dict, Any
+import os
 import asyncio
 import datetime
 import json
@@ -26,12 +27,26 @@ async def execute_agentic_evolution(objective: Dict[str, Any], project_path: Pat
     # Add project path to objective
     objective['project_path'] = str(project_path)
 
-    # Initialize session state with key information
+    # Analyze the current project state
+    canvas.info(f"Analyzing project at: {project_path}")
+    project_files = []
+    for root, dirs, files in os.walk(project_path):
+        for file in files:
+            if file.endswith(('.py', '.js', '.html', '.css')):
+                rel_path = os.path.relpath(os.path.join(root, file), project_path)
+                project_files.append(rel_path)
+    
+    # Add project state to objective
+    objective['existing_files'] = project_files
+    canvas.info(f"Found {len(project_files)} existing files in project")
+    
+    # Initialize session state
     initial_session_state = {
         "project_path": str(project_path),
-        "objective": objective,    
+        "objective": objective,
         "reasoning_trajectory": [],
-        "start_time": datetime.datetime.now().isoformat()
+        "start_time": datetime.datetime.now().isoformat(),
+        "existing_files": project_files
     }
 
     # Add embedding model if available
