@@ -2,6 +2,7 @@
 
 from agno.team import Team
 from i2c.agents.code_orchestration_agent import CodeOrchestrationAgent
+from i2c.workflow.agentic_orchestrator import execute_modification_with_agents
 from builtins import llm_highest
 
 from pydantic import BaseModel, Field

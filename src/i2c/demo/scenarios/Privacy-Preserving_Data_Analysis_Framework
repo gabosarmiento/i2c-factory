@@ -1,0 +1,110 @@
+[
+  {
+    "type": "narration",
+    "name": "Introduction",
+    "message": "Welcome to the Privacy-Preserving Data Analysis Framework Scenario. We'll create a framework that allows data scientists to analyze sensitive data while maintaining privacy through differential privacy techniques and secure multi-party computation.",
+    "pause": 2
+  },
+  {
+    "type": "knowledge_folder",
+    "name": "Import Differential Privacy Knowledge",
+    "folder_path": "projects/differential-privacy",
+    "doc_type": "Framework Source",
+    "framework": "Differential Privacy",
+    "version": "latest",
+    "recursive": true
+  },
+  {
+    "type": "knowledge",
+    "name": "Import Privacy Regulations",
+    "doc_path": "docs/privacy_regulations.md",
+    "doc_type": "Compliance",
+    "framework": "Data Privacy",
+    "version": "2023"
+  },
+  {
+    "type": "initial_generation",
+    "name": "Create Base Framework",
+    "prompt": "Create a Python framework for privacy-preserving data analysis that implements differential privacy techniques, secure multi-party computation, and federated learning. The framework should allow data scientists to perform statistical analysis, machine learning, and visualization on sensitive data without compromising privacy.",
+    "project_name": "privacy_analysis",
+    "language": "python"
+  },
+  {
+    "type": "agentic_evolution",
+    "name": "Add Differential Privacy Engine",
+    "objective": {
+      "task": "Implement a differential privacy engine that adds calibrated noise to queries and results to prevent re-identification while maintaining statistical validity. The engine should support common statistical operations like mean, median, variance, and correlation.",
+      "language": "python",
+      "constraints": [
+        "Implement epsilon and delta privacy budgeting",
+        "Support adaptive composition of privacy guarantees",
+        "Provide privacy-utility tradeoff metrics"
+      ],
+      "quality_gates": [
+        "Mathematically provable privacy guarantees",
+        "Minimal impact on statistical significance",
+        "Performance scales with dataset size"
+      ]
+    }
+  },
+  {
+    "type": "agentic_evolution",
+    "name": "Add Secure Multi-Party Computation",
+    "objective": {
+      "task": "Implement secure multi-party computation protocols that allow multiple parties to jointly compute functions over their inputs while keeping those inputs private. Support both additive and multiplicative secret sharing techniques.",
+      "language": "python",
+      "constraints": [
+        "Implement at least two MPC protocols",
+        "Support distributed computation across networks",
+        "Ensure cryptographic security against adversaries"
+      ],
+      "quality_gates": [
+        "Correctness of computation results",
+        "Security against semi-honest adversaries",
+        "Efficiency for common operations"
+      ]
+    }
+  },
+  {
+    "type": "agentic_evolution",
+    "name": "Add Federated Learning Support",
+    "objective": {
+      "task": "Implement federated learning capabilities that allow training machine learning models across multiple decentralized devices or servers holding local data samples, without exchanging them. Support federated averaging and differential privacy integration.",
+      "language": "python",
+      "constraints": [
+        "Support TensorFlow and PyTorch models",
+        "Implement secure aggregation protocols",
+        "Allow model customization and evaluation"
+      ],
+      "quality_gates": [
+        "Model accuracy comparable to centralized training",
+        "Communication efficiency across participants",
+        "Robustness against participant dropouts"
+      ]
+    }
+  },
+  {
+    "type": "agentic_evolution",
+    "name": "Add Compliance Verification System",
+    "objective": {
+      "task": "Create a compliance verification system that audits analysis workflows to ensure they meet privacy regulations like GDPR, HIPAA, and CCPA. The system should generate compliance reports, track privacy budgets, and enforce policy constraints.",
+      "language": "python",
+      "constraints": [
+        "Support major privacy regulations",
+        "Implement automated workflow auditing",
+        "Generate compliance documentation"
+      ],
+      "quality_gates": [
+        "Correct identification of compliance issues",
+        "Integration with existing workflows",
+        "Comprehensive reporting capabilities"
+      ]
+    }
+  },
+  {
+    "type": "narration",
+    "name": "Conclusion",
+    "message": "The Privacy-Preserving Data Analysis Framework has been successfully created with differential privacy, secure multi-party computation, federated learning, and compliance verification capabilities. This demonstrates how i2c Factory can build sophisticated frameworks that address complex technical and regulatory challenges.",
+    "pause": 2
+  }
+]

@@ -67,6 +67,70 @@ class ScenarioProcessor:
         self.current_structured_goal: Optional[Dict] = None
         self.reader_agent: Optional[ContextReaderAgent] = None
     
+
+    def _process_agentic_evolution_step(self, step: Dict[str, Any]) -> None:
+        """
+        Process an agentic evolution step - uses the new integrated agent orchestration system.
+        
+        Args:
+            step: The agentic evolution step configuration
+        """
+        if not self.current_project_path:
+            canvas.warning("No active project. Cannot perform agentic evolution.")
+            return
+            
+        # Extract objective from step
+        objective = step.get("objective", {})
+        if not objective or not objective.get("task"):
+            canvas.warning("No task specified in objective. Skipping agentic evolution.")
+            return
+            
+        # Set project path in objective
+        objective["project_path"] = str(self.current_project_path)
+        
+        canvas.info(f"🧠 Running agent-orchestrated evolution for: {objective.get('task', 'Unknown task')}")
+        
+        try:
+            # Import the agentic orchestrator
+            from i2c.workflow.agentic_orchestrator import execute_agentic_evolution_sync
+            
+            # Get start cost for operation tracking
+            start_tokens, start_cost = self.budget_manager.get_session_consumption()
+            
+            # Execute the agentic evolution
+            result = execute_agentic_evolution_sync(objective, self.current_project_path)
+            
+            # Display the result
+            if result.get("decision") == "approve":
+                canvas.success(f"✅ Evolution approved: {result.get('reason', 'No reason provided')}")
+                
+                # Show modifications
+                modifications = result.get("modifications", {})
+                if modifications:
+                    canvas.info("📝 Modifications:")
+                    for file_path, summary in modifications.items():
+                        canvas.info(f"  - {file_path}: {summary}")
+            else:
+                canvas.error(f"❌ Evolution rejected: {result.get('reason', 'No reason provided')}")
+                
+            # Calculate operation cost
+            end_tokens, end_cost = self.budget_manager.get_session_consumption()
+            op_tokens = end_tokens - start_tokens
+            op_cost = end_cost - start_cost
+            
+            # Show operation cost
+            from i2c.cli.budget_display import show_operation_cost
+            show_operation_cost(
+                operation=f"Agentic Evolution ({objective.get('task', '')[:30]}...)",
+                tokens=op_tokens,
+                cost=op_cost
+            )
+            
+        except Exception as e:
+            canvas.error(f"Error during agentic evolution: {e}")
+            import traceback
+            canvas.error(traceback.format_exc())
+        
     def debug_code_generation(self, raw_response: str, processed_code: str) -> None:
         """Log details about code generation for debugging"""
         canvas.info("--- Debug: Code Generation Details ---")
@@ -78,11 +142,42 @@ class ScenarioProcessor:
         canvas.info(processed_code[:100] + "..." if len(processed_code) > 100 else processed_code)
         canvas.info("--- End Debug Info ---")
         
+
+
     def _load_scenario(self) -> List[Dict[str, Any]]:
         """Load and parse the scenario JSON file"""
         try:
+            canvas.info(f"Loading scenario file: {self.scenario_path}")
             with open(self.scenario_path, 'r') as f:
-                return json.load(f)
+                content = f.read()
+                canvas.info(f"Scenario file content (first 100 chars): {content[:100]}...")
+                
+                # Parse the JSON
+                data = json.loads(content)
+                
+                # Debug the parsed data
+                canvas.info(f"Parsed scenario data type: {type(data)}")
+                if isinstance(data, dict):
+                    canvas.info(f"Scenario keys: {list(data.keys())}")
+                    
+                    # Check if 'steps' is a list in the data
+                    steps = data.get('steps', [])
+                    canvas.info(f"Steps type: {type(steps)}")
+                    canvas.info(f"Number of steps: {len(steps)}")
+                    
+                    # Check the first step
+                    if steps and isinstance(steps, list) and len(steps) > 0:
+                        first_step = steps[0]
+                        canvas.info(f"First step type: {type(first_step)}")
+                        canvas.info(f"First step content: {first_step}")
+                        
+                    # Return just the steps
+                    return steps
+                else:
+                    # If data is not a dict, assume it's already a list of steps
+                    canvas.info(f"Data is not a dict, assuming direct list of steps")
+                    return data
+                    
         except json.JSONDecodeError as e:
             canvas.error(f"Invalid JSON in scenario file: {e}")
             raise ValueError(f"Invalid JSON in scenario file: {e}")
@@ -195,6 +290,8 @@ class ScenarioProcessor:
                     # Handle different step types
                     if step_type == "narration":
                         self._process_narration_step(step)
+                    elif step_type == "agentic_evolution":
+                        self._process_agentic_evolution_step(step)
                     elif step_type == "initial_generation":
                         self._process_initial_generation_step(step)
                     elif step_type == "modification":

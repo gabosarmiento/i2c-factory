@@ -1,0 +1,110 @@
+[
+  {
+    "type": "narration",
+    "name": "Introduction",
+    "message": "Welcome to the AI-Powered Accounting Application Scenario. We'll create a financial analysis tool that leverages the AGNO framework to provide intelligent financial insights and automated bookkeeping.",
+    "pause": 2
+  },
+  {
+    "type": "knowledge_folder",
+    "name": "Import AGNO Knowledge",
+    "folder_path": "projects/agno-agi/agno",
+    "doc_type": "Framework Source",
+    "framework": "AGNO",
+    "version": "latest",
+    "recursive": true
+  },
+  {
+    "type": "knowledge",
+    "name": "Import Accounting Standards",
+    "doc_path": "docs/accounting_standards.md",
+    "doc_type": "Domain Knowledge",
+    "framework": "Accounting",
+    "version": "GAAP 2023"
+  },
+  {
+    "type": "initial_generation",
+    "name": "Create Base Application",
+    "prompt": "Create a Python application for small business accounting that can import bank statements, categorize transactions, generate financial reports, and provide business insights. The application should use the AGNO framework to build intelligent agents that help with financial decision-making.",
+    "project_name": "agno_accounting",
+    "language": "python"
+  },
+  {
+    "type": "agentic_evolution",
+    "name": "Add Transaction Categorization Agent",
+    "objective": {
+      "task": "Create an AGNO-based agent that automatically categorizes financial transactions using machine learning. The agent should learn from user corrections and improve over time. It should handle common transaction formats from major banks, credit cards, and payment processors.",
+      "language": "python",
+      "constraints": [
+        "Use AGNO's knowledge integration capabilities",
+        "Implement at least three categorization strategies",
+        "Support CSV, QFX, OFX, and PDF statement imports"
+      ],
+      "quality_gates": [
+        "Achieves >85% accuracy on standard transactions",
+        "Handles edge cases like refunds and transfers",
+        "Provides confidence scores for classifications"
+      ]
+    }
+  },
+  {
+    "type": "agentic_evolution",
+    "name": "Add Financial Advisor Agent",
+    "objective": {
+      "task": "Implement an AGNO-based financial advisor agent that analyzes spending patterns, predicts cash flow, and provides personalized recommendations for improving financial health. The agent should generate reports and visualizations that help users understand their finances.",
+      "language": "python",
+      "constraints": [
+        "Implement cash flow prediction algorithms",
+        "Create at least 5 financial health metrics",
+        "Generate interactive dashboards with plotly"
+      ],
+      "quality_gates": [
+        "Predictions are within reasonable error margins",
+        "Recommendations are actionable and relevant",
+        "Dashboard is accessible and informative"
+      ]
+    }
+  },
+  {
+    "type": "agentic_evolution",
+    "name": "Add Tax Preparation Assistant",
+    "objective": {
+      "task": "Add a tax preparation assistant that identifies tax-relevant transactions, calculates deductions, and helps prepare financial information for tax filing. The assistant should handle different business structures and tax jurisdictions.",
+      "language": "python",
+      "constraints": [
+        "Support sole proprietorships, LLCs, and S-Corps",
+        "Identify common tax deductions automatically",
+        "Generate tax-ready reports in standard formats"
+      ],
+      "quality_gates": [
+        "Correctly identifies tax-deductible expenses",
+        "Handles multiple tax jurisdictions",
+        "Provides audit-ready documentation"
+      ]
+    }
+  },
+  {
+    "type": "agentic_evolution",
+    "name": "Add Multi-Agent Collaboration",
+    "objective": {
+      "task": "Implement AGNO's team capabilities to enable collaboration between the transaction categorizer, financial advisor, and tax assistant. The agents should share insights, resolve conflicts, and provide a unified user experience.",
+      "language": "python",
+      "constraints": [
+        "Use AGNO's Team class for agent coordination",
+        "Implement a session manager for persistent state",
+        "Create a unified API for external applications"
+      ],
+      "quality_gates": [
+        "Agents effectively share information",
+        "System provides coherent, non-conflicting advice",
+        "API is well-documented and consistent"
+      ]
+    }
+  },
+  {
+    "type": "narration",
+    "name": "Conclusion",
+    "message": "The AI-Powered Accounting Application has been successfully created with transaction categorization, financial advising, tax preparation, and multi-agent collaboration features. This demonstrates how i2c Factory can leverage the AGNO framework to build sophisticated AI-powered business applications.",
+    "pause": 2
+  }
+]

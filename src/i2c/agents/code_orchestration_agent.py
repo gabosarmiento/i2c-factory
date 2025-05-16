@@ -308,72 +308,54 @@ class CodeOrchestrationAgent(Agent):
         
         return plan
     
+
     async def _execute_modifications(self, plan: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute the modification plan using the modification team"""
+        """Execute the modification plan using the modification workflow"""
         # Track this step in the reasoning trajectory
         self._add_reasoning_step("Code Modification", 
-                            f"Executing {len(plan.get('steps', []))} modification steps")
-        
-        results = {
-            "success": True,
-            "modified_files": [],
-            "patches": {},
-            "summary": {}
-        }
+                            f"Executing modification plan through integrated workflow")
         
         try:
-            # Execute each modification step using the modification team
-            for step in plan.get('steps', []):
-                # Get context for this modification
-                context = ""
-                if self.team_session_state is not None:
-                    analysis = self.team_session_state.get("analysis", {})
-                    context = analysis.get("context", {}).get(step.get("file", ""), "")
-                
-                # Prepare the request in the format expected by the modification team
-                request = {
-                    "modification_step": step,
-                    "project_path": self.team_session_state.get("project_path", ""),
-                    "retrieved_context": context
-                }
-                
-                # Execute the modification
-                response = await self.modification_team.apredict(json.dumps(request))
-                
-                # Parse the response
-                try:
-                    result = json.loads(response)
-                    
-                    # Track the modified file
-                    file_path = result.get("file_path", step.get("file", "unknown"))
-                    results["modified_files"].append(file_path)
-                    
-                    # Store the patch
-                    results["patches"][file_path] = result.get("unified_diff", "")
-                    
-                    # Store the documentation
-                    results["summary"][file_path] = result.get("documentation", "")
-                    
-                    # Log success
-                    self._add_reasoning_step("Code Modification", 
-                                        f"Successfully modified {file_path}",
-                                        success=True)
-                except json.JSONDecodeError:
-                    # Handle case where response is not valid JSON
-                    self._add_reasoning_step("Code Modification", 
-                                        f"Failed to parse modification result for step: {step}",
-                                        success=False)
-                    results["success"] = False
+            from i2c.workflow.bridge import bridge_agentic_and_workflow_modification
+            
+            # Create an objective for the bridge function
+            objective = {
+                "task": self.team_session_state.get("task", ""),
+                "language": self._detect_primary_language(plan)
+            }
+            
+            # Call the bridge function
+            project_path = Path(self.team_session_state.get("project_path", ""))
+            result = bridge_agentic_and_workflow_modification(objective, project_path)
+            
+            # Add success status to reasoning
+            if result.get("success", False):
+                modified_files = result.get("modified_files", [])
+                self._add_reasoning_step("Code Modification", 
+                                    f"Successfully modified {len(modified_files)} files",
+                                    success=True)
+            else:
+                error = result.get("error", "Unknown error")
+                self._add_reasoning_step("Code Modification", 
+                                    f"Failed to execute modifications: {error}",
+                                    success=False)
+            
+            return result
+            
         except Exception as e:
             # Handle exceptions
             self._add_reasoning_step("Code Modification", 
                                 f"Error during modification: {str(e)}",
                                 success=False)
-            results["success"] = False
-            results["error"] = str(e)
-        
-        return results
-    
+            
+            import traceback
+            stack_trace = traceback.format_exc()
+            
+            return {
+                "success": False,
+                "error": str(e),
+                "stack_trace": stack_trace
+            } 
     async def _run_quality_checks(
         self, modification_result: Dict[str, Any], quality_gates: List[str]
     ) -> Dict[str, Any]:

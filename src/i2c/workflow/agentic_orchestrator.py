@@ -94,7 +94,27 @@ async def execute_agentic_evolution(objective: Dict[str, Any], project_path: Pat
     else:
         raise ValueError(f"Unexpected result format: {type(result)}")
 
+# Add to src/i2c/workflow/agentic_orchestrator.py (if not already there)
+
 def execute_agentic_evolution_sync(objective: Dict[str, Any], project_path: Path) -> Dict[str, Any]:
     """Synchronous wrapper for execute_agentic_evolution."""
-    return asyncio.run(execute_agentic_evolution(objective, project_path))
-
+    import asyncio
+    
+    # Check if we're already running in an event loop
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Create a new event loop for this call
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                return new_loop.run_until_complete(execute_agentic_evolution(objective, project_path))
+            finally:
+                new_loop.close()
+                asyncio.set_event_loop(loop)
+        else:
+            # Use the existing loop
+            return loop.run_until_complete(execute_agentic_evolution(objective, project_path))
+    except RuntimeError:
+        # No event loop exists, create one
+        return asyncio.run(execute_agentic_evolution(objective, project_path))
