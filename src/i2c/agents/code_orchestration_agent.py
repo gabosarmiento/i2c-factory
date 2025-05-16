@@ -13,7 +13,7 @@ from i2c.agents.quality_team.quality_team import build_quality_team
 from i2c.agents.sre_team.sre_team import build_sre_team
 from i2c.agents.knowledge.knowledge_team import build_knowledge_team
 from i2c.agents.reflective.plan_refinement_operator import PlanRefinementOperator
-
+from i2c.workflow.orchestration_team import OrchestrationResult
 
 class CodeOrchestrationAgent(Agent):
     def __init__(self, **kwargs):
@@ -575,8 +575,7 @@ def build_orchestration_team(session_state=None) -> Team:
     Returns:
         Team: Configured orchestration team
     """
-    # Create the code orchestration agent
-    orchestrator = CodeOrchestrationAgent()
+    
     
     # Use provided session_state or initialize defaults
     session_state = session_state or {
@@ -594,6 +593,30 @@ def build_orchestration_team(session_state=None) -> Team:
         "reasoning_trajectory": []
     }
     
+      # Extract constraints from session state if available
+    constraints = []
+    if session_state.get("objective") and "constraints" in session_state["objective"]:
+        constraints = session_state["objective"]["constraints"]
+    elif session_state.get("constraints"):
+        constraints = session_state["constraints"]
+
+    # Log constraints for debugging
+    from i2c.cli.controller import canvas
+    if constraints:
+        canvas.info(f"Orchestration team initialized with {len(constraints)} constraints:")
+        for i, constraint in enumerate(constraints):
+            canvas.info(f"  Constraint {i+1}: {constraint}")
+            
+    # Add constraints to instructions
+    constraint_instructions = []
+    if constraints:
+        constraint_instructions.append("Follow these critical quality constraints:")
+        for constraint in constraints:
+            constraint_instructions.append(f"- {constraint}")
+    
+    # Create the code orchestration agent
+    orchestrator = CodeOrchestrationAgent()
+    
     # Create the team
     return Team(
         name="CodeEvolutionTeam",
@@ -603,6 +626,10 @@ def build_orchestration_team(session_state=None) -> Team:
         instructions=[
             "You are the lead orchestrator of a code evolution factory.",
             "Your job is to coordinate specialized teams (Knowledge, Modification, Quality, SRE) to safely evolve code.",
+            "Follow the lead of the CodeOrchestrator.",
+            # Include constraint instructions if available
+            *constraint_instructions,
+            # Rest of standard instructions
             "For each objective, you must:",
             "1. Analyze the project context thoroughly",
             "2. Create a detailed plan for modifications",
@@ -625,5 +652,10 @@ def build_orchestration_team(session_state=None) -> Team:
             "```",
             "Do NOT output explanations, markdown, or narratives after the JSON. Only return the JSON object."
         ],
-        session_state=session_state
+        session_state=session_state,
+        response_model=OrchestrationResult,  
+        show_tool_calls=True,
+        debug_mode=True,
+        markdown=True,
+        enable_agentic_context=True,
     )

@@ -147,4 +147,15 @@ class UnitTestGeneratorAgent(Agent):
         return updated_code_map
 
 # Instantiate the agent for easy import
+
+# Instantiate the agent for easy import
 unit_test_generator = UnitTestGeneratorAgent()
+
+# Add quality constraints as an attribute after instantiation
+unit_test_generator.quality_constraints = [
+    "Ensure tests do not have duplicate unittest.main() calls",
+    "Use consistent data models across all files",
+    "Avoid creating duplicate implementations of the same functionality",
+    "If creating a CLI app, use a single approach for the interface",
+    "Use consistent file naming for data storage (e.g., todos.json)"
+]

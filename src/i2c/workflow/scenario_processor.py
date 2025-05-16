@@ -67,7 +67,6 @@ class ScenarioProcessor:
         self.current_structured_goal: Optional[Dict] = None
         self.reader_agent: Optional[ContextReaderAgent] = None
     
-
     def _process_agentic_evolution_step(self, step: Dict[str, Any]) -> None:
         """
         Process an agentic evolution step - uses the new integrated agent orchestration system.
@@ -75,21 +74,52 @@ class ScenarioProcessor:
         Args:
             step: The agentic evolution step configuration
         """
+        canvas.info("🔎 ENTERING _process_agentic_evolution_step")
         if not self.current_project_path:
             canvas.warning("No active project. Cannot perform agentic evolution.")
             return
-            
+                
         # Extract objective from step
         objective = step.get("objective", {})
         if not objective or not objective.get("task"):
             canvas.warning("No task specified in objective. Skipping agentic evolution.")
             return
-            
+                
         # Set project path in objective
         objective["project_path"] = str(self.current_project_path)
+        canvas.info(f"🔎 STEP TYPE: {step.get('type', 'unknown')}")
+        canvas.info(f"🔎 OBJECTIVE KEYS: {list(objective.keys())}")
+        
+        if not objective or not objective.get("task"):
+            canvas.warning("No task specified in objective. Skipping agentic evolution.")
+            return
+        
+        # Add quality constraints to the objective
+        if "constraints" not in objective:
+            objective["constraints"] = []
+            
+        # Add specific constraints for code quality and consistency
+        quality_constraints = [
+            "Use a consistent data model across all files",
+            "Avoid creating duplicate implementations of the same functionality",
+            "Ensure tests do not have duplicate unittest.main() calls",
+            "If creating a CLI app, use a single approach for the interface",
+            "Use consistent file naming for data storage (e.g., todos.json)"
+        ]
+        
+        # Add constraints if they don't already exist
+        for constraint in quality_constraints:
+            if constraint not in objective["constraints"]:
+                objective["constraints"].append(constraint)
         
         canvas.info(f"🧠 Running agent-orchestrated evolution for: {objective.get('task', 'Unknown task')}")
-        
+        canvas.info(f"📏 Quality constraints added: {len(quality_constraints)}")
+
+        try:
+            import json
+            canvas.info(f"HELLOU!Full objective being sent to orchestrator: {json.dumps(objective, indent=2)[:500]}...")
+        except Exception as e:
+            canvas.info(f"Could not log full objective: {e}")
         try:
             # Import the agentic orchestrator
             from i2c.workflow.agentic_orchestrator import execute_agentic_evolution_sync
@@ -130,7 +160,7 @@ class ScenarioProcessor:
             canvas.error(f"Error during agentic evolution: {e}")
             import traceback
             canvas.error(traceback.format_exc())
-        
+   
     def debug_code_generation(self, raw_response: str, processed_code: str) -> None:
         """Log details about code generation for debugging"""
         canvas.info("--- Debug: Code Generation Details ---")
@@ -391,9 +421,30 @@ class ScenarioProcessor:
             proc = json.loads(getattr(resp, 'content', str(resp)))
             if not (isinstance(proc, dict) and "objective" in proc and "language" in proc):
                 raise ValueError("Invalid JSON from LLM")
+            
+            # Add quality constraints for code generation
+            if "constraints" not in proc:
+                proc["constraints"] = []
+            
+            quality_constraints = [
+                "Use a consistent data model across all files",
+                "Avoid creating duplicate implementations of the same functionality",
+                "Ensure tests do not have duplicate unittest.main() calls",
+                "If creating a CLI app, use a single approach for the interface",
+                "Use consistent file naming for data storage (e.g., todos.json)"
+            ]
+            
+            # Add constraints if they don't already exist
+            for constraint in quality_constraints:
+                if constraint not in proc["constraints"]:
+                    proc["constraints"].append(constraint)
+                    
+            canvas.info(f"📏 Quality constraints added to generation goal: {len(quality_constraints)}")
+            
             self.current_structured_goal = proc
             canvas.success(f"Objective: {proc['objective']}")
             canvas.success(f"Language:  {proc['language']}")
+                        
         except Exception as e:
             canvas.error(f"Error clarifying idea: {e}")
             return
@@ -522,6 +573,7 @@ class ScenarioProcessor:
         Args:
             step: The modification step configuration
         """
+        canvas.info("🔎 ENTERING _process_modification_step")
         # Add diagnostic logging
         canvas.info("=" * 40)
         canvas.info(f"PROCESSING MODIFICATION STEP: {step.get('prompt', 'Unknown')}")
@@ -536,6 +588,25 @@ class ScenarioProcessor:
             canvas.warning("Modification step has empty prompt. Skipping...")
             return
         
+        # Add quality constraints to the step
+        if "constraints" not in step:
+            step["constraints"] = []
+                
+        quality_constraints = [
+            "Use a consistent data model across all files",
+            "Avoid creating duplicate implementations of the same functionality",
+            "Ensure tests do not have duplicate unittest.main() calls",
+            "If creating a CLI app, use a single approach for the interface",
+            "Use consistent file naming for data storage (e.g., todos.json)"
+        ]
+        
+        # Add constraints if they don't already exist
+        for constraint in quality_constraints:
+            if constraint not in step["constraints"]:
+                step["constraints"].append(constraint)
+                
+        canvas.info(f"📏 Quality constraints added to modification step: {len(quality_constraints)}")
+
         # Get language from structured goal
         language = self.current_structured_goal.get('language', 'python')
         

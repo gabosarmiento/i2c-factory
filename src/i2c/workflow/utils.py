@@ -112,3 +112,72 @@ def extract_model_from_groq_log(log_message: str) -> str:
     # This is a simplified approach - in reality, you'd need to intercept the actual
     # model being used in the API call
     return "groq/llama-3.1-8b-instant"  # Default Groq model
+
+def deduplicate_code_map(code_map: dict) -> dict:
+    """
+    Remove duplicate files from the code map.
+    Prioritizes more detailed implementations and organized file paths.
+    """
+    # Create a clean copy of the code map
+    clean_map = {}
+    
+    # Find base filenames without paths to detect duplicates
+    base_names = {}
+    for file_path, content in code_map.items():
+        base_name = Path(file_path).name
+        
+        # If this is the first time seeing this base name, just record it
+        if base_name not in base_names:
+            base_names[base_name] = [file_path]
+        else:
+            base_names[base_name].append(file_path)
+    
+    # Process duplicates
+    for base_name, paths in base_names.items():
+        if len(paths) == 1:
+            # No duplicate for this file, just add it
+            clean_map[paths[0]] = code_map[paths[0]]
+        else:
+            canvas.warning(f"Found duplicate files for {base_name}: {paths}")
+            
+            # Prioritize files in test directories for test files
+            if base_name.startswith("test_"):
+                test_dir_paths = [p for p in paths if "test" in str(Path(p).parent).lower()]
+                if test_dir_paths:
+                    # Choose the first test directory path
+                    chosen_path = test_dir_paths[0]
+                    canvas.info(f"Selecting {chosen_path} as the test file")
+                    clean_map[chosen_path] = code_map[chosen_path]
+                    
+                    # Log the dropped duplicates
+                    for p in paths:
+                        if p != chosen_path:
+                            canvas.warning(f"Dropping duplicate test file: {p}")
+                else:
+                    # No test directory found, use the first path
+                    chosen_path = paths[0]
+                    canvas.info(f"No test directory found, using {chosen_path}")
+                    clean_map[chosen_path] = code_map[chosen_path]
+            else:
+                # For non-test files, choose the one with more content
+                longest_content = ""
+                chosen_path = ""
+                for p in paths:
+                    if len(code_map[p]) > len(longest_content):
+                        longest_content = code_map[p]
+                        chosen_path = p
+                
+                if chosen_path:
+                    canvas.info(f"Selecting {chosen_path} as it has the most content")
+                    clean_map[chosen_path] = longest_content
+                    
+                    # Log the dropped duplicates
+                    for p in paths:
+                        if p != chosen_path:
+                            canvas.warning(f"Dropping duplicate file: {p}")
+    
+    # Check if we actually reduced any duplicates
+    if len(clean_map) < len(code_map):
+        canvas.success(f"Removed {len(code_map) - len(clean_map)} duplicate files")
+    
+    return clean_map

@@ -5,16 +5,60 @@ from pathlib import Path
 import sys
 import json
 import unittest
+import pytest
 from unittest.mock import MagicMock, patch
+from i2c.agents.modification_team.code_modification_manager import ModifierAdapter
 
 # Import necessary components (adjust imports as needed for your project structure)
 from i2c.agents.modification_team.code_modification_manager import (
     ModificationRequest, 
     AnalysisResult, 
     ModificationPlan,
-    ModifierAdapter
+    ModifierAdapter,
+    Patch, 
+    ValidationReport
 )
 
+class DummyEmptyModifierAgent:
+    def predict(self, messages):
+        # Simulate a valid response with empty modified content
+        return json.dumps({
+            "file_path": "dummy.py",
+            "modified": ""
+        })
+
+def test_modifier_adapter_empty_llm_output_fallbacks_to_original():
+    adapter = ModifierAdapter(agent=DummyEmptyModifierAgent())
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dummy_path = Path(tmpdir) / "dummy.py"
+        dummy_path.write_text("def hello():\n    pass\n")
+
+        request = ModificationRequest(
+            project_root=str(tmpdir),
+            user_prompt=json.dumps({
+                "file": "dummy.py",
+                "what": "simulate",
+                "how": "empty response"
+            })
+        )
+        analysis = AnalysisResult(details="{}")
+
+        result = adapter.modify(request, analysis)
+        diff_hints = json.loads(result.diff_hints)
+
+        # Should fallback to the original file contents
+        assert diff_hints["modified"] == "def hello():\n    pass\n"
+        assert diff_hints["file_path"] == "dummy.py"
+
+# ---------- For the "real change" test, you likely have a test class: ----------
+
+class DummyModifierAgent:
+    def __init__(self, response):
+        self._response = response
+    def predict(self, messages):
+        return self._response
+
+       
 class TestModifierAdapter(unittest.TestCase):
     """
     Test suite for ModifierAdapter to ensure it correctly handles
@@ -515,16 +559,14 @@ h1 {
         self.mock_ask_response(json.dumps({
             "file_path": "test_app.py",
             "original": "",
-            "modified": """
-    import unittest
-
-    class TestCreateEpub(unittest.TestCase):
-        def test_example(self):
-            self.assertTrue(True)
-
-    if __name__ == "__main__":
-        unittest.main()
-    """
+            "modified": (
+                "import unittest\n\n"
+                "class TestCreateEpub(unittest.TestCase):\n"
+                "    def test_example(self):\n"
+                "        self.assertTrue(True)\n\n"
+                "if __name__ == '__main__':\n"
+                "    unittest.main()\n"
+            )
         }))
 
         request = ModificationRequest(
@@ -542,8 +584,9 @@ h1 {
 
         diff_hints = json.loads(result.diff_hints)
 
-        self.assertIn("class TestCreateEpub", diff_hints["modified"])
-        self.assertEqual(diff_hints["modified"].count("class TestCreateEpub"), 1)
+        assert "class TestCreateEpub" in diff_hints["modified"]
+        assert diff_hints["modified"].count("class TestCreateEpub") == 1
+        assert diff_hints["file_path"] == "test_app.py"
 
 
     def test_multiple_files_modification(self):
@@ -579,6 +622,7 @@ h1 {
         # Only file1.py should be processed in this context
         self.assertIn("file1.py", diff_hints["file_path"])
         self.assertIn("File 1 modified", diff_hints["modified"])
+
 
 
 # If running directly, execute all tests

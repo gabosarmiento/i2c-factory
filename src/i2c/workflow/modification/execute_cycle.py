@@ -22,6 +22,10 @@ from i2c.db_utils import get_db_connection
 # Import CLI controller
 from i2c.cli.controller import canvas
 
+# Import Utils 
+from i2c.workflow.utils import deduplicate_code_map
+
+
 def execute_modification_cycle(
     user_request: str,
     project_path: Path,
@@ -154,6 +158,15 @@ def execute_modification_cycle(
         final_code_map = generate_unit_tests(modified_code_map)
         canvas.info(f"[Tests] Generated/ran tests for {len(final_code_map)} modules.")
 
+        # ───── Step 5.5: Apply deduplication ────────────────────────────
+        try:
+            original_file_count = len(final_code_map)
+            final_code_map = deduplicate_code_map(final_code_map)
+            if len(final_code_map) < original_file_count:
+                canvas.success(f"[Dedup] Removed {original_file_count - len(final_code_map)} duplicate files")
+        except Exception as e:
+            canvas.warning(f"[Dedup] Error during file deduplication: {e}")
+            
         # ───── Step 6: Quality Checks ───────────────────────────────────
         if not run_quality_checks(final_code_map):
             canvas.warning("[Quality] Some quality checks failed—continuing anyway.")

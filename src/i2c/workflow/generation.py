@@ -15,9 +15,11 @@ from i2c.agents.sre_team import (
     code_quality_sentinel
 )
 # Import file operations
-from .modification.file_operations import write_files_to_disk as write_files
+from .modification.file_operations import write_files_to_disk as write_files, post_process_code_map
 # Import CLI controller
 from i2c.cli.controller import canvas
+# Import Utils 
+from i2c.workflow.utils import deduplicate_code_map
 
 def clean_and_validate_code(raw_text, file_path):
     """Enhanced code cleaning and validation function"""
@@ -112,6 +114,8 @@ def fix_common_python_errors(code):
     
     return '\n'.join(fixed_lines)
 
+# Add to generation.py or another appropriate file
+
 def generate_fallback_template(file_path):
     """Generate a minimal working fallback template based on file type"""
     if file_path.endswith('.py'):
@@ -141,6 +145,13 @@ def execute_generation_cycle(structured_goal: dict, project_path: Path) -> dict:
     canvas.start_process(f"Generation Cycle for: {project_path.name}")
     language = structured_goal.get("language")
     objective = structured_goal.get("objective")
+    
+    # Log constraints
+    if "constraints" in structured_goal:
+        canvas.info("🔍 CONSTRAINTS FOUND IN EXECUTE_GENERATION_CYCLE:")
+        for i, constraint in enumerate(structured_goal["constraints"], 1):
+            canvas.info(f"  Constraint {i}: {constraint}")
+                
     file_plan = None
     generated_code = {}
     code_map_with_tests = None # Initialize as None
@@ -154,11 +165,20 @@ def execute_generation_cycle(structured_goal: dict, project_path: Path) -> dict:
     # 1. Plan Files
     canvas.step("Planning minimal file structure...")
     try:
+        # Build constraint text if available
+        constraint_text = ""
+        if "constraints" in structured_goal:
+            constraint_text = "\n\nQUALITY CONSTRAINTS (MUST FOLLOW):\n"
+            for i, constraint in enumerate(structured_goal["constraints"], 1):
+                constraint_text += f"{i}. {constraint}\n"
+            canvas.info(f"Added {len(structured_goal['constraints'])} quality constraints to planning prompt")
+            
         plan_prompt = f"Objective: {objective}\nLanguage: {language}"
         response = planner_agent.run(plan_prompt)
         content = response.content if hasattr(response, 'content') else str(response)
         # ... (JSON parsing/validation) ...
         try:
+            
             content_processed = content.strip()
             if content_processed.startswith("```json"): content_processed = content_processed[len("```json"):].strip()
             if content_processed.startswith("```"): content_processed = content_processed[3:].strip()
@@ -185,8 +205,18 @@ def execute_generation_cycle(structured_goal: dict, project_path: Path) -> dict:
     canvas.step("Generating code files...")
     try:
         for file_path in file_plan:
+            # Add our quality constraints directly to each prompt
+            quality_constraints = (
+                "\n\nIMPORTANT QUALITY REQUIREMENTS:\n"
+                "1. Use a consistent data model across all files\n"
+                "2. Avoid creating duplicate implementations of the same functionality\n"
+                "3. Ensure tests do not have duplicate unittest.main() calls\n"
+                "4. If creating a CLI app, use a single approach for the interface\n"
+                "5. Use consistent file naming for data storage (e.g., todos.json)\n"
+            )
             build_prompt = (
                 f"Objective: {objective}\nLanguage: {language}\n"
+                f"{quality_constraints}\n"
                 f"Generate complete, runnable code for the file '{file_path}'."
             )
             response = code_builder_agent.run(build_prompt)
@@ -227,13 +257,25 @@ def execute_generation_cycle(structured_goal: dict, project_path: Path) -> dict:
     canvas.step("Performing SRE Code Quality Check...")
     try:
         issues = code_quality_sentinel.check_code(code_map_with_tests)
-        if issues: canvas.warning(f"Code quality issues found: {len(issues)}")
-        else: canvas.success("Code quality checks passed.")
+        if issues: 
+            canvas.warning(f"Code quality issues found: {len(issues)}")
+        else: 
+            canvas.success("Code quality checks passed.")
     except Exception as e:
         canvas.error(f"Error during SRE Quality Check: {e}")
         canvas.end_process(f"Generation cycle failed during quality check.")
         return return_context # Return context with success=False
 
+    # 4.5 Apply deduplication to remove redundant files
+    canvas.step("Applying file deduplication...")
+    try:
+        original_file_count = len(code_map_with_tests)
+        code_map_with_tests = deduplicate_code_map(code_map_with_tests)
+        if len(code_map_with_tests) < original_file_count:
+            canvas.success(f"Removed {original_file_count - len(code_map_with_tests)} duplicate files")
+    except Exception as e:
+        canvas.error(f"Error during file deduplication: {e}")
+        
     # 5. Write Files
     canvas.step("Writing files to disk...")
     try:

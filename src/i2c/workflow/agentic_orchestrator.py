@@ -27,6 +27,12 @@ async def execute_agentic_evolution(objective: Dict[str, Any], project_path: Pat
     # Add project path to objective
     objective['project_path'] = str(project_path)
 
+    # Log the constraints
+    if "constraints" in objective:
+        canvas.info(f"Orchestrator received {len(objective['constraints'])} constraints:")
+        for i, constraint in enumerate(objective['constraints']):
+            canvas.info(f"  Constraint {i+1}: {constraint}")
+    
     # Analyze the current project state
     canvas.info(f"Analyzing project at: {project_path}")
     project_files = []
@@ -99,7 +105,15 @@ async def execute_agentic_evolution(objective: Dict[str, Any], project_path: Pat
 def execute_agentic_evolution_sync(objective: Dict[str, Any], project_path: Path) -> Dict[str, Any]:
     """Synchronous wrapper for execute_agentic_evolution."""
     import asyncio
-    
+    # Add debug logging for constraints WITH RAISE
+    from i2c.cli.controller import canvas
+    if "constraints" in objective:
+        canvas.info("🔍 CONSTRAINTS RECEIVED IN ORCHESTRATOR:")
+        for i, constraint in enumerate(objective["constraints"], 1):
+            canvas.info(f"  Constraint {i}: {constraint}")
+    else:
+        canvas.info("❌ NO CONSTRAINTS FOUND IN OBJECTIVE")
+        raise ValueError("HALTING: No constraints found in objective!")
     # Check if we're already running in an event loop
     try:
         loop = asyncio.get_event_loop()

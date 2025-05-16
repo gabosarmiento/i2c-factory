@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Create Simple Module",
+    "type": "initial_generation",
+    "prompt": "Create a simple Python module with a greeting function"
+  },
+  {
+    "name": "Add Title Parameter",
+    "type": "modification",
+    "prompt": "Add a title parameter to the greeting function that prepends the title to the name if provided"
+  }
+]

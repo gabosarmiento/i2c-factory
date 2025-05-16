@@ -63,6 +63,7 @@ class GenerationWorkflow(Workflow):
             }
         )
     
+    # In generation_workflow.py
     def planning_phase(self, structured_goal: dict) -> Iterator[RunResponse]:
         """Plan files based on structured goal."""
         canvas.step("Planning minimal file structure...")
@@ -71,7 +72,17 @@ class GenerationWorkflow(Workflow):
         objective = structured_goal.get("objective")
         
         try:
-            plan_prompt = f"Objective: {objective}\nLanguage: {language}"
+            # Check for constraints and add them to the prompt
+            constraints_text = ""
+            if "constraints" in structured_goal:
+                constraints_text = "\n\n# QUALITY CONSTRAINTS (MUST FOLLOW):\n"
+                for i, constraint in enumerate(structured_goal["constraints"], 1):
+                    constraints_text += f"{i}. {constraint}\n"
+                canvas.info(f"Added {len(structured_goal['constraints'])} quality constraints to planning prompt")
+            
+            # Build the plan prompt with constraints
+            plan_prompt = f"Objective: {objective}\nLanguage: {language}{constraints_text}"
+            
             response = planner_agent.run(plan_prompt)
             content = response.content if hasattr(response, 'content') else str(response)
             
@@ -102,7 +113,7 @@ class GenerationWorkflow(Workflow):
                 content=f"❌ File planning failed: {e}",
                 extra_data={"error": str(e)}
             )
-    
+            
     def code_generation_phase(self) -> Iterator[RunResponse]:
         """Generate code for planned files."""
         canvas.step("Generating code files...")
@@ -112,10 +123,18 @@ class GenerationWorkflow(Workflow):
         language = self.session_state.get("language")
         generated_code = {}
         
+        # Check for constraints and add them to the prompt
+        constraints_text = ""
+        if "constraints" in self.session_state:
+            constraints_text = "\n\n# QUALITY CONSTRAINTS (MUST FOLLOW):\n"
+            for i, constraint in enumerate(self.session_state["constraints"], 1):
+                constraints_text += f"{i}. {constraint}\n"
+            canvas.info(f"Added {len(self.session_state['constraints'])} quality constraints to code generation prompt")
+        
         try:
             for file_path in file_plan:
                 build_prompt = (
-                    f"Objective: {objective}\nLanguage: {language}\n"
+                    f"Objective: {objective}\nLanguage: {language}{constraints_text}\n"
                     f"Generate complete, runnable code for the file '{file_path}'."
                 )
                 response = code_builder_agent.run(build_prompt)
@@ -149,7 +168,7 @@ class GenerationWorkflow(Workflow):
                 content=f"❌ Code generation failed: {e}",
                 extra_data={"error": str(e)}
             )
-    
+            
     def unit_test_phase(self) -> Iterator[RunResponse]:
         """Generate unit tests for code."""
         canvas.step("Generating Unit Tests...")

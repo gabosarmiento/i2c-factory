@@ -5,6 +5,37 @@ from i2c.cli.controller import canvas # For logging
 
 # In file_operations.py, modify the write_files_to_disk function:
 
+# In file_operations.py or a related file
+def post_process_code_map(code_map: dict) -> dict:
+    """Fix common quality issues in the code map before writing to disk."""
+    processed_map = code_map.copy()
+    
+    # Fix duplicate unittest.main() calls
+    for file_path, content in processed_map.items():
+        if file_path.startswith("test_") and file_path.endswith(".py"):
+            # Check for duplicate unittest.main() calls
+            if content.count("unittest.main()") > 1:
+                canvas.warning(f"Fixing duplicate unittest.main() calls in {file_path}")
+                
+                # Split into lines, find all unittest.main() occurrences
+                lines = content.splitlines()
+                main_calls = [i for i, line in enumerate(lines) if "unittest.main()" in line]
+                
+                # Keep only the last one
+                if len(main_calls) > 1:
+                    for idx in main_calls[:-1]:
+                        lines[idx] = "# " + lines[idx] + " # Removed duplicate"
+                
+                # Update content
+                processed_map[file_path] = "\n".join(lines)
+        
+        # Fix inconsistent file references
+        if "tasks.json" in content:
+            canvas.warning(f"Fixing inconsistent file reference in {file_path}")
+            processed_map[file_path] = content.replace("tasks.json", "todos.json")
+    
+    return processed_map
+
 def write_files_to_disk(code_map: dict[str, str], destination_dir: Path):
     """Writes the generated/modified code content to disk with integrity checks."""
     canvas.step("Writing files to disk...")
