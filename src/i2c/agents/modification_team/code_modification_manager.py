@@ -1801,7 +1801,7 @@ class ModifierAdapter(_AgentPortAdapter, IModifier):
             print(f"Sending request to ModifierAgent: {prompt[:200]}...")
             
             # Try up to 3 times to get a valid response from the agent
-            max_retries = 3
+            max_retries = 0
             raw_reply = None
             
             for attempt in range(max_retries):

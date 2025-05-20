@@ -1,0 +1,453 @@
+{
+  "api_calls": [
+    {
+      "timestamp": "2025-05-18T22:15:53.340357",
+      "category": "api_calls",
+      "data": {
+        "id": "1747599353_4474697216",
+        "function": "__main__.test_simple_modification",
+        "args": {},
+        "thread_id": 4474697216,
+        "thread_name": "MainThread"
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:54.996518",
+      "category": "api_calls",
+      "data": {
+        "id": "1747599354_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "args": {
+          "self": "SyncHttpxClientWrapper",
+          "request": "<Request('POST', 'https://api.groq.com/openai/v1/chat/completions')>",
+          "args": "()",
+          "kwargs": "{'stream': False}"
+        },
+        "thread_id": 4474697216,
+        "thread_name": "MainThread"
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:56.545800",
+      "category": "api_calls",
+      "data": {
+        "id": "1747599356_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "args": {
+          "self": "Client",
+          "request": "<Request('POST', 'https://api.agno.com/v1/telemetry/agent/run/create')>",
+          "args": "()",
+          "kwargs": "{'auth': <httpx._client.UseClientDefault object at 0x102e30950>, 'follow_redirects': <httpx._client.UseClientDefault object at 0x102e30950>}"
+        },
+        "thread_id": 4474697216,
+        "thread_name": "MainThread"
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:57.254715",
+      "category": "api_calls",
+      "data": {
+        "id": "1747599357_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "args": {
+          "self": "SyncHttpxClientWrapper",
+          "request": "<Request('POST', 'https://api.groq.com/openai/v1/chat/completions')>",
+          "args": "()",
+          "kwargs": "{'stream': False}"
+        },
+        "thread_id": 4474697216,
+        "thread_name": "MainThread"
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:58.271024",
+      "category": "api_calls",
+      "data": {
+        "id": "1747599358_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "args": {
+          "self": "Client",
+          "request": "<Request('POST', 'https://api.agno.com/v1/telemetry/agent/run/create')>",
+          "args": "()",
+          "kwargs": "{'auth': <httpx._client.UseClientDefault object at 0x102e30950>, 'follow_redirects': <httpx._client.UseClientDefault object at 0x102e30950>}"
+        },
+        "thread_id": 4474697216,
+        "thread_name": "MainThread"
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:58.944690",
+      "category": "api_calls",
+      "data": {
+        "id": "1747599358_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "args": {
+          "self": "SyncHttpxClientWrapper",
+          "request": "<Request('POST', 'https://api.groq.com/openai/v1/chat/completions')>",
+          "args": "()",
+          "kwargs": "{'stream': False}"
+        },
+        "thread_id": 4474697216,
+        "thread_name": "MainThread"
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:16:02.613739",
+      "category": "api_calls",
+      "data": {
+        "id": "1747599362_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "args": {
+          "self": "Client",
+          "request": "<Request('POST', 'https://api.agno.com/v1/telemetry/agent/run/create')>",
+          "args": "()",
+          "kwargs": "{'auth': <httpx._client.UseClientDefault object at 0x102e30950>, 'follow_redirects': <httpx._client.UseClientDefault object at 0x102e30950>}"
+        },
+        "thread_id": 4474697216,
+        "thread_name": "MainThread"
+      }
+    }
+  ],
+  "prompt_sizes": [],
+  "response_times": [
+    {
+      "timestamp": "2025-05-18T22:15:56.164295",
+      "category": "response_times",
+      "data": {
+        "id": "1747599354_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "duration": 1.1676368713378906,
+        "timeout": false,
+        "error": false
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:57.012029",
+      "category": "response_times",
+      "data": {
+        "id": "1747599356_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "duration": 0.466127872467041,
+        "timeout": false,
+        "error": false
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:58.001268",
+      "category": "response_times",
+      "data": {
+        "id": "1747599357_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "duration": 0.7464730739593506,
+        "timeout": false,
+        "error": false
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:58.652330",
+      "category": "response_times",
+      "data": {
+        "id": "1747599358_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "duration": 0.3775200843811035,
+        "timeout": false,
+        "error": false
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:16:02.357913",
+      "category": "response_times",
+      "data": {
+        "id": "1747599358_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "duration": 3.4131147861480713,
+        "timeout": false,
+        "error": false
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:16:02.988971",
+      "category": "response_times",
+      "data": {
+        "id": "1747599362_4474697216",
+        "function": "diagnostic_wrapper.tracked_send",
+        "duration": 0.3751699924468994,
+        "timeout": false,
+        "error": false
+      }
+    }
+  ],
+  "timeouts": [],
+  "errors": [],
+  "memory_snapshots": [
+    {
+      "timestamp": "2025-05-18T22:15:29.861651",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 125.171875,
+        "vms_mb": 33823.90234375,
+        "cpu_percent": 0.1,
+        "thread_count": 2,
+        "open_files": 0,
+        "connections": 0
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:53.337985",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 524.02734375,
+        "vms_mb": 35086.80859375,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 1
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:54.988309",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 531.4375,
+        "vms_mb": 35179.96875,
+        "cpu_percent": 0.3,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 1
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:56.269843",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 531.703125,
+        "vms_mb": 35180.00390625,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 2
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:56.545079",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 531.99609375,
+        "vms_mb": 35134.71484375,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 2
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:57.113946",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 531.81640625,
+        "vms_mb": 35134.71484375,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 3
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:57.253479",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 532.36328125,
+        "vms_mb": 35134.71484375,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 2
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:58.103690",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 532.4296875,
+        "vms_mb": 35135.2265625,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 3
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:58.270123",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 532.98828125,
+        "vms_mb": 35136.2265625,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 3
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:58.767878",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 533.06640625,
+        "vms_mb": 35136.2265625,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 4
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:58.930983",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 533.23046875,
+        "vms_mb": 35136.2265625,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 3
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:16:02.463980",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 532.9140625,
+        "vms_mb": 35136.2265625,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 4
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:16:02.613414",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 532.984375,
+        "vms_mb": 35136.2265625,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 4
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:16:03.093239",
+      "category": "memory_snapshots",
+      "data": {
+        "rss_mb": 533.01171875,
+        "vms_mb": 35135.71484375,
+        "cpu_percent": 0.1,
+        "thread_count": 3,
+        "open_files": 0,
+        "connections": 5
+      }
+    }
+  ],
+  "thread_counts": [
+    {
+      "timestamp": "2025-05-18T22:15:53.339652",
+      "category": "thread_counts",
+      "data": {
+        "active_threads": 3,
+        "thread_names": [
+          "MainThread",
+          "LanceDBBackgroundEventLoop",
+          "Thread-1"
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:54.988682",
+      "category": "thread_counts",
+      "data": {
+        "active_threads": 3,
+        "thread_names": [
+          "MainThread",
+          "LanceDBBackgroundEventLoop",
+          "Thread-1"
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:56.545357",
+      "category": "thread_counts",
+      "data": {
+        "active_threads": 3,
+        "thread_names": [
+          "MainThread",
+          "LanceDBBackgroundEventLoop",
+          "Thread-1"
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:57.254120",
+      "category": "thread_counts",
+      "data": {
+        "active_threads": 3,
+        "thread_names": [
+          "MainThread",
+          "LanceDBBackgroundEventLoop",
+          "Thread-1"
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:58.270379",
+      "category": "thread_counts",
+      "data": {
+        "active_threads": 3,
+        "thread_names": [
+          "MainThread",
+          "LanceDBBackgroundEventLoop",
+          "Thread-1"
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:15:58.940995",
+      "category": "thread_counts",
+      "data": {
+        "active_threads": 3,
+        "thread_names": [
+          "MainThread",
+          "LanceDBBackgroundEventLoop",
+          "Thread-1"
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-05-18T22:16:02.613537",
+      "category": "thread_counts",
+      "data": {
+        "active_threads": 3,
+        "thread_names": [
+          "MainThread",
+          "LanceDBBackgroundEventLoop",
+          "Thread-1"
+        ]
+      }
+    }
+  ],
+  "system_info": [
+    {
+      "timestamp": "2025-05-18T22:15:29.862902",
+      "category": "system_info",
+      "data": {
+        "python_version": "3.11.12 (main, May  5 2025, 18:05:21) [Clang 14.0.0 (clang-1400.0.29.202)]",
+        "platform": "darwin",
+        "argv": [
+          "diagnose_code_modification.py"
+        ],
+        "pid": 39757,
+        "processors": 4
+      }
+    }
+  ]
+}

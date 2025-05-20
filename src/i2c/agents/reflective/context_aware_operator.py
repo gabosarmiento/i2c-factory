@@ -4,7 +4,7 @@
 This cleaned‑up version fixes minor syntax/typing hiccups, adds missing imports,
 normalises doc‑strings, and ensures the file is importable.
 """
-from __future__ import annotations
+# from __future__ import annotationsllm_deepseek
 
 import time
 import uuid
@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from i2c.cli.controller import canvas
-from builtins import llm_highest, llm_middle, llm_small, llm_xs
+from builtins import llm_highest, llm_middle, llm_middle_alt,llm_small, llm_deepseek
 from i2c.workflow.utils import count_tokens, estimate_cost
 
 from i2c.agents.budget_manager import BudgetManagerAgent
@@ -222,7 +222,7 @@ class BudgetScope:
             "highest": llm_highest,
             "middle": llm_middle,
             "small": llm_small,
-            "xs": llm_xs,
+            "deepseek": llm_deepseek,
         }
         return mapping.get(tier, llm_middle)
 

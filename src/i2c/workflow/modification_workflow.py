@@ -152,3 +152,33 @@ class ModificationWorkflow(Workflow):
                     "error_type": type(e).__name__
                 }
             )
+
+# === Reflective Validation Add-on ===
+from i2c.workflow.reflective_validation import ReflectiveValidator
+from i2c.workflow.retry_planner import RetryPlanner
+
+
+def run_reflective_validation_if_needed(project_path):
+    validator = ReflectiveValidator(project_path)
+    result = validator.validate_project()
+    if not result.success:
+        print("[REFLECTIVE VALIDATION] Code validation failed:")
+        print(f"Failure type: {result.failure_type}")
+        print(f"Message: {result.message}")
+        print("Suggestions:")
+        for suggestion in result.suggestions:
+            print(f" - {suggestion}")
+
+        retry_planner = RetryPlanner(project_path)
+        plan = retry_planner.plan_retry(result)
+
+        print("[RETRY PLAN]")
+        for action in plan["actions"]:
+            print(f"🔁 {action}")
+        return False
+    print("[REFLECTIVE VALIDATION] Code validated successfully.")
+    return True
+
+def run_modification_workflow(scenario_path: str):
+    from i2c.workflow.scenario_processor import run_scenario
+    run_scenario(scenario_path)

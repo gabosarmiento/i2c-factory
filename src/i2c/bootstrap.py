@@ -18,7 +18,7 @@ def initialize_environment():
     # 1) Tokenizer safety
      
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    builtins.llm_highest, builtins.llm_middle, builtins.llm_small, builtins.llm_xs = initialize_groq_providers()
+    builtins.llm_highest, builtins.llm_middle, builtins.llm_middle_alt, builtins.llm_small, builtins.llm_deepseek = initialize_groq_providers()
 
     # 2) Initialize a global budget manager if not already present
     if not hasattr(builtins, 'global_budget_manager'):

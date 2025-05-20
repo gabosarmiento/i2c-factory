@@ -12,7 +12,7 @@ from i2c.agents.sre_team.code_quality import code_quality_sentinel
 from i2c.agents.sre_team.dependency import dependency_verifier
 from i2c.agents.sre_team.sandbox import sandbox_executor
 from i2c.agents.sre_team.version_control import version_controller
-from i2c.agents.sre_team.unit_test import unit_test_generator
+from i2c.agents.sre_team.multilang_unit_test import unit_test_generator
 
 class SRELeadAgent(Agent):
     """Lead agent for the SRE Team that coordinates operational checks"""

@@ -50,6 +50,7 @@ class ModificationPlannerAgent(Agent):
                 "Output ONLY a valid JSON list of modification steps.",
                 "Each step MUST be a JSON object with keys: 'file', 'action', 'what', 'how'.",
                 "Use valid JSON syntax: double quotes ONLY for all keys and string values. Do NOT use single quotes or Python dictionary syntax.",
+                "If a string needs to contain code with double quotes, escape them (\\\") or wrap the code snippet in single quotes.",
                 
                 "### Valid Actions:",
                 "- 'modify': Update existing file",

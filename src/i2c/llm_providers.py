@@ -21,33 +21,42 @@ def initialize_groq_providers():
     print("[INFO]: Initializing Groq LLM providers…")
 
     llm_highest = Groq(
-        id="meta-llama/llama-4-maverick-17b-128e-instruct",
+        # id="meta-llama/llama-4-maverick-17b-128e-instruct",
+        id="llama-3.3-70b-versatile",
+        api_key=GROQ_API_KEY,
+        temperature=0.5
+    )
+    
+    llm_middle_alt = Groq(
+        id="meta-llama/llama-guard-4-12b",
         api_key=GROQ_API_KEY,
         temperature=0.5
     )
 
     llm_middle = Groq(
-        id="meta-llama/llama-4-scout-17b-16e-instruct",
+        # id="meta-llama/llama-4-scout-17b-16e-instruct",
+        id="llama-3.1-8b-instant",
         api_key=GROQ_API_KEY,
         temperature=0.2
     )
 
     llm_small = Groq(
-        id="llama-guard-3-8b",
+        id="llama-3.1-8b-instant",
         api_key=GROQ_API_KEY,
         temperature=0.2
+    )
+    
+    llm_deepseek = Groq(
+        id="deepseek-r1-distill-llama-70b",
+        api_key=GROQ_API_KEY,
+        temperature=0.4,
     )
 
-    llm_xs = Groq(
-        id="llama3-8b-8192",
-        api_key=GROQ_API_KEY,
-        temperature=0.2
-    )
 
     print("[INFO]: Groq LLM providers initialized successfully.")
-    return llm_highest, llm_middle, llm_small, llm_xs
+    return llm_highest, llm_middle, llm_middle_alt, llm_small, llm_deepseek
 
-llm_highest, llm_middle, llm_small, llm_xs = initialize_groq_providers()
+llm_highest, llm_middle, llm_middle_alt, llm_small, llm_deepseek = initialize_groq_providers()
 
 # --- Destructor fix ---
 import groq._base_client
@@ -124,7 +133,7 @@ def make_tracked_request(model, messages, budget_manager=None, agent=None):
         return "", 0, 0.0
     
 def _cleanup_groq_clients():
-    for model in (llm_highest, llm_middle, llm_small, llm_xs):
+    for model in (llm_highest, llm_middle, llm_middle_alt, llm_small, llm_deepseek):
         wrapper = getattr(model, "_client", None)
         if wrapper:
             try:

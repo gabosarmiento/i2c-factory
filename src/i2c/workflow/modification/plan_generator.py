@@ -1,13 +1,23 @@
 # workflow/modification/plan_generator.py
 # Handles generating the modification plan using the planner agent and RAG context.
 
-import json
+import json, re
 from pathlib import Path
 
 # Import necessary agent INSTANCES
 from i2c.agents.modification_team import modification_planner_agent
 # Import CLI controller
 from i2c.cli.controller import canvas
+
+def _safe_json_load(raw: str):
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        # common error: unescaped double-quotes inside 'how'
+        fixed = re.sub(r'("how"\\s*:\\s*")([^"]*?)(".*?")',
+                       lambda m: m.group(1) + m.group(2).replace('"', '\\"') + m.group(3),
+                       raw, count=1)
+        return json.loads(fixed)
 
 def generate_modification_plan(user_request: str, retrieved_context_plan: str, project_path: Path, language: str) -> list[dict] | None:
     """
@@ -101,7 +111,7 @@ def generate_modification_plan(user_request: str, retrieved_context_plan: str, p
                 content_processed = content_processed[open_bracket_idx:close_bracket_idx+1]
             
             # Parse JSON
-            modification_plan = json.loads(content_processed)
+            modification_plan = _safe_json_load(content_processed)
 
             # Complete Validation Logic
             if not isinstance(modification_plan, list) or not all(

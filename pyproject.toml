@@ -19,7 +19,7 @@ pyarrow               = "^20.0.0"
 pandas                = "^2.2.3"
 numpy                 = "<2.0"
 sentence-transformers = "^2.2.0"
-agno                  = "*"
+agno                  = "1.4.4"
 llm-providers         = "*"
 groq                  = "0.23.1"
 pypdf2                = "^3.0.0"
@@ -36,6 +36,7 @@ jsonschema            = "^4.23.0"
 esprima               = "^4.0.1"
 libcst = "^1.7.0"
 scipy = {version = "^1.15.3", allow-prereleases = true}
+psutil = "^7.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest      = "^7.0.0"

@@ -10,7 +10,7 @@ from i2c.bootstrap import initialize_environment, PROJECT_ROOT
 initialize_environment()
 
 # 2) Use real LLM agent if available
-from builtins import llm_xs
+from builtins import llm_deepseek
 
 # 3) Default output folder
 os.environ['DEFAULT_PROJECT_ROOT'] = str(PROJECT_ROOT / 'test_output')
