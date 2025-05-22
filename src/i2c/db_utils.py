@@ -32,6 +32,7 @@ VECTOR_DIMENSION = 384                 # For 'all-MiniLM-L6-v2'
 
 # --- Schema for Code Context Table ---
 SCHEMA_CODE_CONTEXT = pa.schema([
+    pa.field('chunk_id',pa.string()),
     pa.field("path", pa.string()),
     pa.field("chunk_name", pa.string()),
     pa.field("chunk_type", pa.string()),

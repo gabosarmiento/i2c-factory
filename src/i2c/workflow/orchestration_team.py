@@ -1,20 +1,8 @@
 # src/i2c/workflow/orchestration_team.py
 
 from agno.team import Team
-from i2c.agents.code_orchestration_agent import CodeOrchestrationAgent
-from i2c.workflow.agentic_orchestrator import execute_modification_with_agents
+from i2c.agents.code_orchestration_agent import CodeOrchestrationAgent, OrchestrationResult
 from builtins import llm_highest
-
-from pydantic import BaseModel, Field
-from typing import Dict, Any, List
-
-class OrchestrationResult(BaseModel):
-    decision: str = Field(..., description="Final decision: approve or reject")
-    reason: str = Field(..., description="Explanation for the decision")
-    modifications: Dict[str, Any] = Field(..., description="Summary of code modifications")
-    quality_results: Dict[str, Any] = Field(..., description="Results of quality validations")
-    sre_results: Dict[str, Any] = Field(..., description="Results of operational checks")
-    reasoning_trajectory: List[Dict[str, Any]] = Field(..., description="Reasoning steps taken during the process")
 
 
 def build_orchestration_team(initial_session_state=None) -> Team:
@@ -32,7 +20,7 @@ def build_orchestration_team(initial_session_state=None) -> Team:
         initial_session_state = {}
     
     # Create the orchestration agent
-    orchestration_agent = CodeOrchestrationAgent()
+    orchestration_agent = CodeOrchestrationAgent(session_state=initial_session_state)
     
     # Create the team with session state
     return Team(

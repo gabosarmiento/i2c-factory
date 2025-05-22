@@ -8,6 +8,7 @@ from agno.team import Team
 from agno.agent import Agent
 
 # Import existing knowledge components
+from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent
 from i2c.agents.knowledge.knowledge_manager import ExternalKnowledgeManager
 from i2c.workflow.modification.rag_retrieval import retrieve_context_for_planner
 from i2c.workflow.modification.rag_config import get_embed_model
@@ -47,8 +48,9 @@ class KnowledgeLeadAgent(Agent):
             except Exception as e:
                 canvas.warning(f"Failed to initialize embedding model: {e}")
                 
-        # Initialize knowledge manager if embed_model is available
+        # Initialize knowledge manager and enhanced ingestor if embed_model is available
         self.knowledge_manager = None
+        self.enhanced_ingestor = None
         if self.embed_model:
             try:
                 db_path = self.team_session_state.get("db_path", "./data/lancedb")
@@ -56,9 +58,20 @@ class KnowledgeLeadAgent(Agent):
                     embed_model=self.embed_model,
                     db_path=db_path
                 )
+                
+                # Add enhanced ingestor with caching
+                from i2c.agents.budget_manager import BudgetManagerAgent
+                budget_manager = self.team_session_state.get("budget_manager") or BudgetManagerAgent()
+                knowledge_space = self.team_session_state.get("knowledge_space", "default")
+                
+                self.enhanced_ingestor = EnhancedKnowledgeIngestorAgent(
+                    budget_manager=budget_manager,
+                    knowledge_space=knowledge_space,
+                    embed_model=self.embed_model
+                )
             except Exception as e:
-                canvas.warning(f"Failed to initialize knowledge manager: {e}")
-    
+                canvas.warning(f"Failed to initialize knowledge components: {e}")
+                
     async def analyze_project_context(self, project_path: Path, task: str) -> Dict[str, Any]:
         """
         Analyze the project context for a specific task.
@@ -299,7 +312,42 @@ class KnowledgeLeadAgent(Agent):
                     pass
         
         return list(target_files)
-
+    
+    async def ingest_project_documentation(
+        self, 
+        project_path: Path, 
+        force_refresh: bool = False
+    ) -> Dict[str, Any]:
+        """Ingest project documentation with smart caching"""
+        
+        if not self.enhanced_ingestor:
+            canvas.warning("Enhanced ingestor not available")
+            return {"success": False, "error": "No ingestor available"}
+        
+        canvas.info(f"Ingesting documentation from {project_path}")
+        
+        try:
+            # Use the enhanced ingestor with caching
+            success, results = self.enhanced_ingestor.execute(
+                document_path=project_path,
+                document_type="project_documentation",
+                metadata={
+                    "project_path": str(project_path),
+                    "ingested_by": "knowledge_team"
+                },
+                force_refresh=force_refresh,
+                recursive=True
+            )
+            
+            if success:
+                canvas.success(f"✅ Ingested {results['successful_files']} files, "
+                            f"skipped {results['skipped_files']} (cached)")
+            
+            return {"success": success, "results": results}
+            
+        except Exception as e:
+            canvas.error(f"Error ingesting documentation: {e}")
+            return {"success": False, "error": str(e)}
 def build_knowledge_team(session_state=None) -> Team:
     """
     Build the knowledge team with a lead agent.
@@ -314,10 +362,15 @@ def build_knowledge_team(session_state=None) -> Team:
     knowledge_lead = KnowledgeLeadAgent()
     
     # Use shared session if provided, else default
-    session_state = session_state or {
-        "project_context": None,
-        "db_path": "./data/lancedb"
-    }
+    if session_state is None:
+        session_state = {
+            "project_context": None,
+            "db_path": "./data/lancedb",
+        }
+    else:
+        # 2️⃣ Add only the keys this team needs (if they are missing)
+        session_state.setdefault("project_context", None)
+        session_state.setdefault("db_path", "./data/lancedb")
     
     return Team(
         name="KnowledgeTeam",

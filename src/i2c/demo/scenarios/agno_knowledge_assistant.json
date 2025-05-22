@@ -1,0 +1,239 @@
+{
+    "name": "AI Knowledge Assistant with Learning Capabilities",
+    "description": "Intelligent knowledge management system using Agno agent teams for document processing, question answering, and continuous learning",
+    "steps": [
+      {
+        "type": "initial_generation", 
+        "name": "Knowledge Assistant",
+        "prompt": "Create an Agno-Powered Knowledge Assistant: SmartKnowledgeHub using Agno agent teams for document ingestion, intelligent indexing, natural language querying, and adaptive learning from interactions",
+        "project_name": "KnowledgeAssistant"
+      },
+      {
+        "type": "narration",
+        "name": "Introduction",
+        "message": "🤖 Creating Agno-Powered Knowledge Assistant: SmartKnowledgeHub",
+        "pause": 2
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Initial Knowledge Assistant Generation",
+        "objective": {
+          "task": "Create an intelligent knowledge management system called 'SmartKnowledgeHub' using Agno agent teams for document ingestion, intelligent indexing, natural language querying, and adaptive learning from interactions",
+          "constraints": [
+            "Use Agno framework for all knowledge processing operations",
+            "Implement multi-agent system for document understanding and retrieval",
+            "Use advanced RAG with knowledge graph integration",
+            "Implement agent memory for learning user preferences and domain knowledge",
+            "Support multi-modal content processing (text, images, videos, audio)",
+            "Include intelligent summarization and synthesis capabilities",
+            "Use semantic search with vector embeddings and agent enhancement",
+            "Implement conversational knowledge interaction with context awareness"
+          ],
+          "quality_gates": ["lint", "tests", "agno_integration", "knowledge_accuracy", "learning_effectiveness"],
+          "application_type": "agno_knowledge_system",
+          "file_structure": {
+            "app.py": "Main knowledge system with Agno agent orchestration",
+            "agents/": "Agno agent definitions for knowledge processing",
+            "ingestion/": "Document ingestion with intelligent processing",
+            "indexing/": "Smart indexing and knowledge graph construction",
+            "retrieval/": "Intelligent retrieval with agent-powered ranking",
+            "synthesis/": "Knowledge synthesis and insight generation",
+            "conversation/": "Conversational AI with context management",
+            "learning/": "Continuous learning and adaptation systems",
+            "knowledge/": "Knowledge graphs and semantic storage",
+            "config.py": "System and Agno agent configuration",
+            "requirements.txt": "Dependencies including Agno framework",
+            "tests/": "Knowledge system and agent testing",
+            "README.md": "Documentation for intelligent knowledge features"
+          }
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Intelligent Document Processing Implementation",
+        "message": "📄 Building AI Document Processing Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Intelligent Document Processing Team",
+        "objective": {
+          "task": "Create Agno agent team for intelligent document ingestion, content extraction, structure analysis, and semantic understanding with multi-modal processing capabilities",
+          "constraints": [
+            "Deploy Agno agent team for comprehensive document processing",
+            "Implement content extraction agent with format-specific intelligence",
+            "Create structure analysis agent for document hierarchy understanding",
+            "Add semantic processing agent for meaning extraction",
+            "Use knowledge graphs for document relationship mapping",
+            "Implement multi-modal processing agent for various content types",
+            "Support metadata extraction and enrichment with AI analysis",
+            "Include content quality assessment agent for information validation"
+          ],
+          "quality_gates": ["extraction_accuracy", "structure_recognition", "semantic_understanding"],
+          "depends_on": []
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Advanced Knowledge Retrieval Implementation",
+        "message": "🔍 Creating Intelligent Knowledge Retrieval Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Advanced Knowledge Retrieval System",
+        "objective": {
+          "task": "Build intelligent knowledge retrieval system using Agno agents for semantic search, context-aware ranking, query expansion, and personalized result optimization",
+          "constraints": [
+            "Use Agno agents for multi-layered retrieval intelligence",
+            "Implement semantic search agent with vector similarity and graph traversal",
+            "Create query understanding agent with intent recognition",
+            "Add result ranking agent with personalization and context awareness",
+            "Use hybrid search combining keyword, semantic, and graph-based retrieval",
+            "Implement query expansion agent for comprehensive coverage",
+            "Support faceted search with intelligent filtering",
+            "Include result explanation agent for transparency and trust"
+          ],
+          "quality_gates": ["retrieval_precision", "recall_effectiveness", "ranking_relevance"],
+          "depends_on": ["Intelligent Document Processing Team"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Conversational AI Interface Implementation",
+        "message": "💬 Building Conversational Knowledge Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Conversational AI Interface",
+        "objective": {
+          "task": "Create intelligent conversational interface using Agno agents for natural language interaction, context management, question answering, and adaptive conversation flow",
+          "constraints": [
+            "Deploy Agno agents for sophisticated conversational AI",
+            "Implement dialogue management agent with context preservation",
+            "Create question answering agent with reasoning capabilities",
+            "Add conversation flow agent for natural interaction patterns",
+            "Use knowledge retrieval integration for informed responses",
+            "Implement clarification agent for ambiguous queries",
+            "Support multi-turn conversations with memory and context",
+            "Include conversation quality agent for response optimization"
+          ],
+          "quality_gates": ["conversation_quality", "context_preservation", "answer_accuracy"],
+          "depends_on": ["Advanced Knowledge Retrieval System"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Knowledge Synthesis and Insights Implementation",
+        "message": "🧠 Creating AI Knowledge Synthesis Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Knowledge Synthesis and Insights",
+        "objective": {
+          "task": "Build intelligent knowledge synthesis system using Agno agents for cross-document analysis, insight generation, knowledge gap identification, and automated report creation",
+          "constraints": [
+            "Use Agno agents for advanced knowledge synthesis",
+            "Implement cross-document analysis agent for pattern identification",
+            "Create insight generation agent with reasoning and evidence",
+            "Add knowledge gap detection agent for content opportunities",
+            "Use graph analysis for relationship discovery and synthesis",
+            "Implement automated summarization agent with customizable depth",
+            "Support trend analysis and knowledge evolution tracking",
+            "Include report generation agent with narrative creation"
+          ],
+          "quality_gates": ["synthesis_quality", "insight_accuracy", "report_completeness"],
+          "depends_on": ["Conversational AI Interface"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Continuous Learning System Implementation",
+        "message": "🎓 Building AI Learning and Adaptation Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Continuous Learning System",
+        "objective": {
+          "task": "Create intelligent learning system using Agno agents for user feedback processing, knowledge quality improvement, domain adaptation, and system optimization with continuous enhancement",
+          "constraints": [
+            "Deploy Agno agents for comprehensive system learning",
+            "Implement feedback processing agent for user interaction learning",
+            "Create knowledge quality agent for content improvement",
+            "Add domain adaptation agent for specialized knowledge areas",
+            "Use reinforcement learning for retrieval optimization",
+            "Implement user preference learning agent for personalization",
+            "Support active learning for knowledge gap filling",
+            "Include system performance optimization agent for efficiency"
+          ],
+          "quality_gates": ["learning_effectiveness", "adaptation_accuracy", "performance_improvement"],
+          "depends_on": ["Knowledge Synthesis and Insights"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Testing Knowledge Assistant Systems",
+        "message": "🧪 Testing Agno Agent Teams and Knowledge Intelligence",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Comprehensive Knowledge System Testing",
+        "objective": {
+          "task": "Create comprehensive testing suite for all Agno agents, knowledge processing accuracy, conversational AI quality, and learning system effectiveness with performance validation",
+          "constraints": [
+            "Test all Agno agent teams for knowledge operations",
+            "Validate document processing accuracy and semantic understanding",
+            "Test retrieval precision, recall, and ranking effectiveness",
+            "Verify conversational AI quality and context management",
+            "Test knowledge synthesis accuracy and insight generation",
+            "Validate learning system effectiveness and adaptation",
+            "Include performance testing for large-scale knowledge bases",
+            "Test system responsiveness with concurrent user interactions"
+          ],
+          "quality_gates": ["agent_test_coverage", "knowledge_accuracy_benchmarks", "ai_quality_metrics"],
+          "ai_testing_requirements": [
+            "Knowledge processing accuracy validation",
+            "Retrieval effectiveness testing",
+            "Conversational AI quality benchmarks",
+            "Learning system effectiveness metrics",
+            "Agent coordination performance validation"
+          ]
+        }
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Knowledge Assistant Documentation and Deployment",
+        "objective": {
+          "task": "Create comprehensive documentation for intelligent knowledge features, agent configurations, processing capabilities, and deployment guides for production AI-powered knowledge systems",
+          "constraints": [
+            "Document all Agno agent configurations for knowledge operations",
+            "Create setup guides for intelligent document processing",
+            "Include configuration guides for knowledge graphs and retrieval",
+            "Document conversational AI capabilities and customization",
+            "Create troubleshooting guides for agent-related knowledge issues",
+            "Include performance optimization recommendations for knowledge systems",
+            "Document integration patterns for existing knowledge bases",
+            "Create user guides for advanced knowledge interaction features"
+          ],
+          "quality_gates": ["documentation_completeness", "user_guide_quality", "deployment_readiness"],
+          "ai_documentation_requirements": [
+            "Knowledge agent architecture diagrams",
+            "Intelligent processing pipeline documentation",
+            "Conversational AI setup and customization guides",
+            "Performance monitoring for knowledge systems",
+            "Integration patterns for enterprise knowledge management"
+          ]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Final Knowledge Assistant Validation",
+        "message": "✅ SmartKnowledgeHub complete! Validating all Agno agent systems and intelligent knowledge processing...",
+        "pause": 2
+      }
+    ]
+}

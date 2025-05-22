@@ -172,3 +172,19 @@ def generate_modification_plan(user_request: str, retrieved_context_plan: str, p
         # Let the exception propagate up
         canvas.error(f"Error during modification planning call: {e}")
         raise e
+
+# Add to plan_generator.py
+def validate_and_visualize_plan(plan, project_path):
+    invalid_steps = []
+    for step in plan:
+        file_path = project_path / step['file']
+        if step['action'] in ['modify', 'delete'] and not file_path.exists():
+            invalid_steps.append(f"File does not exist: {step['file']}")
+    
+    # Generate visualization of plan
+    from rich.table import Table
+    table = Table(title="Modification Plan")
+    table.add_column("File")
+    table.add_column("Action")
+    table.add_column("What")
+    # Add rows and print

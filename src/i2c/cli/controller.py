@@ -35,3 +35,4 @@ class Canvas:
 
 # Instantiate globally for imports
 canvas = Canvas()
+

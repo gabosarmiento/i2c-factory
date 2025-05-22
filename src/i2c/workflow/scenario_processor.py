@@ -64,6 +64,8 @@ class ScenarioProcessor:
         
         # Session state variables (similar to session.py)
         self.current_project_path: Optional[Path] = None
+        # Session state carried across agentic runs
+        self.session_state: Optional[Dict[str, Any]] = None
         self.current_structured_goal: Optional[Dict] = None
         self.reader_agent: Optional[ContextReaderAgent] = None
     
@@ -117,7 +119,7 @@ class ScenarioProcessor:
 
         try:
             import json
-            canvas.info(f"HELLOU!Full objective being sent to orchestrator: {json.dumps(objective, indent=2)[:500]}...")
+            canvas.info(f"Full objective being sent to orchestrator: {json.dumps(objective, indent=2)[:500]}...")
         except Exception as e:
             canvas.info(f"Could not log full objective: {e}")
         try:
@@ -128,8 +130,14 @@ class ScenarioProcessor:
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
             
             # Execute the agentic evolution
-            result = execute_agentic_evolution_sync(objective, self.current_project_path)
-            
+            result = execute_agentic_evolution_sync(
+                objective,
+                self.current_project_path,
+                self.session_state
+            )
+            # Step 3: update our processor’s session_state for next time
+            if isinstance(result, dict) and "session_state" in result:
+                self.session_state = result["session_state"]
             # Display the result
             if result.get("decision") == "approve":
                 canvas.success(f"✅ Evolution approved: {result.get('reason', 'No reason provided')}")
@@ -764,7 +772,7 @@ class ScenarioProcessor:
             canvas.warning("Refinement cancelled due to budget rejection.")
             
     def _process_knowledge_step(self, step: Dict[str, Any]) -> None:
-        """Process a knowledge step - add documentation to knowledge base"""
+        """Process a knowledge step - add documentation to knowledge base with smart caching"""
         if not self.current_project_path:
             canvas.warning("No active project. Cannot add knowledge.")
             return
@@ -775,7 +783,6 @@ class ScenarioProcessor:
             return
             
         doc_path = Path(doc_path)
-        # Check if path is absolute, if not make it relative to the current directory
         if not doc_path.is_absolute():
             doc_path = Path(os.getcwd()) / doc_path
         
@@ -790,60 +797,37 @@ class ScenarioProcessor:
         
         canvas.step(f"Adding documentation to knowledge base: {doc_path.name}")
         
-        # First, ensure tables exist
-        if not self.ensure_database_tables():
-            canvas.error("Database tables not ready, skipping knowledge step")
-            return
-        
-        # Use ingest_documentation with proper error handling
+        # Use enhanced ingestor with smart caching
         try:
-            # Use the ingest_documentation function with explicit error handling
-            success = False
-            try:
-                from i2c.workflow.session_handlers import ingest_documentation
-                
-                # Make sure path is absolute
-                if not doc_path.is_absolute():
-                    doc_path = Path(os.getcwd()) / doc_path
-                    
-                canvas.info(f"Using absolute path: {doc_path}")
-                
-                if not doc_path.exists():
-                    canvas.error(f"Document not found at: {doc_path}")
-                    return
-                    
-                success = ingest_documentation(
-                    project_path=self.current_project_path,
-                    doc_path=doc_path,
-                    document_type=doc_type,
-                    framework=framework,
-                    version=version
-                )
-            except ImportError as e:
-                canvas.error(f"Failed to import session handlers: {e}")
-                return
-            except Exception as e:
-                canvas.error(f"Error in ingest_documentation: {e}")
-                import traceback
-                canvas.error(traceback.format_exc())
-                return
-                
+            from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent
+            
+            ingestor = EnhancedKnowledgeIngestorAgent(
+                budget_manager=self.budget_manager,
+                knowledge_space=self.current_project_path.name,
+            )
+            
+            success, results = ingestor.execute(
+                document_path=doc_path,
+                document_type=doc_type,
+                metadata={
+                    "framework": framework,
+                    "version": version,
+                    "project_path": str(self.current_project_path)
+                },
+                force_refresh=False  # Use smart caching
+            )
+            
             if success:
-                canvas.success(f"Successfully added {doc_path.name} to knowledge base.")
+                canvas.success(f"✅ Added {doc_path.name}: {results['successful_files']} files, "
+                            f"skipped {results['skipped_files']} (cached)")
             else:
                 canvas.error(f"Failed to add {doc_path.name} to knowledge base.")
+                
         except Exception as e:
             canvas.error(f"Error in knowledge step: {e}")
-            import traceback
-            canvas.error(traceback.format_exc())
-             
+
     def _process_knowledge_folder_step(self, step: Dict[str, Any]) -> None:
-        """
-        Process a knowledge folder step - add a folder of documentation
-        
-        Args:
-            step: The knowledge folder step configuration
-        """
+        """Process a knowledge folder step with smart caching"""
         if not self.current_project_path:
             canvas.warning("No active project. Cannot add knowledge.")
             return
@@ -862,27 +846,39 @@ class ScenarioProcessor:
         doc_type = step.get("doc_type", "API Documentation")
         framework = step.get("framework", "")
         version = step.get("version", "")
-        recursive = step.get("recursive", True)
         
         canvas.step(f"Adding documentation folder to knowledge base: {folder_path.name}")
         
-        # Use the ingest_documentation function from session_handlers
-        from i2c.workflow.session_handlers import ingest_documentation
-        
-        success = ingest_documentation(
-            project_path=self.current_project_path,
-            doc_path=folder_path,
-            document_type=doc_type,
-            framework=framework,
-            version=version,
-            recursive=recursive
-        )
-        
-        if success:
-            canvas.success(f"Successfully added documentation from {folder_path.name} to knowledge base.")
-        else:
-            canvas.error(f"Failed to add documentation from {folder_path.name} to knowledge base.")
+        # Use enhanced ingestor with smart caching
+        try:
+            from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent
             
+            ingestor = EnhancedKnowledgeIngestorAgent(
+                budget_manager=self.budget_manager,
+                knowledge_space=self.current_project_path.name,
+            )
+            
+            success, results = ingestor.execute(
+                document_path=folder_path,
+                document_type=doc_type,
+                metadata={
+                    "framework": framework,
+                    "version": version,
+                    "project_path": str(self.current_project_path)
+                },
+                force_refresh=False,  # Use smart caching
+                recursive=True
+            )
+            
+            if success:
+                canvas.success(f"✅ Added {folder_path.name}: {results['successful_files']} files, "
+                            f"skipped {results['skipped_files']} (cached)")
+            else:
+                canvas.error(f"Failed to add documentation from {folder_path.name}")
+                
+        except Exception as e:
+            canvas.error(f"Error in knowledge folder step: {e}")
+                
     def _process_pause_step(self, step: Dict[str, Any]) -> None:
         """
         Process a pause step - pause for user interaction

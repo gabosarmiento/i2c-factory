@@ -1,7 +1,7 @@
 # from i2c/cli/knowledge_commands.py
 """CLI commands for knowledge base management"""
 from pathlib import Path
-from i2c.agents.knowledge.knowledge_ingestor import KnowledgeIngestorAgent
+from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent as KnowledgeIngestorAgent
 from i2c.cli.controller import canvas, budget_manager
 
 def add_knowledge_command(project_path: Path):

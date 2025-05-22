@@ -37,8 +37,10 @@ class IssueResolutionOperator(ContextAwareOperator):
 
     def __init__(
         self,
+        *,
         budget_manager,
         max_reasoning_steps: int = 3,
+        session_state: dict | None = None,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -46,6 +48,7 @@ class IssueResolutionOperator(ContextAwareOperator):
             operation_type="issue_resolution",
             max_reasoning_steps=max_reasoning_steps,
             default_model_tier="highest",
+            session_state=session_state,
         )
 
         # Dedicated reasoning LLM

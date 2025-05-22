@@ -1,6 +1,5 @@
-# agents/modification_team/chunkers/html_code.py
 import hashlib
-from typing import List
+from typing import List, Optional
 
 from agno.document.base import Document
 from agno.document.chunking.strategy import ChunkingStrategy
@@ -21,10 +20,16 @@ except ImportError:
         def error(self, msg):   print(f"[ERROR_HTML] {msg}")
     canvas = FallbackCanvas()
 
+
 class HTMLCodeChunkingStrategy(ChunkingStrategy):
     """
     Chunk HTML files into <script> blocks and main HTML content.
     """
+
+    def __init__(self, chunk_size: Optional[int] = None, overlap: Optional[int] = None):
+        self.chunk_size = chunk_size
+        self.overlap = overlap
+
     def chunk(self, document: Document) -> List[Document]:
         content = document.content or ""
         chunks: List[Document] = []
@@ -35,7 +40,7 @@ class HTMLCodeChunkingStrategy(ChunkingStrategy):
 
         soup = BeautifulSoup(content, 'html.parser')
 
-        # Extract script tags
+        # Extract <script> blocks
         for idx, script in enumerate(soup.find_all('script')):
             code = script.string or ''
             if not code.strip():
@@ -50,7 +55,7 @@ class HTMLCodeChunkingStrategy(ChunkingStrategy):
             }
             chunks.append(Document(content=code, meta_data=meta))
 
-        # Main HTML content 
+        # Remaining HTML content
         for script in soup.find_all('script'):
             script.decompose()
         html_text = soup.prettify().strip()

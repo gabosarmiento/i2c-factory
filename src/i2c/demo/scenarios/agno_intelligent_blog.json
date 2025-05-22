@@ -1,0 +1,244 @@
+{
+    "name": "AI-Powered Intelligent Blog Platform",
+    "description": "Complete Agno-powered blogging platform with AI content generation, smart moderation, and knowledge-enhanced interactions",
+    "steps": [
+      {
+        "type": "initial_generation", 
+        "name": "Agno Intelligent Blog",
+        "prompt": "Create an Agno-Powered Intelligent Blog: SmartBlog AI Platform using Agno agent teams for intelligent content management, automated moderation, and knowledge-enhanced user interactions",
+        "project_name": "SmartBlogAI",
+        "language": "python"
+      },
+      {
+        "type": "narration",
+        "name": "Introduction",
+        "message": "🤖 Creating Agno-Powered Intelligent Blog: SmartBlog AI Platform ",
+        "pause": 2
+      },
+      {
+        "type": "knowledge_folder",
+        "name": "Add Agno Framework Knowledge", 
+        "folder_path": "/projects/agno-1.4.4/cookbook/examples",
+        "doc_type": "Framework Examples",
+        "framework": "Agno",
+        "version": "1.4.4",
+        "recursive": true
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Initial AI-Enhanced Application Generation",
+        "objective": {
+          "task": "Create a complete AI-powered blogging platform called 'SmartBlog' using Agno agent teams for intelligent content management, automated moderation, and knowledge-enhanced user interactions",
+          "constraints": [
+            "Use Python 3.11 as the programming language",
+            "Use Flask framework for web development",
+            "Use Agno framework v 1.4.4 as the core AI engine",
+            "Implement multi-agent teams for different blog functions",
+            "Integrate RAG for knowledge-enhanced content suggestions",
+            "Use vector embeddings for semantic content analysis",
+            "Implement agent memory for learning user preferences",
+            "Follow MVC pattern with AI agent integration",
+            "Use Flask with Agno agent endpoints",
+            "Include real-time agent collaboration features"
+          ],
+          "quality_gates": ["lint", "security", "tests", "agno_integration", "ai_functionality"],
+          "application_type": "agno_web_app",
+          "file_structure": {
+            "app.py": "Main Flask application with Agno agent coordination",
+            "agents/": "Agno agent definitions and team configurations",
+            "models/": "Database models with AI enhancement metadata",
+            "views/": "Route handlers with agent-powered endpoints",
+            "templates/": "HTML templates with AI interaction components",
+            "static/": "Frontend assets with AI chat interfaces",
+            "knowledge/": "RAG knowledge base and vector storage",
+            "config.py": "Application and Agno agent configuration",
+            "requirements.txt": "Dependencies including Agno framework",
+            "tests/": "Unit tests for agents and AI functionality",
+            "README.md": "Documentation for AI-powered features"
+          }
+        }
+      },
+      {
+        "type": "narration",
+        "name": "AI Content Generation Implementation",
+        "message": "✍️ Implementing AI Content Generation Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement AI Content Generation Team",
+        "objective": {
+          "task": "Create Agno agent team for intelligent content generation including blog post creation, title optimization, tag suggestions, and SEO enhancement using multi-agent collaboration",
+          "constraints": [
+            "Use Agno Team with specialized content agents",
+            "Implement content writer agent with style adaptation",
+            "Create SEO optimization agent for search ranking",
+            "Add tag suggestion agent with semantic analysis",
+            "Use RAG for knowledge-enhanced content creation",
+            "Implement agent memory for writing style learning",
+            "Support multiple content formats (markdown, HTML, plain text)",
+            "Include content quality validation agent"
+          ],
+          "quality_gates": ["agno_agent_tests", "content_quality", "collaboration_flow"],
+          "depends_on": []
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Smart Moderation System Implementation",
+        "message": "🛡️ Building AI-Powered Content Moderation Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Smart Moderation Agent Team",
+        "objective": {
+          "task": "Create intelligent content moderation system using Agno agents for automated comment filtering, spam detection, sentiment analysis, and community management with learning capabilities",
+          "constraints": [
+            "Deploy Agno agent team for multi-layered moderation",
+            "Implement sentiment analysis agent for emotional content",
+            "Create spam detection agent with pattern learning",
+            "Add toxicity detection agent for harmful content",
+            "Use knowledge base for community guidelines enforcement",
+            "Implement escalation agent for complex cases",
+            "Support real-time moderation with agent coordination",
+            "Include user reputation scoring with AI analysis"
+          ],
+          "quality_gates": ["moderation_accuracy", "false_positive_rate", "agent_coordination"],
+          "depends_on": ["AI Content Generation Team"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Knowledge-Enhanced Reader Experience",
+        "message": "📚 Creating AI Reading Assistant and Knowledge Enhancement",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Knowledge-Enhanced Reading Experience",
+        "objective": {
+          "task": "Build AI reading assistant using Agno agents for content recommendations, related article suggestions, concept explanations, and personalized reading paths with RAG integration",
+          "constraints": [
+            "Use Agno agents for personalized content recommendation",
+            "Implement knowledge graph agent for concept connections",
+            "Create reading comprehension assistant with explanations",
+            "Add related content discovery agent with semantic search",
+            "Use vector embeddings for content similarity analysis",
+            "Implement reading progress tracking with AI insights",
+            "Support interactive Q&A about blog content",
+            "Include learning path generation for educational content"
+          ],
+          "quality_gates": ["recommendation_relevance", "knowledge_accuracy", "user_engagement"],
+          "depends_on": ["AI Content Generation Team", "Smart Moderation Agent Team"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "AI Analytics and Insights Dashboard",
+        "message": "📊 Building Intelligent Analytics with Agent-Powered Insights",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement AI Analytics Dashboard",
+        "objective": {
+          "task": "Create intelligent analytics dashboard powered by Agno agents for content performance analysis, reader behavior insights, trend prediction, and automated reporting with natural language explanations",
+          "constraints": [
+            "Deploy analytics agent team for multi-dimensional analysis",
+            "Implement trend analysis agent with predictive capabilities",
+            "Create performance optimization agent for content improvement",
+            "Add audience insights agent with behavioral analysis",
+            "Use time-series analysis for content performance tracking",
+            "Implement natural language report generation",
+            "Support real-time analytics with agent coordination",
+            "Include actionable insights generation with AI recommendations"
+          ],
+          "quality_gates": ["analytics_accuracy", "insight_quality", "report_generation"],
+          "depends_on": ["Knowledge-Enhanced Reading Experience"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Testing AI Agent Systems",
+        "message": "🧪 Testing Agno Agent Teams and AI Functionality",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Comprehensive AI System Testing",
+        "objective": {
+          "task": "Create comprehensive testing suite for all Agno agents, AI functionality, multi-agent coordination, and knowledge-enhanced features with performance benchmarks",
+          "constraints": [
+            "Test all Agno agent teams individually and in coordination",
+            "Validate AI content generation quality and consistency",
+            "Test moderation accuracy and false positive rates",
+            "Verify knowledge base integration and RAG functionality",
+            "Test agent memory and learning capabilities",
+            "Validate real-time agent collaboration performance",
+            "Include load testing for concurrent agent operations",
+            "Test AI explanation generation and user interaction flows"
+          ],
+          "quality_gates": ["agent_test_coverage", "ai_performance_benchmarks", "coordination_tests"],
+          "ai_testing_requirements": [
+            "Agent response time validation",
+            "Multi-agent coordination accuracy",
+            "Knowledge retrieval precision and recall",
+            "Content generation quality metrics",
+            "User interaction flow testing"
+          ]
+        }
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "AI Documentation and Deployment Optimization",
+        "objective": {
+          "task": "Create comprehensive documentation for AI-powered features, agent configurations, knowledge base setup, and deployment guides for production Agno agent systems",
+          "constraints": [
+            "Document all Agno agent team configurations and roles",
+            "Create setup guides for knowledge base and vector storage",
+            "Include AI model configuration and optimization guides",
+            "Document agent coordination patterns and best practices",
+            "Create troubleshooting guides for agent-related issues",
+            "Include performance tuning recommendations for AI features",
+            "Document API endpoints for agent interactions",
+            "Create user guides for AI-enhanced blog features"
+          ],
+          "quality_gates": ["documentation_completeness", "setup_validation", "deployment_readiness"],
+          "ai_documentation_requirements": [
+            "Agent architecture diagrams",
+            "Knowledge base schema documentation",
+            "AI model configuration guides",
+            "Performance monitoring setup",
+            "Scaling guidelines for agent systems"
+          ]
+        }
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Create Deployment Configuration",
+        "objective": {
+            "task": "Create Docker configuration and startup scripts to run the SmartBlog application",
+            "constraints": [
+            "Create Dockerfile for the Flask application",
+            "Add docker-compose.yml for easy deployment",
+            "Create startup script with proper dependencies",
+            "Include environment configuration"
+            ],
+            "quality_gates": ["docker_build", "docker_run", "config_validation"],
+            "depends_on": ["AI Documentation and Deployment Optimization"],
+            "file_structure": {
+            "Dockerfile": "Container definition for SmartBlogAI",
+            "docker-compose.yml": "Service orchestration for app and database",
+            "start.sh": "Entrypoint script to load env vars and launch app"
+            }
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Final AI System Validation",
+        "message": "✅ SmartBlog AI Platform complete! Validating all Agno agent systems and AI functionality...",
+        "pause": 2
+      }
+    ]
+  }

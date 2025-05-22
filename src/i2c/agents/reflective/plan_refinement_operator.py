@@ -37,6 +37,7 @@ class PlanRefinementOperator(ContextAwareOperator):
         rag_table=None,
         embed_model=None,
         max_reasoning_steps: int = 3,
+        session_state: dict | None = None,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -44,6 +45,7 @@ class PlanRefinementOperator(ContextAwareOperator):
             operation_type="plan_refinement",
             max_reasoning_steps=max_reasoning_steps,
             default_model_tier="highest",
+            session_state=session_state, 
         )
         self.rag_table = rag_table
         self.embed_model = embed_model

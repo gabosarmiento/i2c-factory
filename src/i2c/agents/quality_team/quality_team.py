@@ -343,7 +343,12 @@ def build_quality_team(session_state=None) -> Team:
     quality_lead = QualityLeadAgent()
     
     # Use shared session if provided, else initialize defaults
-    session_state = session_state or {"validation_results": None}
+    if session_state is None:
+        session_state = {
+            "validation_results": None,
+        }
+    else:
+        session_state.setdefault("validation_results", None)
     
     # Create the team
     return Team(

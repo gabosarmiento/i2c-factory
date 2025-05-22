@@ -14,17 +14,30 @@ from .rag_retrieval import retrieve_context_for_step
 from i2c.cli.controller import canvas
 
 def execute_modification_steps(
-    modification_plan, project_path, db, embed_model
+    *, 
+    modification_plan: List[Dict[str, Any]],
+    project_path: Path, 
+    db=None, 
+    embed_model=None,
+    session_state: Dict[str, Any] | None = None,
 ) -> Tuple[Dict[str, str], List[Path]]:
     print(f"=== EXECUTE_MODIFICATION_STEPS CALLED ===")
     print(f"Plan steps: {len(modification_plan)}")
     """
-    Iterates through the plan, retrieves context for each step, calls the modifier,
-    and collects results.
+    Execute all steps in `modification_plan` and return a map of modified files.
+
+    Parameters
+    ----------
+    session_state
+        A **single shared dictionary** created by the orchestrator.  If ``None``
+        we create a throw-away dict so unit tests that call this helper in
+        isolation still work.
     """
+    shared = session_state if session_state is not None else {}
+    
     canvas.step("Executing modification plan (generating code with step-specific context)...")
-    modified_code_map = {}
-    files_to_delete = []
+    modified_code_map: Dict[str, str] = {}
+    files_to_delete: List[Path] = []
     all_steps_succeeded = True  # Assume success initially
 
     # Check if database has any indexed chunks
@@ -85,6 +98,7 @@ def execute_modification_steps(
                     modification_step=step,
                     project_path=project_path,
                     retrieved_context=retrieved_context_step_str,
+                    session_state=shared,
                 )
 
                 # Patch → store unified diff; error dict → raise
@@ -101,6 +115,7 @@ def execute_modification_steps(
                 if action == 'create':
                     modified_code_map[file_rel_path] = unified_diff
                     canvas.success(f"  - Generated content for '{action}' on {file_rel_path}")
+                    shared.setdefault("modified_files", {})[file_rel_path] = unified_diff
                 else:
                     # For modify action, we need to apply the diff to the original content
                     try:
@@ -112,12 +127,22 @@ def execute_modification_steps(
                             
                         # Apply the diff to get the modified content
                         if unified_diff:
-                            # Use our new function to apply the diff
-                            modified_content = apply_diff_to_content(original_content, unified_diff)
+                            # Check if this is actual diff format or complete content
+                            # Diffs typically start with "---" or contain "@@ -" markers
+                            is_diff_format = unified_diff.startswith("---") or "@@ -" in unified_diff
                             
+                            if is_diff_format:
+                                # It's a real diff, apply it
+                                modified_content = apply_diff_to_content(original_content, unified_diff)
+                            else:
+                                # It's the complete content, use it directly
+                                modified_content = unified_diff
+                                canvas.info(f"  - Using complete content as modification for {file_rel_path}")
                             # Store the result in the code map
                             modified_code_map[file_rel_path] = modified_content
+                            shared.setdefault("modified_files", {})[file_rel_path] = modified_content
                             canvas.success(f"  - Modified content for '{action}' on {file_rel_path}")
+                           
                         else:
                             # No changes were made, use original content
                             modified_code_map[file_rel_path] = original_content
@@ -127,6 +152,7 @@ def execute_modification_steps(
                         canvas.error(f"  - Falling back to using raw diff")
                         # Fall back to using the raw diff
                         modified_code_map[file_rel_path] = unified_diff
+                        shared.setdefault("modified_files", {})[file_rel_path] = unified_diff
                 
             except Exception as mod_err:
                 # Catch error from modify_code call
@@ -260,4 +286,19 @@ def apply_diff_to_content(original_content: str, unified_diff: str) -> str:
         traceback.print_exc()
         return original_content
     
-    
+
+def debug_modification_step(step, original_content, modified_content):
+    import difflib
+    diff = difflib.unified_diff(
+        original_content.splitlines(), 
+        modified_content.splitlines(), 
+        fromfile='before', 
+        tofile='after'
+    )
+    with open("modifications_debug.log", "a") as f:
+        f.write(f"==== Modification for {step['file']} ====\n")
+        f.write(f"What: {step['what']}\n")
+        f.write(f"How: {step['how']}\n")
+        f.write("Diff:\n")
+        f.write("\n".join(diff))
+        f.write("\n\n")

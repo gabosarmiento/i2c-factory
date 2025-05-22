@@ -1,4 +1,5 @@
 # agents/modification_team/chunkers/ts_code.py
+
 import os
 import re
 import hashlib
@@ -17,16 +18,29 @@ except ImportError:
         def error(self, msg):   print(f"[ERROR_TS] {msg}")
     canvas = FallbackCanvas()
 
+
 class TSCodeChunkingStrategy(ChunkingStrategy):
     """
     Chunk TypeScript/JSX code into functions, classes, interfaces, and types using regex.
     """
-    def __init__(self, max_content_length: int = int(os.getenv('MAX_TS_CHUNK_CONTENT', '100000'))):
+
+    def __init__(
+        self,
+        chunk_size: Optional[int] = None,
+        overlap: Optional[int] = None,
+        max_content_length: int = int(os.getenv('MAX_TS_CHUNK_CONTENT', '100000'))
+    ):
+        self.chunk_size = chunk_size
+        self.overlap = overlap
         self.max_content_length = max_content_length
+
         # Matches function, class, interface, or type declarations
         self.pattern = re.compile(
             r"\b(function|class|interface|type)\s+(\w+)"
         )
+
+        if chunk_size or overlap:
+            canvas.warning(f"Ignoring chunk_size={chunk_size}, overlap={overlap} for TS chunker")
 
     def chunk(self, document: Document) -> List[Document]:
         content = document.content or ""
@@ -40,16 +54,20 @@ class TSCodeChunkingStrategy(ChunkingStrategy):
         chunks: List[Document] = []
         for match in self.pattern.finditer(content):
             start_idx = match.start()
+
             # Find opening brace or semicolon (for type aliases)
             brace_pos = content.find('{', match.end())
             semi_pos = content.find(';', match.end())
+
             if brace_pos >= 0 and (semi_pos < 0 or brace_pos < semi_pos):
                 # Block declaration
                 depth = 1
                 idx = brace_pos + 1
                 while idx < len(content) and depth > 0:
-                    if content[idx] == '{': depth += 1
-                    elif content[idx] == '}': depth -= 1
+                    if content[idx] == '{':
+                        depth += 1
+                    elif content[idx] == '}':
+                        depth -= 1
                     idx += 1
                 end_idx = idx
             elif semi_pos >= 0:
@@ -73,6 +91,7 @@ class TSCodeChunkingStrategy(ChunkingStrategy):
                 'language': 'typescript',
                 'file_path': document.meta_data.get('file_path', ''),
             }
+
             chunks.append(Document(content=snippet, meta_data=meta))
 
         canvas.info(f"Chunked {len(chunks)} TS blocks")

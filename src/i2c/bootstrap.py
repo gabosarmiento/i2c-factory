@@ -4,7 +4,6 @@ import builtins
 from pathlib import Path
 from i2c.llm_providers import initialize_groq_providers
 
-
 # Compute and inject PROJECT_ROOT
 PROJECT_ROOT = Path(__file__).parents[2].resolve()
 builtins.PROJECT_ROOT = PROJECT_ROOT
@@ -18,7 +17,7 @@ def initialize_environment():
     # 1) Tokenizer safety
      
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    builtins.llm_highest, builtins.llm_middle, builtins.llm_middle_alt, builtins.llm_small, builtins.llm_deepseek = initialize_groq_providers()
+    builtins.llm_highest, builtins.llm_middle, builtins.llm_middle_alt, builtins.llm_small, builtins.llm_deepseek, builtins.llm_ligthweight = initialize_groq_providers()
 
     # 2) Initialize a global budget manager if not already present
     if not hasattr(builtins, 'global_budget_manager'):

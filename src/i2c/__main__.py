@@ -1,5 +1,4 @@
 # src/i2c/__main__.py
-
 from i2c.bootstrap import initialize_environment
 
 # 1) one-time env & builtins setup

@@ -4,8 +4,29 @@
 EMBEDDING_MODEL: all-MiniLM-L6-v2
 MAX_FILE_SIZE: 102400          # bytes
 WORKERS: 8
-SKIP_DIRS: [.git, __pycache__, .venv, node_modules]
+SKIP_DIRS:
+  - .git               # VCS history
+  - __pycache__        # Python bytecode
+  - .venv              # Virtual‐envs
+  - venv               # alternative virtual‐env name
+  - node_modules       # JS deps
+  - build              # build outputs
+  - dist               # distribution packages
+  - target             # Maven/Gradle Java outputs
+  - bazel-bin          # Bazel build artifacts
+  - bazel-out          # Bazel intermediate files
+  - third_party        # Vendored code (often huge)
+  - vendor             # Go/Rust vendored deps
+  - .pytest_cache      # Pytest cache
+  - .mypy_cache        # Mypy cache
+  - .idea              # IDE project files (IntelliJ)
+  - .vscode            # VSCode settings
+  - coverage           # coverage reports
+  - logs               # runtime logs
+  - tmp                # temp files
 MIN_THRESHOLD: 0
+# Maximum number of lines before we switch to coarse chunking
+MAX_LINES_COARSE: 5000
 
 # ── reflective agent settings ──────────────────────────────────────
 reflective:

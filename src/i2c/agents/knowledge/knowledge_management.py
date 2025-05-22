@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List, Dict, Any
 import asyncio
-from i2c.agents.knowledge.knowledge_ingestor import KnowledgeIngestorAgent
+from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent as KnowledgeIngestorAgent
 from i2c.cli.controller import canvas
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler

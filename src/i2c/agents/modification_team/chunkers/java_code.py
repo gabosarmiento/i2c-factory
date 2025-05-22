@@ -1,4 +1,3 @@
-# agents/modification_team/chunkers/java_code.py
 import os
 import re
 import hashlib
@@ -23,12 +22,21 @@ except ImportError:
         def error(self, msg):   print(f"[ERROR_JAVA] {msg}")
     canvas = FallbackCanvas()
 
+
 class JavaCodeChunkingStrategy(ChunkingStrategy):
     """
     Chunk Java code into class/interface/enum definitions (naive regex-based),
     with an optional javalang fallback for parsing.
     """
-    def __init__(self, max_content_length: int = int(os.getenv('MAX_JAVA_CHUNK_CONTENT', '100000'))):
+
+    def __init__(
+        self,
+        chunk_size: Optional[int] = None,
+        overlap: Optional[int] = None,
+        max_content_length: int = int(os.getenv('MAX_JAVA_CHUNK_CONTENT', '100000'))
+    ):
+        self.chunk_size = chunk_size
+        self.overlap = overlap
         self.max_content_length = max_content_length
         # Matches class, interface, or enum declarations
         self.pattern = re.compile(r"\b(class|interface|enum)\s+(\w+)")
@@ -43,7 +51,7 @@ class JavaCodeChunkingStrategy(ChunkingStrategy):
             return [document]
 
         chunks: List[Document] = []
-        # If javalang available, could enhance parsing here
+
         if javalang is None:
             canvas.info("javalang not installed; using regex-based chunking.")
 

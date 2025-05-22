@@ -1,0 +1,239 @@
+{
+    "name": "Intelligent Data Pipeline with Agent Automation",
+    "description": "AI-powered ETL pipeline using Agno agent teams for intelligent data processing, adaptive workflows, and automated decision making",
+    "steps": [
+      {
+        "type": "initial_generation", 
+        "name": "Smart Pipeline",
+        "prompt": "Create an Agno-Powered Smart Pipeline: IntelligentDataPipeline using Agno agent teams for adaptive ETL operations, smart data quality management, and automated workflow optimization",
+        "project_name": "SmartPipeline"
+      },
+      {
+        "type": "narration",
+        "name": "Introduction",
+        "message": "🤖 Creating Agno-Powered Smart Pipeline: IntelligentDataPipeline",
+        "pause": 2
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Initial Smart Pipeline Generation",
+        "objective": {
+          "task": "Create an intelligent data processing pipeline called 'IntelligentDataPipeline' using Agno agent teams for adaptive ETL operations, smart data quality management, and automated workflow optimization",
+          "constraints": [
+            "Use Agno framework for all intelligent pipeline operations",
+            "Implement multi-agent system for different data processing stages",
+            "Use RAG for knowledge-enhanced data processing decisions",
+            "Implement agent memory for learning data patterns and optimizations",
+            "Support adaptive pipeline configuration based on data characteristics",
+            "Include intelligent error handling and recovery with agent coordination",
+            "Use machine learning for data quality assessment and improvement",
+            "Implement predictive analytics for pipeline performance optimization"
+          ],
+          "quality_gates": ["lint", "tests", "agno_integration", "data_intelligence", "pipeline_reliability"],
+          "application_type": "agno_data_pipeline",
+          "file_structure": {
+            "pipeline.py": "Main pipeline orchestrator with Agno agent coordination",
+            "agents/": "Agno agent definitions for intelligent data processing",
+            "extractors/": "Data extraction modules with AI enhancement",
+            "transformers/": "Intelligent data transformation with agent logic",
+            "loaders/": "Smart data loading with quality validation",
+            "intelligence/": "AI processing engines and learning systems",
+            "knowledge/": "Data pattern knowledge base and processing insights",
+            "config/": "Pipeline and Agno agent configuration",
+            "schemas/": "Data schemas with AI validation rules",
+            "utils/": "Utility functions with intelligent enhancement",
+            "tests/": "Pipeline and agent functionality testing",
+            "README.md": "Documentation for intelligent pipeline features"
+          }
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Intelligent Data Discovery Implementation",
+        "message": "🔍 Building AI Data Discovery Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Intelligent Data Discovery Team",
+        "objective": {
+          "task": "Create Agno agent team for intelligent data source discovery, schema inference, data profiling, and automated data catalog generation with learning capabilities",
+          "constraints": [
+            "Deploy Agno agent team for comprehensive data discovery",
+            "Implement schema inference agent with pattern recognition",
+            "Create data profiling agent for quality and characteristics analysis",
+            "Add relationship discovery agent for data lineage mapping",
+            "Use knowledge base for data source pattern recognition",
+            "Implement metadata extraction agent for comprehensive cataloging",
+            "Support automated data documentation generation",
+            "Include data sensitivity classification agent for compliance"
+          ],
+          "quality_gates": ["discovery_accuracy", "profiling_completeness", "catalog_quality"],
+          "depends_on": []
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Adaptive ETL Agent System Implementation",
+        "message": "⚙️ Creating Intelligent ETL Processing Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Adaptive ETL Agent System",
+        "objective": {
+          "task": "Build intelligent ETL system using Agno agents for adaptive data extraction, smart transformation logic, and optimized loading strategies with performance learning",
+          "constraints": [
+            "Use Agno agents for adaptive ETL workflow optimization",
+            "Implement extraction optimization agent for performance tuning",
+            "Create transformation intelligence agent for logic adaptation",
+            "Add loading strategy agent for efficient data persistence",
+            "Use machine learning for ETL process optimization",
+            "Implement error prediction and prevention agent",
+            "Support dynamic pipeline reconfiguration based on data patterns",
+            "Include resource utilization optimization agent"
+          ],
+          "quality_gates": ["etl_performance", "adaptation_effectiveness", "data_integrity"],
+          "depends_on": ["Intelligent Data Discovery Team"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Smart Data Quality Management Implementation",
+        "message": "✨ Building AI Data Quality Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Smart Data Quality Management",
+        "objective": {
+          "task": "Create intelligent data quality system using Agno agents for automated quality assessment, anomaly detection, data cleansing, and quality improvement recommendations",
+          "constraints": [
+            "Deploy Agno agents for comprehensive data quality management",
+            "Implement quality assessment agent with multi-dimensional analysis",
+            "Create anomaly detection agent with pattern learning",
+            "Add data cleansing agent with intelligent correction strategies",
+            "Use knowledge base for quality rule learning and adaptation",
+            "Implement data validation agent with contextual understanding",
+            "Support automated data repair with confidence scoring",
+            "Include quality monitoring agent for continuous assessment",
+            "Use predictive analytics for quality issue prevention"
+          ],
+          "quality_gates": ["quality_detection_accuracy", "cleansing_effectiveness", "validation_reliability"],
+          "depends_on": ["Adaptive ETL Agent System"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Intelligent Pipeline Orchestration Implementation",
+        "message": "🎭 Creating AI Pipeline Orchestration Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Intelligent Pipeline Orchestration",
+        "objective": {
+          "task": "Build smart pipeline orchestration system using Agno agents for automated workflow management, dynamic scheduling, resource optimization, and intelligent failure recovery",
+          "constraints": [
+            "Use Agno agents for intelligent pipeline workflow coordination",
+            "Implement scheduling optimization agent with workload balancing",
+            "Create resource management agent for efficient utilization",
+            "Add failure recovery agent with intelligent retry strategies",
+            "Use machine learning for pipeline performance prediction",
+            "Implement dependency resolution agent for workflow optimization",
+            "Support dynamic pipeline scaling based on data volume",
+            "Include cost optimization agent for resource efficiency"
+          ],
+          "quality_gates": ["orchestration_efficiency", "resource_optimization", "recovery_effectiveness"],
+          "depends_on": ["Smart Data Quality Management"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "AI-Powered Monitoring and Analytics Implementation",
+        "message": "📊 Building Intelligent Monitoring Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement AI-Powered Monitoring and Analytics",
+        "objective": {
+          "task": "Create intelligent monitoring system using Agno agents for real-time pipeline analysis, predictive maintenance, performance optimization, and automated reporting with insights generation",
+          "constraints": [
+            "Deploy Agno agents for comprehensive pipeline monitoring",
+            "Implement performance analysis agent with trend prediction",
+            "Create alerting intelligence agent for proactive notifications",
+            "Add insights generation agent for automated reporting",
+            "Use time-series analysis for pipeline performance forecasting",
+            "Implement root cause analysis agent for issue diagnosis",
+            "Support intelligent dashboard generation with agent coordination",
+            "Include optimization recommendation agent for continuous improvement"
+          ],
+          "quality_gates": ["monitoring_accuracy", "prediction_reliability", "insight_quality"],
+          "depends_on": ["Intelligent Pipeline Orchestration"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Testing Smart Pipeline Systems",
+        "message": "🧪 Testing Agno Agent Teams and Pipeline Intelligence",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Comprehensive Smart Pipeline Testing",
+        "objective": {
+          "task": "Create comprehensive testing suite for all Agno agents, intelligent pipeline functionality, data processing accuracy, and adaptive optimization systems with performance validation",
+          "constraints": [
+            "Test all Agno agent teams for pipeline operations",
+            "Validate intelligent data processing accuracy and quality",
+            "Test adaptive optimization effectiveness and learning",
+            "Verify orchestration intelligence and workflow efficiency",
+            "Test monitoring agent coordination and alerting accuracy",
+            "Validate pipeline performance with large-scale data processing",
+            "Include stress testing for concurrent agent operations",
+            "Test pipeline intelligence adaptation over time"
+          ],
+          "quality_gates": ["agent_test_coverage", "pipeline_performance_benchmarks", "intelligence_metrics"],
+          "ai_testing_requirements": [
+            "Data processing accuracy validation",
+            "Quality improvement effectiveness testing",
+            "Agent coordination performance benchmarks",
+            "Adaptive optimization accuracy metrics",
+            "Monitoring and alerting effectiveness validation"
+          ]
+        }
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Smart Pipeline Documentation and Deployment",
+        "objective": {
+          "task": "Create comprehensive documentation for intelligent pipeline features, agent configurations, data processing capabilities, and deployment guides for production AI-powered data systems",
+          "constraints": [
+            "Document all Agno agent configurations for pipeline operations",
+            "Create setup guides for intelligent data processing systems",
+            "Include configuration guides for adaptive optimization features",
+            "Document monitoring and alerting capabilities with agent coordination",
+            "Create troubleshooting guides for agent-related pipeline issues",
+            "Include performance optimization recommendations for intelligent features",
+            "Document data lineage and quality management workflows",
+            "Create scaling guides for production pipeline deployments"
+          ],
+          "quality_gates": ["documentation_completeness", "setup_clarity", "deployment_readiness"],
+          "ai_documentation_requirements": [
+            "Pipeline agent architecture diagrams",
+            "Intelligent processing workflow documentation",
+            "Adaptive optimization configuration guides",
+            "Performance monitoring setup for agent systems",
+            "Integration patterns for intelligent data pipelines"
+          ]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Final Smart Pipeline Validation",
+        "message": "✅ IntelligentDataPipeline complete! Validating all Agno agent systems and intelligent data processing...",
+        "pause": 2
+      }
+    ]
+  }

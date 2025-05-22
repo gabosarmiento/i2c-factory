@@ -32,7 +32,8 @@ def execute_modification_cycle(
     language: str,
     db=None,                      # LanceDBConnection
     embed_model=None,             # SentenceTransformerEmbedder
-    retrieved_context=None        # Optional pre-retrieved context
+    retrieved_context=None,        # Optional pre-retrieved context
+    session_state: dict | None = None
 ) -> dict:
     """
     Runs the full cycle for modifying an existing project using RAG.
@@ -48,6 +49,11 @@ def execute_modification_cycle(
     Returns:
         dict: Result with keys: success (bool), language (str), code_map (dict)
     """
+    # ─── shared state ───────────────────────────────────────────
+    shared: Dict[str, Any] = session_state if session_state is not None else {}
+    # (store a few useful facts for anyone downstream)
+    shared["project_path"] = str(project_path)
+    shared["user_request"] = user_request
     canvas.start_process(f"Modification Cycle for: {project_path.name}")
     result = {"success": False, "language": language, "code_map": None}
 
@@ -95,7 +101,7 @@ def execute_modification_cycle(
                 canvas.info(f"[RAG] Using provided context: {len(retrieved_context.split())} words")
             else:
                 canvas.warning("[RAG] Skipping context retrieval due to missing components")
-
+        shared["planner_ctx"] = planner_ctx 
         # ───── Step 3: Generate Modification Plan ──────────────────────
         modification_plan = generate_modification_plan(
             user_request=user_request,
@@ -106,7 +112,7 @@ def execute_modification_cycle(
         if not modification_plan:
             raise RuntimeError("Planning returned no steps.")
         canvas.info(f"[Plan] Generated {len(modification_plan)} steps.")
-
+        shared["modification_plan"] = modification_plan
         # ───── Step 4: Execute Each Modification Step ───────────────────
         try:
             # Pass the DB & embedder into the step executor so it can RAG‐retrieve step context
@@ -114,9 +120,11 @@ def execute_modification_cycle(
                 modification_plan=modification_plan,
                 project_path=project_path,
                 db=db,
-                embed_model=embed_model
+                embed_model=embed_model,
+                session_state=shared,
             )
             canvas.info(f"[Exec] Applied modifications to {len(modified_code_map)} files.")
+            shared["modified_files"] = modified_code_map
         except Exception as e:
             # Handle execution errors with more robust error management
             canvas.error(f"Error during modification execution: {e}")
@@ -157,7 +165,8 @@ def execute_modification_cycle(
         # ───── Step 5: Generate & Run Unit Tests ─────────────────────────
         final_code_map = generate_unit_tests(modified_code_map)
         canvas.info(f"[Tests] Generated/ran tests for {len(final_code_map)} modules.")
-
+        shared["unit_tests"] = final_code_map 
+        
         # ───── Step 5.5: Apply deduplication ────────────────────────────
         try:
             original_file_count = len(final_code_map)
@@ -170,7 +179,8 @@ def execute_modification_cycle(
         # ───── Step 6: Quality Checks ───────────────────────────────────
         if not run_quality_checks(final_code_map):
             canvas.warning("[Quality] Some quality checks failed—continuing anyway.")
-
+        shared["quality_results"] = {"passed": True}
+        
         # ───── Step 7: Write Files & Cleanup ────────────────────────────
         write_files_to_disk(final_code_map, project_path)
         delete_files(files_to_delete, project_path)

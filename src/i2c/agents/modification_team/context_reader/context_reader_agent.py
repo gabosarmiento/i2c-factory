@@ -20,10 +20,7 @@ if loaded_embedding_model is None:
         logging.error(f"Failed to load embedding model from rag_config: {e}")
         # No further fallbacks - we'll just have None and handle the case properly
         
-try:
-    from .context_indexer import ContextIndexer
-except ImportError:
-    ContextIndexer = None
+from .context_indexer import ContextIndexer
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -50,6 +47,8 @@ class ContextReaderAgent:
 
         # Initialize the indexer - don't create table here
         try:
+            logger.info(f"DEBUG: ContextIndexer = {ContextIndexer}, type = {type(ContextIndexer)}")
+
             self.indexer = ContextIndexer(self.project_path)
         except Exception as e:
             logger.error(f"Error creating ContextIndexer: {e}", exc_info=True)

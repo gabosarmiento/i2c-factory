@@ -1,0 +1,213 @@
+{
+    "name": "Cognitive REST API with Agent Intelligence",
+    "description": "Production-ready intelligent REST API using Agno agent teams for cognitive responses, adaptive learning, and intelligent data processing",
+    "steps": [
+      {
+        "type": "initial_generation", 
+        "name": "Cognitive REST API",
+        "prompt": "Create an Agno-Powered Cognitive API: IntelligentAPI Service using Agno agent teams for cognitive responses, intelligent data processing, and adaptive API behavior with learning capabilities",
+        "project_name": "CognitiveAPI"
+      },
+      {
+        "type": "narration",
+        "name": "Introduction",
+        "message": "🤖 Creating Agno-Powered Cognitive API: IntelligentAPI Service",
+        "pause": 2
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Initial Cognitive API Generation",
+        "objective": {
+          "task": "Create a production-ready intelligent REST API called 'IntelligentAPI' using Agno agent teams for cognitive responses, intelligent data processing, and adaptive API behavior with learning capabilities",
+          "constraints": [
+            "Use Agno framework for all intelligent API operations",
+            "Implement multi-agent system for different API functionalities",
+            "Use RAG for knowledge-enhanced API responses",
+            "Implement agent memory for learning API usage patterns",
+            "Follow REST principles with AI-enhanced endpoint intelligence",
+            "Use FastAPI with Agno agent integration",
+            "Include cognitive response generation with reasoning",
+            "Support adaptive API behavior based on usage patterns"
+          ],
+          "quality_gates": ["lint", "security", "tests", "agno_integration", "cognitive_functionality"],
+          "application_type": "agno_rest_api",
+          "file_structure": {
+            "main.py": "FastAPI application with Agno agent orchestration",
+            "agents/": "Agno agent definitions for API intelligence",
+            "api/": "API routes with cognitive agent integration",
+            "models/": "Pydantic models with AI enhancement schemas",
+            "services/": "Business logic powered by intelligent agents",
+            "cognitive/": "Cognitive processing and reasoning engines",
+            "knowledge/": "RAG knowledge base for intelligent responses",
+            "middleware/": "Custom middleware with agent-powered features",
+            "config.py": "API and Agno agent configuration",
+            "requirements.txt": "Dependencies including Agno framework",
+            "tests/": "API and agent functionality testing",
+            "docs/": "API documentation with AI feature descriptions"
+          }
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Intelligent Query Processing Implementation",
+        "message": "🧠 Building Cognitive Query Processing Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Intelligent Query Processing Team",
+        "objective": {
+          "task": "Create Agno agent team for intelligent query interpretation, intent recognition, natural language processing, and adaptive response generation with context awareness",
+          "constraints": [
+            "Deploy Agno agent team for multi-layered query analysis",
+            "Implement intent recognition agent for query understanding",
+            "Create context analysis agent for request interpretation",
+            "Add response optimization agent for personalized answers",
+            "Use knowledge base for enhanced query processing",
+            "Implement query complexity assessment agent",
+            "Support multi-turn conversation context maintenance",
+            "Include query expansion agent for comprehensive responses"
+          ],
+          "quality_gates": ["query_understanding_accuracy", "response_relevance", "context_preservation"],
+          "depends_on": []
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Adaptive Learning System Implementation",
+        "message": "🎯 Creating AI Learning and Adaptation Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Adaptive Learning System",
+        "objective": {
+          "task": "Build intelligent learning system using Agno agents for API usage pattern analysis, performance optimization, and adaptive behavior modification with continuous improvement",
+          "constraints": [
+            "Use Agno agents for continuous API behavior optimization",
+            "Implement usage pattern analysis agent for behavior insights",
+            "Create performance optimization agent for response improvement",
+            "Add personalization agent for user-specific adaptations",
+            "Use machine learning for API response optimization",
+            "Implement feedback processing agent for quality improvement",
+            "Support A/B testing for agent behavior optimization",
+            "Include predictive analytics for proactive API improvements"
+          ],
+          "quality_gates": ["learning_effectiveness", "adaptation_accuracy", "performance_improvement"],
+          "depends_on": ["Intelligent Query Processing Team"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Cognitive Data Processing Implementation",
+        "message": "📊 Building Intelligent Data Processing Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Cognitive Data Processing Team",
+        "objective": {
+          "task": "Create intelligent data processing system using Agno agents for smart data validation, semantic analysis, automated insights generation, and intelligent data transformation",
+          "constraints": [
+            "Deploy Agno agents for intelligent data processing workflows",
+            "Implement data validation agent with semantic understanding",
+            "Create insight generation agent for automated analytics",
+            "Add data transformation agent with intelligent mapping",
+            "Use knowledge graphs for data relationship analysis",
+            "Implement anomaly detection agent for data quality",
+            "Support real-time data processing with agent coordination",
+            "Include data enrichment agent for enhanced information"
+          ],
+          "quality_gates": ["data_processing_accuracy", "insight_quality", "transformation_reliability"],
+          "depends_on": ["Adaptive Learning System"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Intelligent API Security Implementation",
+        "message": "🔒 Creating AI-Powered Security Agent Team",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Implement Intelligent API Security System",
+        "objective": {
+          "task": "Build advanced security system using Agno agents for threat detection, adaptive authentication, behavioral analysis, and automated security response with learning capabilities",
+          "constraints": [
+            "Use Agno agents for multi-layered security intelligence",
+            "Implement threat detection agent with pattern recognition",
+            "Create behavioral analysis agent for anomaly detection",
+            "Add adaptive authentication agent for risk-based security",
+            "Use machine learning for security threat prediction",
+            "Implement incident response agent for automated reactions",
+            "Support real-time security monitoring with agent coordination",
+            "Include security learning agent for evolving threat adaptation"
+          ],
+          "quality_gates": ["security_effectiveness", "threat_detection_accuracy", "false_positive_rate"],
+          "depends_on": ["Cognitive Data Processing Team"]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Testing Cognitive API Systems",
+        "message": "🧪 Testing Agno Agent Teams and Cognitive API Functionality",
+        "pause": 1
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Comprehensive Cognitive API Testing",
+        "objective": {
+          "task": "Create comprehensive testing suite for all Agno agents, cognitive API functionality, intelligent processing, and adaptive learning systems with performance validation",
+          "constraints": [
+            "Test all Agno agent teams for API operations",
+            "Validate cognitive query processing accuracy and relevance",
+            "Test adaptive learning effectiveness and improvement rates",
+            "Verify intelligent data processing and insight generation",
+            "Test security agent coordination and threat detection",
+            "Validate API performance with concurrent agent operations",
+            "Include load testing for cognitive processing systems",
+            "Test API intelligence adaptation over time"
+          ],
+          "quality_gates": ["agent_test_coverage", "cognitive_performance_benchmarks", "intelligence_metrics"],
+          "ai_testing_requirements": [
+            "Cognitive response quality validation",
+            "Learning system effectiveness testing",
+            "Agent coordination performance benchmarks",
+            "Intelligence adaptation accuracy metrics",
+            "Security agent effectiveness validation"
+          ]
+        }
+      },
+      {
+        "type": "agentic_evolution",
+        "name": "Cognitive API Documentation and Deployment",
+        "objective": {
+          "task": "Create comprehensive documentation for cognitive API features, agent configurations, intelligent processing capabilities, and deployment guides for production AI-powered API systems",
+          "constraints": [
+            "Document all Agno agent configurations for API operations",
+            "Create API documentation with cognitive feature descriptions",
+            "Include setup guides for knowledge base and learning systems",
+            "Document intelligent processing workflows and capabilities",
+            "Create troubleshooting guides for agent-related API issues",
+            "Include performance optimization recommendations for cognitive features",
+            "Document API endpoints with intelligence enhancement details",
+            "Create integration guides for cognitive API consumption"
+          ],
+          "quality_gates": ["documentation_completeness", "api_clarity", "deployment_readiness"],
+          "ai_documentation_requirements": [
+            "Cognitive agent architecture diagrams",
+            "Intelligence processing setup guides",
+            "Adaptive learning configuration",
+            "Performance monitoring for cognitive systems",
+            "Integration patterns for intelligent APIs"
+          ]
+        }
+      },
+      {
+        "type": "narration",
+        "name": "Final Cognitive API Validation",
+        "message": "✅ IntelligentAPI Service complete! Validating all Agno agent systems and cognitive functionality...",
+        "pause": 2
+      }
+    ]
+  }

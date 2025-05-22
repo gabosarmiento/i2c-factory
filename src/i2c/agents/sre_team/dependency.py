@@ -43,7 +43,7 @@ class DependencyVerifierAgent:
         print(f"   🔎 Auditing {requirements_file}...")
         # Use -r for requirements file, --local to avoid creating virtual envs (faster but less isolated)
         # Use --json for parseable output, --exit-zero to prevent error on finding vulns
-        audit_cmd = ['pip-audit', '-r', str(requirements_file), '--local', '--json', '--exit-zero']
+        audit_cmd = ['pip-audit', '-r', str(requirements_file)]
 
         try:
             # Run in the project directory context for potentially better dependency resolution

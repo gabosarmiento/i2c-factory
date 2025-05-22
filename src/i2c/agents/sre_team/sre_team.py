@@ -198,7 +198,14 @@ def build_sre_team(session_state=None) -> Team:
     sre_lead = SRELeadAgent()
     
     # Use shared session if provided, else initialize defaults
-    session_state = session_state or {"validation_results": None}
+    if session_state is None:
+        session_state = {
+            "validation_results": None,
+        }
+    else:
+        # 2️⃣ Add only the keys this team needs (if they are missing)
+        session_state.setdefault("validation_results", None)
+ 
     
     # Create the team
     return Team(

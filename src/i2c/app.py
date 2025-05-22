@@ -10,6 +10,9 @@ from i2c.config.config import load_groq_api_key
 from i2c.agents.budget_manager import BudgetManagerAgent
 from i2c.workflow.scenario_processor import run_scenario, add_scenario_arguments
 
+from i2c.cli.diagnostic_cli import run_diagnostic_command
+from pathlib import Path
+
 import builtins
 
 def check_environment():
@@ -59,11 +62,44 @@ def main():
     # Add scenario arguments
     add_scenario_arguments(parser)
     
+    # Add diagnostic command arguments
+    parser.add_argument("--diagnose", action="store_true", 
+                       help="Run diagnostic analysis on the modification workflow")
+    parser.add_argument("--request", help="Modification request for diagnostic")
+    parser.add_argument("--project-path", help="Project path for diagnostic")
+    parser.add_argument("--language", "-l", default="python", 
+                       help="Programming language (default: python)")
+    parser.add_argument("--output-dir", "-o", default="./diagnostic_reports", 
+                       help="Output directory for reports")
+    parser.add_argument("--index", action="store_true", help="Index the codebase context")
+
      # Parse arguments
     args = parser.parse_args()
 
     if load_environment():
         initialize_budget_manager()
+        if args.index:
+            if not args.project_path:
+                print("Error: --project-path is required with --index")
+                return
+            from i2c.agents.modification_team.context_reader import ContextReaderAgent
+            from pathlib import Path
+            reader = ContextReaderAgent(Path(args.project_path))
+            result = reader.index_project_context()
+            print("\n✅ Indexing complete.")
+            for k, v in result.items():
+                print(f"{k}: {v}")
+            return
+        # Check if we should run a diagnostic
+        if args.diagnose:
+            if not args.request or not args.project_path:
+                print("Error: --request and --project-path are required with --diagnose")
+                return
+                
+            # Run diagnostic command
+            run_diagnostic_command(args)
+            return
+        
         # Check if we should run a scenario
         if hasattr(args, 'scenario') and args.scenario:
             print(f"Running scenario: {args.scenario}")

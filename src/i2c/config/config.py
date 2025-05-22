@@ -1,5 +1,16 @@
 
 import os
+import yaml
+from pathlib import Path
+
+def load_config(config_path: Path = None):
+    if config_path is None:
+        config_path = Path(__file__).resolve().parents[3]  / "config.yaml"
+
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    
+    return config
 
 def load_groq_api_key() -> str:
     """

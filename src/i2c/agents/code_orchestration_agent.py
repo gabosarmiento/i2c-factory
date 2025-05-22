@@ -8,16 +8,57 @@ from agno.agent import Agent
 from agno.team import Team
 
 # Import necessary team builders
-from i2c.agents.modification_team.code_modification_manager import build_code_modification_team
+from i2c.agents.modification_team.code_modification_manager_agno import build_code_modification_team
 from i2c.agents.quality_team.quality_team import build_quality_team
 from i2c.agents.sre_team.sre_team import build_sre_team
 from i2c.agents.knowledge.knowledge_team import build_knowledge_team
-from i2c.agents.reflective.plan_refinement_operator import PlanRefinementOperator
-from i2c.workflow.orchestration_team import OrchestrationResult
+from i2c.cli.controller import canvas
+from pydantic import BaseModel, Field
+from typing import Dict, Any, List
+
+class OrchestrationResult(BaseModel):
+    decision: str = Field(..., description="Final decision: approve or reject")
+    reason: str = Field(..., description="Explanation for the decision")
+    modifications: Dict[str, Any] = Field(..., description="Summary of code modifications")
+    quality_results: Dict[str, Any] = Field(..., description="Results of quality validations")
+    sre_results: Dict[str, Any] = Field(..., description="Results of operational checks")
+    reasoning_trajectory: List[Dict[str, Any]] = Field(..., description="Reasoning steps taken during the process")
+
 
 class CodeOrchestrationAgent(Agent):
-    def __init__(self, **kwargs):
-        super().__init__(
+    def __init__(
+        self, 
+        *, 
+        session_state: Optional[Dict[str, Any]] = None,  
+        **kwargs,
+    ) -> None:
+        # ------------------------------------------------------------------
+        # 1. Ensure we have a shared, mutable dict (create it exactly once)
+        # ------------------------------------------------------------------
+        if session_state is None:
+            session_state = {
+                "objective": None,
+                "project_path": None,
+                "task": None,
+                "constraints": None,
+                "quality_gates": None,
+                "analysis": None,
+                "modification_plan": None,
+                "modification_result": None,
+                "quality_results": None,
+                "sre_results": None,
+                "refinement_result": None,
+                "reasoning_trajectory": [],
+                # Fields relied upon by downstream teams
+                "modified_files": {},
+                "unit_tests": {},
+            }
+
+        self.session_state = session_state  # the single pointer
+        # ------------------------------------------------------------------
+        # 2. AGNO initialisation (name, model, role, instructions)
+        # ------------------------------------------------------------------
+        super().__init__(  # noqa: D401 – imperative style is fine
             name="CodeOrchestrator",
             model=llm_middle,
             role="Orchestrates the end-to-end code evolution process with reasoning and reflection",
@@ -52,27 +93,42 @@ class CodeOrchestrationAgent(Agent):
             "Do NOT output explanations, markdown, or narratives. Only return the JSON object."
         ])
 
-        if self.team_session_state is None:
-            self.team_session_state = {}
+        # placeholders; real teams wired in _initialize_teams()
+        self.knowledge_team: Team | None = None
+        self.modification_team: Team | None = None
+        self.quality_team: Team | None = None
+        self.sre_team: Team | None = None
 
+        # Build specialist teams with the shared state
         self._initialize_teams()
         self._initialize_reflective_operators()
 
     def _initialize_teams(self):
-        self.knowledge_team = None
-        self.modification_team = None
-        self.quality_team = None
-        self.sre_team = None
+        """Instantiate all specialist teams **with the same session_state**."""
+        shared = self.session_state  # one pointer for every team
+
+        self.knowledge_team = build_knowledge_team(session_state=shared)
+        self.modification_team = build_code_modification_team(session_state=shared)
+        self.quality_team = build_quality_team(session_state=shared)
+        self.sre_team = build_sre_team(session_state=shared)
 
     def _initialize_reflective_operators(self):
         """Initialize reflective operators (PlanRefinementOperator, IssueResolutionOperator)"""
-        shared_session = self.team_session_state
+        shared_session = self.session_state
+        if shared_session is None:
+            canvas.warning("Session state is None, skipping reflective operators")
+            return
+        
+        if shared_session is None or not all(k in shared_session for k in ["budget_manager", "rag_table", "embed_model"]):
+            canvas.warning("Missing session state keys, skipping reflective operators")
+            return
+        
         budget_manager = shared_session.get("budget_manager")
         rag_table = shared_session.get("rag_table")
         embed_model = shared_session.get("embed_model")
 
-        if not all (k in self.team_session_state for k in ["budget_manager", "rag_table", "embed_model"]):
-            raise ValueError("Missing one of budget_manager, rag_table, embed_model in session state")
+        # if not all (k in self.session_state for k in ["budget_manager", "rag_table", "embed_model"]):
+        #     raise ValueError("Missing one of budget_manager, rag_table, embed_model in session state")
 
         from i2c.agents.reflective.plan_refinement_operator import PlanRefinementOperator
         from i2c.agents.reflective.issue_resolution_operator import IssueResolutionOperator
@@ -81,17 +137,19 @@ class CodeOrchestrationAgent(Agent):
         self.plan_refinement_operator = PlanRefinementOperator(
             budget_manager=budget_manager,
             rag_table=rag_table,
-            embed_model=embed_model
+            embed_model=embed_model,
+            session_state=shared_session 
         )
 
         # Instantiate Issue Resolution Operator
         self.issue_resolution_operator = IssueResolutionOperator(
             budget_manager=budget_manager,
-            max_reasoning_steps=3
+            max_reasoning_steps=2,
+            session_state=shared_session 
         )
 
         # Optional: Log initialization
-        from i2c.cli.controller import canvas
+        
         canvas.info(f"Budget Manager: {budget_manager}")
         canvas.info(f"RAG Table: {rag_table}")
         canvas.info(f"Embed Model: {embed_model}")
@@ -140,47 +198,47 @@ class CodeOrchestrationAgent(Agent):
                 }
             
             # Store basic context in team session state
-            if self.team_session_state is not None:
-                self.team_session_state["objective"] = objective
-                self.team_session_state["project_path"] = str(project_path)
-                self.team_session_state["task"] = task
-                self.team_session_state["constraints"] = constraints
-                self.team_session_state["quality_gates"] = quality_gates
+            if self.session_state is not None:
+                self.session_state["objective"] = objective
+                self.session_state["project_path"] = str(project_path)
+                self.session_state["task"] = task
+                self.session_state["constraints"] = constraints
+                self.session_state["quality_gates"] = quality_gates
                 
                 # Initialize reasoning trajectory if not exists
-                if "reasoning_trajectory" not in self.team_session_state:
-                    self.team_session_state["reasoning_trajectory"] = []
+                if "reasoning_trajectory" not in self.session_state:
+                    self.session_state["reasoning_trajectory"] = []
             
             # 2. Initialize teams with fresh state for this execution
             await self._setup_teams(project_path)
             
             # 3. Project context analysis phase
             analysis_result = await self._analyze_project_context(project_path, task)
-            if self.team_session_state is not None:
-                self.team_session_state["analysis"] = analysis_result
+            if self.session_state is not None:
+                self.session_state["analysis"] = analysis_result
             
             # 4. Modification planning phase
             modification_plan = await self._create_modification_plan(
                 task, constraints, analysis_result
             )
-            if self.team_session_state is not None:
-                self.team_session_state["modification_plan"] = modification_plan
+            if self.session_state is not None:
+                self.session_state["modification_plan"] = modification_plan
             
             # 5. Modification execution phase
             modification_result = await self._execute_modifications(modification_plan)
-            if self.team_session_state is not None:
-                self.team_session_state["modification_result"] = modification_result
+            if self.session_state is not None:
+                self.session_state["modification_result"] = modification_result
             
             # 6. Validation phase (quality and operational checks)
             quality_results = await self._run_quality_checks(
                 modification_result, quality_gates
             )
-            if self.team_session_state is not None:
-                self.team_session_state["quality_results"] = quality_results
+            if self.session_state is not None:
+                self.session_state["quality_results"] = quality_results
             
             sre_results = await self._run_operational_checks(modification_result)
-            if self.team_session_state is not None:
-                self.team_session_state["sre_results"] = sre_results
+            if self.session_state is not None:
+                self.session_state["sre_results"] = sre_results
             
             # 7. Reflection and refinement if needed
             if not quality_results.get('passed', False) or not sre_results.get('passed', False):
@@ -188,28 +246,28 @@ class CodeOrchestrationAgent(Agent):
                 refinement_result = await self._refine_based_on_feedback(
                     modification_plan, quality_results, sre_results
                 )
-                if self.team_session_state is not None:
-                    self.team_session_state["refinement_result"] = refinement_result
+                if self.session_state is not None:
+                    self.session_state["refinement_result"] = refinement_result
                 
                 # Re-execute with refined plan
                 refined_modification_result = await self._execute_modifications(
                     refinement_result.get('refined_plan', {})
                 )
-                if self.team_session_state is not None:
-                    self.team_session_state["refined_modification_result"] = refined_modification_result
+                if self.session_state is not None:
+                    self.session_state["refined_modification_result"] = refined_modification_result
                 
                 # Re-validate
                 refined_quality_results = await self._run_quality_checks(
                     refined_modification_result, quality_gates
                 )
-                if self.team_session_state is not None:
-                    self.team_session_state["refined_quality_results"] = refined_quality_results
+                if self.session_state is not None:
+                    self.session_state["refined_quality_results"] = refined_quality_results
                 
                 refined_sre_results = await self._run_operational_checks(
                     refined_modification_result
                 )
-                if self.team_session_state is not None:
-                    self.team_session_state["refined_sre_results"] = refined_sre_results
+                if self.session_state is not None:
+                    self.session_state["refined_sre_results"] = refined_sre_results
                 
                 # Use refined results for final decision
                 quality_results = refined_quality_results
@@ -228,15 +286,15 @@ class CodeOrchestrationAgent(Agent):
                 "modifications": modification_result.get('summary', {}),
                 "quality_results": quality_results,
                 "sre_results": sre_results,
-                "reasoning_trajectory": self.team_session_state.get("reasoning_trajectory", []) if self.team_session_state else []
+                "reasoning_trajectory": self.session_state.get("reasoning_trajectory", []) if self.session_state else []
             }
             
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            if self.team_session_state is not None:
-                self.team_session_state["error"] = str(e)
-                self.team_session_state["error_details"] = error_details
+            if self.session_state is not None:
+                self.session_state["error"] = str(e)
+                self.session_state["error_details"] = error_details
             
             return {
                 "decision": "reject",
@@ -246,7 +304,7 @@ class CodeOrchestrationAgent(Agent):
     
     async def _setup_teams(self, project_path: Path):
         """Initialize all specialized teams for this execution"""
-        shared_session = self.team_session_state  # Ensure shared dict ref
+        shared_session = self.session_state  # Ensure shared dict ref
 
         # Initialize teams with shared session state
         self.knowledge_team = build_knowledge_team(session_state=shared_session)
@@ -320,12 +378,12 @@ class CodeOrchestrationAgent(Agent):
             
             # Create an objective for the bridge function
             objective = {
-                "task": self.team_session_state.get("task", ""),
+                "task": self.session_state.get("task", ""),
                 "language": self._detect_primary_language(plan)
             }
             
             # Call the bridge function
-            project_path = Path(self.team_session_state.get("project_path", ""))
+            project_path = Path(self.session_state.get("project_path", ""))
             result = bridge_agentic_and_workflow_modification(objective, project_path)
             
             # Add success status to reasoning
@@ -405,7 +463,7 @@ class CodeOrchestrationAgent(Agent):
         success, result = self.plan_refinement_operator.execute(
             initial_plan=json.dumps(plan),
             user_request=user_request,
-            project_path=self.team_session_state.get("project_path", ""),
+            project_path=self.session_state.get("project_path", ""),
             language=self._detect_primary_language(plan)
         )
 
@@ -437,7 +495,7 @@ class CodeOrchestrationAgent(Agent):
                     file_content=file_content,
                     file_path=file_path,
                     language=self._detect_language_from_file(file_path),
-                    project_path=Path(self.team_session_state.get("project_path", ""))
+                    project_path=Path(self.session_state.get("project_path", ""))
                 )
 
                 if success:
@@ -548,10 +606,10 @@ class CodeOrchestrationAgent(Agent):
     
     def _add_reasoning_step(self, step_name: str, description: str, success: bool = None):
         """Add a step to the reasoning trajectory"""
-        if self.team_session_state is None:
+        if self.session_state is None:
             return
         
-        trajectory = self.team_session_state.get("reasoning_trajectory", [])
+        trajectory = self.session_state.get("reasoning_trajectory", [])
         
         step = {
             "step": step_name,
@@ -563,7 +621,7 @@ class CodeOrchestrationAgent(Agent):
             step["success"] = success
             
         trajectory.append(step)
-        self.team_session_state["reasoning_trajectory"] = trajectory
+        self.session_state["reasoning_trajectory"] = trajectory
 
 def build_orchestration_team(session_state=None) -> Team:
     """
@@ -576,23 +634,6 @@ def build_orchestration_team(session_state=None) -> Team:
         Team: Configured orchestration team
     """
     
-    
-    # Use provided session_state or initialize defaults
-    session_state = session_state or {
-        "objective": None,
-        "project_path": None,
-        "task": None,
-        "constraints": None,
-        "quality_gates": None,
-        "analysis": None,
-        "modification_plan": None,
-        "modification_result": None,
-        "quality_results": None,
-        "sre_results": None,
-        "refinement_result": None,
-        "reasoning_trajectory": []
-    }
-    
       # Extract constraints from session state if available
     constraints = []
     if session_state.get("objective") and "constraints" in session_state["objective"]:
@@ -601,7 +642,7 @@ def build_orchestration_team(session_state=None) -> Team:
         constraints = session_state["constraints"]
 
     # Log constraints for debugging
-    from i2c.cli.controller import canvas
+    
     if constraints:
         canvas.info(f"Orchestration team initialized with {len(constraints)} constraints:")
         for i, constraint in enumerate(constraints):
@@ -615,7 +656,7 @@ def build_orchestration_team(session_state=None) -> Team:
             constraint_instructions.append(f"- {constraint}")
     
     # Create the code orchestration agent
-    orchestrator = CodeOrchestrationAgent()
+    orchestrator = CodeOrchestrationAgent(session_state=session_state)
     
     # Create the team
     return Team(

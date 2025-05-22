@@ -1,0 +1,96 @@
+{
+  "name": "Create Tic Tac Toe App",
+  "description": "Generate a complete Tic Tac Toe application with AI agents",
+  "steps": [
+    {
+      "type": "narration",
+      "name": "Welcome",
+      "message": "🎮 Creating an AI-powered Tic Tac Toe application...",
+      "pause": 2
+    },
+    {
+      "type": "initial_generation",
+      "name": "Generate Base Application",
+      "prompt": "Create a complete Tic Tac Toe web application using Streamlit where two AI agents can play against each other. The app should include: 1) A visual game board with 3x3 grid, 2) Support for multiple AI models (OpenAI GPT, Anthropic Claude, Google Gemini), 3) Real-time game state management, 4) Move validation and game rules, 5) Interactive player selection interface, 6) Move history tracking, 7) Game controls (start, pause, reset), 8) Responsive UI with custom CSS styling. The application should be modular with separate files for game logic, AI agents, utilities, and the main Streamlit app.",
+      "project_name": "ai_tic_tac_toe"
+    },
+    {
+      "type": "knowledge",
+      "name": "Add LLM Provider Info",
+      "doc_path": "./src/i2c/llm_providers.py",
+      "doc_type": "Code Documentation",
+      "framework": "I2C Factory",
+      "version": "1.0"
+    },
+    {
+      "type": "knowledge_folder",
+      "name": "Add Agno Core Library", 
+      "folder_path": "/projects/agno-main/libs/agno/agno",
+      "doc_type": "Framework Library",
+      "framework": "Agno",
+      "version": "1.4.4",
+      "recursive": true
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Enhance Game Logic",
+      "objective": {
+        "task": "Improve the game logic to include proper win detection, draw conditions, and move validation. Add support for different game modes and ensure the game state is properly managed throughout the gameplay.",
+        "constraints": [
+          "Maintain clean separation between game logic and UI",
+          "Ensure thread-safe game state management",
+          "Add comprehensive error handling for invalid moves",
+          "Include proper game reset functionality"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution", 
+      "name": "Add AI Agent Integration",
+      "objective": {
+        "task": "Integrate AI agents that can play Tic Tac Toe strategically using Agno Agent framework and the existing I2C Factory LLM providers. Create Agno agents that use the configured Groq models (llm_highest, llm_middle, llm_small) from llm_providers.py. Each agent should analyze the board state, make intelligent moves, and employ different strategies.",
+        "constraints": [
+          "Use the existing llm_providers.py imports (from llm_providers import llm_highest, llm_middle, llm_small)",
+          "Leverage Groq models that are already configured",
+          "Implement proper agent coordination and turn management",
+          "Add retry logic for API failures",
+          "Ensure agents follow game rules strictly",
+          "Include strategy variation between different model tiers"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Create Interactive UI",
+      "objective": {
+        "task": "Build a beautiful Streamlit interface with real-time board visualization, player selection controls, game status display, and move history tracking. Include responsive design and custom CSS for enhanced user experience.",
+        "constraints": [
+          "Use modern CSS styling with dark theme support",
+          "Ensure responsive design for different screen sizes",
+          "Add smooth animations and visual feedback",
+          "Include clear game status indicators"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add Requirements and Setup",
+      "objective": {
+        "task": "Create proper requirements.txt based on the I2C Factory dependencies, setup scripts, and documentation for easy installation and deployment. The app should work out-of-the-box after cloning the I2C Factory repo and setting GROQ_API_KEY. Include environment setup, API key configuration, and running instructions.",
+        "constraints": [
+          "Use dependencies that are already in the I2C Factory project",
+          "Require only GROQ_API_KEY environment variable",
+          "Include clear setup instructions for the cloned repo",
+          "Make it work with the existing poetry environment",
+          "Provide example .env configuration"
+        ]
+      }
+    },
+    {
+      "type": "narration",
+      "name": "Completion",
+      "message": "🎉 AI Tic Tac Toe application created successfully! You can now run it with 'streamlit run app.py'",
+      "pause": 3
+    }
+  ]
+}

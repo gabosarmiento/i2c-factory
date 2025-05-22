@@ -19,7 +19,7 @@ from i2c.agents.modification_team.context_utils import _embedding_model as embed
 
 # Import knowledge agents (these will need to be created)
 from i2c.agents.knowledge.knowledge_retriever import KnowledgeRetrieverAgent
-from i2c.agents.knowledge.knowledge_ingestor import KnowledgeIngestorAgent
+from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent as KnowledgeIngestorAgent
 
 def detect_framework(project_path: Path) -> Optional[str]:
     """Detect the framework used in a project by analyzing files."""

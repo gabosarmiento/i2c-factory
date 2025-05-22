@@ -37,6 +37,9 @@ esprima               = "^4.0.1"
 libcst = "^1.7.0"
 scipy = {version = "^1.15.3", allow-prereleases = true}
 psutil = "^7.0.0"
+openai = "^1.79.0"
+pylint = "^3.3.7"
+chonkie = "^1.0.7"
 
 [tool.poetry.group.dev.dependencies]
 pytest      = "^7.0.0"

@@ -321,12 +321,14 @@ class ContextAwareOperator(ABC):
         operation_type: str,
         max_reasoning_steps: int = 5,
         default_model_tier: str = "middle",
+        session_state: dict | None = None,
     ) -> None:
         self.budget_manager = budget_manager
         self.operation_type = operation_type
         self.max_reasoning_steps = max_reasoning_steps
         self.default_model_tier = default_model_tier
         self.operation_id = f"{operation_type}_{uuid.uuid4().hex[:8]}"
+        self.session_state = session_state if session_state is not None else {}
 
         self.cost_tracker = PhaseCostTracker(budget_manager, self.operation_id, operation_type)
         self.budget_scope = BudgetScope(budget_manager, self.operation_id, operation_type, model_tier=default_model_tier)
