@@ -1,4 +1,4 @@
-# src/i2c/agents/quality_team/quality_team.py (Updated)
+# src/i2c/agents/quality_team/quality_team.py
 
 from typing import Dict, Any, List
 from pathlib import Path
@@ -28,6 +28,7 @@ from i2c.agents.quality_team.integration_checker_agent import integration_checke
 
 # Import new Enterprise Static Analyzer
 from i2c.agents.quality_team.enterprise_static_analyzer import enterprise_static_analyzer
+from i2c.agents.quality_team.utils.language_detector import LanguageDetector
 
 class QualityLeadAgent(Agent):
     """Lead agent for the Quality Team that coordinates quality checks"""
@@ -51,8 +52,61 @@ class QualityLeadAgent(Agent):
                 "You are the lead of the Quality Team, responsible for code quality checks.",
                 "Your job is to coordinate quality validation of code changes.",
                 "You must ensure that the code meets quality standards and adheres to best practices.",
-                "Work with your team to check static analysis, code review, and integration issues.",
-                "Apply enterprise-grade quality gates like flake8, black, mypy, pytest, and bandit for Python code.",
+                
+                # Message parsing instructions
+                "You will receive messages in this format:",
+                "{",
+                "  'instruction': 'Validate the modified files using all relevant quality gates.',",
+                "  'project_path': '/path/to/project',",
+                "  'modified_files': {'file.py': 'content...', 'file2.js': 'content...'},",
+                "  'quality_gates': ['python', 'javascript']  # Optional presets or specific tools"
+                "}",
+                
+                # Processing instructions
+                "When you receive a message, follow these steps:",
+                "1. Identify the project_path, modified_files, and quality_gates from the message",
+                "1.5 If 'quality_gates' is missing or empty, use your internal logic to decide which gates apply based on the file types.",
+                "2. Detect the programming languages used in the modified files",
+                "3. Use file types to determine appropriate language presets or resolve any explicit tools from 'quality_gates'",
+                "4. You must call your validate_changes(...) function using the values from the message.",
+                "5. Format the response according to the expected structure",
+                
+                # Language detection
+                "Use the file extensions and contents to determine appropriate quality gates:",
+                "- .py files: Use Python quality gates (flake8, black, mypy, pytest, bandit)",
+                "- .js files: Use JavaScript quality gates (eslint)",
+                "- .ts files: Use TypeScript quality gates (eslint, tsc)",
+                "- .go files: Use Go quality gates (govet)",
+                "- .java files: Use Java quality gates (checkstyle)",
+                
+                # Resource optimization
+                "Be smart about resource usage:",
+                "- Only run quality gates appropriate for the detected languages",
+                "- Prioritize critical checks (syntax, type) before style checks",
+                "- Skip tools that would fail based on missing dependencies",
+                
+                # Response formatting
+                "Return results in this format:",
+                "{",
+                "  'passed': boolean,  # Overall pass/fail status",
+                "  'issues': [string],  # List of identified issues",
+                "  'gate_results': {  # Results per quality gate",
+                "    'flake8': {'passed': boolean, 'issues': [string]},",
+                "    'eslint': {'passed': boolean, 'issues': [string]},",
+                "    'tsc': {'passed': boolean, 'issues': [string]}"
+                "  }",
+                "}",
+                
+                # Detailed process instructions
+                "For each validation request:",
+                "1. Run static analysis to identify lint errors",
+                "2. Run enterprise checks based on quality gates",
+                "3. Request code review from the reviewer agent",
+                "4. Check integration issues across files",
+                "5. Apply guardrails to decide if the changes are acceptable",
+                "6. Compile all results and return a structured response",
+                "Always return a dictionary as a response, even if validation fails or inputs are incomplete.",
+                "If a tool fails, still include it in 'gate_results' with 'passed': False and an error message.",
                 "If any quality issues are found, provide clear feedback for correction."
             ],
             **kwargs
@@ -60,6 +114,33 @@ class QualityLeadAgent(Agent):
         # Initialize team session state if needed
         if self.team_session_state is None:
             self.team_session_state = {}
+
+    async def _decide_quality_gate_presets_with_llm(
+        self, project_path: Path, modified_files: Dict[str, str]
+    ) -> List[str]:
+        """
+        Use the LLM to decide which preset quality gates to apply.
+        It returns keys like 'python', 'javascript', 'minimal', etc.
+        """
+        message = (
+            "Given the following modified files, decide which quality gate presets to apply.\n"
+            "Available presets:\n"
+            f"{list(self.ENTERPRISE_QUALITY_GATES.keys())}\n\n"
+            "Return a Python list like: ['python', 'security']\n\n"
+            "Files:\n" +
+            "\n".join(modified_files.keys())
+        )
+
+        response = await self.model.aask(message)
+        try:
+            import ast
+            result = ast.literal_eval(response.content.strip())
+            if isinstance(result, list):
+                return result
+        except Exception:
+            pass
+        return []
+
     
     async def validate_changes(
         self, project_path: Path, modified_files: Dict[str, str], quality_gates: List[str] = None
@@ -76,11 +157,16 @@ class QualityLeadAgent(Agent):
         Returns:
             Dictionary with validation results
         """
+        if quality_gates is None:
+            presets = await self._decide_quality_gate_presets_with_llm(project_path, modified_files)
+            quality_gates = presets
+        
+        # Resolve quality gates to specific tools if preset names are used
+        resolved_gates = self._resolve_quality_gates(quality_gates)
+        canvas.info(f"[QualityLeadAgent] Running quality gates: {resolved_gates}")
+
         # This function will coordinate the Quality team activities
         try:
-            # Resolve quality gates to specific tools if preset names are used
-            resolved_gates = self._resolve_quality_gates(quality_gates)
-            
             # 1. Static analysis check
             static_analysis_results = await self._run_static_analysis(
                 project_path, modified_files, resolved_gates
@@ -123,26 +209,75 @@ class QualityLeadAgent(Agent):
             issues.extend(enterprise_results.get("issues", []))
             issues.extend(guardrail_results.get("reasons", []))
             
+            # Prepare gate results for response
+            gate_results = {}
+            
+            # Add enterprise results to gate_results
+            if enterprise_results and "detailed_results" in enterprise_results:
+                detailed = enterprise_results.get("detailed_results", {})
+                if "issues" in detailed:
+                    for file_path, file_issues in detailed.get("issues", {}).items():
+                        for gate, gate_result in file_issues.items():
+                            if gate not in gate_results:
+                                gate_results[gate] = {
+                                    "passed": True,
+                                    "issues": []
+                                }
+                            
+                            # If this gate has issues, mark it as failed
+                            if gate_result.get("issues", []):
+                                gate_results[gate]["passed"] = False
+                                gate_results[gate]["issues"].extend(
+                                    [f"{file_path}: {issue}" for issue in gate_result.get("issues", [])]
+                                )
+            
+            # Add static analysis to gate_results
+            if static_analysis_results and static_analysis_results.get("summary", {}).get("total_lint_errors", 0) > 0:
+                gate_results["static_analysis"] = {
+                    "passed": static_analysis_results.get("passed", True),
+                    "issues": static_analysis_results.get("issues", [])
+                }
+            
+            # Add review results to gate_results
+            if review_results and review_results.get("issues", []):
+                gate_results["code_review"] = {
+                    "passed": review_results.get("passed", True),
+                    "issues": review_results.get("issues", [])
+                }
+            
+            # Add integration results to gate_results
+            if integration_results and integration_results.get("issues", []):
+                gate_results["integration"] = {
+                    "passed": integration_results.get("passed", True),
+                    "issues": integration_results.get("issues", [])
+                }
+            
             # Store results in the team session state
             if self.team_session_state is not None:
                 self.team_session_state["validation_results"] = {
                     "passed": all_passed,
+                    "issues": issues,
+                    "gate_results": gate_results,
                     "static_analysis_results": static_analysis_results,
                     "enterprise_results": enterprise_results,
                     "review_results": review_results,
                     "integration_results": integration_results,
-                    "guardrail_results": guardrail_results,
-                    "issues": issues
+                    "guardrail_results": guardrail_results
                 }
             
+            # Return the structured response expected by the orchestrator
             return {
                 "passed": all_passed,
-                "static_analysis_results": static_analysis_results,
-                "enterprise_results": enterprise_results,
-                "review_results": review_results,
-                "integration_results": integration_results,
-                "guardrail_results": guardrail_results,
-                "issues": issues
+                "issues": issues,
+                "gate_results": gate_results,
+                "summary": {
+                    "total_issues": len(issues),
+                    "static_analysis": static_analysis_results.get("passed", True),
+                    "enterprise_checks": enterprise_results.get("passed", True),
+                    "code_review": review_results.get("passed", True),
+                    "integration": integration_results.get("passed", True),
+                    "guardrails": guardrail_results.get("decision") == "CONTINUE"
+                }
             }
             
         except Exception as e:
@@ -151,7 +286,8 @@ class QualityLeadAgent(Agent):
                 "passed": False,
                 "error": f"Quality team error: {str(e)}",
                 "error_details": traceback.format_exc(),
-                "issues": [f"Quality validation error: {str(e)}"]
+                "issues": [f"Quality validation error: {str(e)}"],
+                "gate_results": {}
             }
             
             # Store error in the team session state
@@ -212,6 +348,7 @@ class QualityLeadAgent(Agent):
         self, project_path: Path, modified_files: Dict[str, str], quality_gates: List[str]
     ) -> Dict[str, Any]:
         """Run enterprise quality gate checks"""
+
         try:
             # Use enterprise_static_analyzer to run quality gates
             enterprise_results = enterprise_static_analyzer.analyze_files(modified_files, quality_gates)
@@ -243,8 +380,21 @@ class QualityLeadAgent(Agent):
     async def _run_code_review(self, project_path: Path, modified_files: Dict[str, str]) -> Dict[str, Any]:
         """Run code review"""
         try:
+            # Determine the dominant language in modified files
+            language_counts = {}
+            for file_path in modified_files:
+                lang = LanguageDetector.detect_language(file_path)
+                if lang != 'unknown':
+                    language_counts[lang] = language_counts.get(lang, 0) + 1
+            
+            # Find the most common language
+            dominant_language = max(language_counts.items(), key=lambda x: x[1])[0] if language_counts else "python"
+            
             # Use reviewer_agent to review code
-            structured_goal = {"objective": "Ensure code quality", "language": "Python"}  # Simplified
+            structured_goal = {
+                "objective": "Ensure code quality", 
+                "language": dominant_language.capitalize()  # Provide actual language
+            }
             review_feedback = reviewer_agent.review_code(structured_goal, modified_files)
             
             # Simple check for potential issues in the review
@@ -359,6 +509,27 @@ def build_quality_team(session_state=None) -> Team:
         instructions=[
             "You are the Quality Team, responsible for code quality.",
             "Follow the lead of the QualityLead agent, who will coordinate your activities.",
+            
+            # Message parsing instructions
+            "You will receive messages with validation requests like:",
+            "{",
+            "  'instruction': 'Validate the modified files using all relevant quality gates.',",
+            "  'project_path': '/path/to/project',",
+            "  'modified_files': {'file.py': 'content...', 'file2.js': 'content...'},",
+            "  'quality_gates': ['flake8', 'mypy'] # Optional quality gates",
+            "}",
+            
+            # Response formatting
+            "Your response should include:",
+            "{",
+            "  'passed': boolean,  # Overall pass/fail status",
+            "  'issues': [string],  # List of identified issues",
+            "  'gate_results': {  # Results per quality gate",
+            "    'flake8': {'passed': boolean, 'issues': [string]},",
+            "    'mypy': {'passed': boolean, 'issues': [string]}",
+            "  }",
+            "}",
+            
             "Ensure that code changes meet quality standards and adhere to best practices.",
             "Apply enterprise-grade quality gates like flake8, black, mypy, pytest, and bandit for Python code.",
             "Focus on issues that would affect readability, maintainability, or correctness."

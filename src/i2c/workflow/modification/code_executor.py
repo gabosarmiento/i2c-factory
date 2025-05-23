@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Tuple
 # Import necessary agent INSTANCES
 #from i2c.agents.modification_team import code_modifier_agent
 # replace legacy code modifier agent
-from i2c.workflow.modification.code_modifier_adapter import apply_modification
+# from i2c.workflow.modification.code_modifier_adapter import apply_modification
 
 # Import RAG retrieval function for per-step context
 from .rag_retrieval import retrieve_context_for_step
@@ -94,6 +94,9 @@ def execute_modification_steps(
 
             # Call modifier agent, passing the specific retrieved context
             try:
+                from i2c.agents.modification_team.code_modification_manager_agno import apply_modification
+                # Enable retrieval tools
+                shared["use_retrieval_tools"]= True
                 patch_or_err = apply_modification(
                     modification_step=step,
                     project_path=project_path,

@@ -20,9 +20,7 @@ def get_rag_table() -> Any | None:
 def get_embed_model():
     try:
         from agno.embedder.sentence_transformer import SentenceTransformerEmbedder
-        return SentenceTransformerEmbedder(
-            model="all-MiniLM-L6-v2"
-        )
+        return SentenceTransformerEmbedder("all-MiniLM-L6-v2")
     except Exception as e:
         print(f"[RAG] No embedding model: {e}")
         return None

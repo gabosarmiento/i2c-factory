@@ -62,13 +62,22 @@ async def execute_agentic_evolution(
     # Once final, parse the content safely
     content = getattr(result, "content", None)
     if hasattr(content, "dict"):
-        return content.dict()
+        return {
+            "result": content.dict(),
+            "session_state": session_state
+        }
     elif isinstance(content, dict):
-        return content
+        return {
+            "result": content,
+            "session_state": session_state
+        }
     elif isinstance(content, str):
         if is_json_like_string(content):
             try:
-                return json.loads(content)
+                return {
+                    "result": json.loads(content),
+                    "session_state": session_state
+                }
             except json.JSONDecodeError as e:
                 raise ValueError(f"Failed to parse JSON from string: {e}")
         else:

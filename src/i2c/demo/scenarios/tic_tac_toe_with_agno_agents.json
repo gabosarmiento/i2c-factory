@@ -24,7 +24,7 @@
     },
     {
       "type": "knowledge_folder",
-      "name": "Add Agno Core Library", 
+      "name": "Add Agno Core Library",
       "folder_path": "/projects/agno-main/libs/agno/agno",
       "doc_type": "Framework Library",
       "framework": "Agno",
@@ -45,7 +45,7 @@
       }
     },
     {
-      "type": "agentic_evolution", 
+      "type": "agentic_evolution",
       "name": "Add AI Agent Integration",
       "objective": {
         "task": "Integrate AI agents that can play Tic Tac Toe strategically using Agno Agent framework and the existing I2C Factory LLM providers. Create Agno agents that use the configured Groq models (llm_highest, llm_middle, llm_small) from llm_providers.py. Each agent should analyze the board state, make intelligent moves, and employ different strategies.",

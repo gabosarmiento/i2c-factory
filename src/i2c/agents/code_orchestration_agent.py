@@ -414,22 +414,58 @@ class CodeOrchestrationAgent(Agent):
                 "error": str(e),
                 "stack_trace": stack_trace
             } 
+            
     async def _run_quality_checks(
         self, modification_result: Dict[str, Any], quality_gates: List[str]
     ) -> Dict[str, Any]:
-        """Run quality checks on the modifications"""
-        # Track this step in the reasoning trajectory
-        self._add_reasoning_step("Quality Validation", 
-                               f"Running quality checks: {', '.join(quality_gates)}")
-        
-        # This is a placeholder - implement actual Quality Team integration
-        quality_results = {
-            "passed": True,
-            "gate_results": {},
-            "issues": []
-        }
-        
-        return quality_results
+        """Delegate quality validation to the Quality Team using agentic instructions."""
+        self._add_reasoning_step("Quality Validation", f"Delegating quality checks: {', '.join(quality_gates)}")
+
+        try:
+            project_path = Path(self.session_state.get("project_path", ""))
+            modified_files = modification_result.get("modified_files", {})
+
+            if not self.quality_team:
+                raise ValueError("Quality team not initialized.")
+
+            message_payload = {
+                "instruction": (
+                    "Validate the provided code changes using all relevant quality gates "
+                    "based on the modified files and languages involved."
+                ),
+                "project_path": str(project_path),
+                "modified_files": modified_files,
+                "quality_gates": quality_gates
+            }
+            canvas.info(f"[CodeOrchestrator] Message to Quality Team:\n{json.dumps(message_payload, indent=2)}")
+
+            result = await self.quality_team.arun(message=message_payload)
+            canvas.info(f"[CodeOrchestrator] Raw result from Quality Team: {result}")
+            
+            content = getattr(result, "content", result)
+            output = content.dict() if hasattr(content, "dict") else content
+            
+            canvas.info(f"[CodeOrchestrator] Parsed output from Quality Team: {output}")
+
+            return {
+                "passed": output.get("passed", False),
+                "issues": output.get("issues", []),
+                "gate_results": output.get("gate_results", {}),
+                "summary": output.get("summary", {}),
+                "debug_raw_output": output  
+            }
+
+        except Exception as e:
+            canvas.error(f"[CodeOrchestrationAgent] Quality delegation failed: {e}")
+            import traceback
+            canvas.error(traceback.format_exc())
+            return {
+                "passed": False,
+                "issues": [f"Quality delegation error: {str(e)}"],
+                "gate_results": {},
+                "summary": {}
+            }
+
     
     async def _run_operational_checks(self, modification_result: Dict[str, Any]) -> Dict[str, Any]:
         """Run operational checks on the modifications"""

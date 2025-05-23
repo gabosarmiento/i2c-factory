@@ -49,8 +49,8 @@ def initialize_groq_providers():
     )
     
     llm_deepseek = Groq(
-        # id="deepseek-r1-distill-llama-70b",
-        id="llama-3.1-8b-instant",
+        id="deepseek-r1-distill-llama-70b",
+        #id="llama-3.1-8b-instant",
         api_key=GROQ_API_KEY,
         temperature=0.4,
     )

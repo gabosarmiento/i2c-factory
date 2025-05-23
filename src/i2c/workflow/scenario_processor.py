@@ -138,18 +138,22 @@ class ScenarioProcessor:
             # Step 3: update our processor’s session_state for next time
             if isinstance(result, dict) and "session_state" in result:
                 self.session_state = result["session_state"]
+                
+            # Extract the actual agent output
+            output = result.get("result", {})
+            
             # Display the result
-            if result.get("decision") == "approve":
-                canvas.success(f"✅ Evolution approved: {result.get('reason', 'No reason provided')}")
+            if output.get("decision") == "approve":
+                canvas.success(f"✅ Evolution approved: {output.get('reason', 'No reason provided')}")
                 
                 # Show modifications
-                modifications = result.get("modifications", {})
+                modifications = output.get("modifications", {})
                 if modifications:
                     canvas.info("📝 Modifications:")
                     for file_path, summary in modifications.items():
                         canvas.info(f"  - {file_path}: {summary}")
             else:
-                canvas.error(f"❌ Evolution rejected: {result.get('reason', 'No reason provided')}")
+                canvas.error(f"❌ Evolution rejected: {output.get('reason', 'No reason provided')}")
                 
             # Calculate operation cost
             end_tokens, end_cost = self.budget_manager.get_session_consumption()
@@ -426,7 +430,25 @@ class ScenarioProcessor:
                 cost=op_cost
             )
             
-            proc = json.loads(getattr(resp, 'content', str(resp)))
+            # Get the response content and extract JSON from markdown if needed
+            response_content = getattr(resp, 'content', str(resp))
+
+            # Extract JSON from markdown code fences if present
+            import re
+            json_pattern = r'```(?:json)?\s*\n?(.*?)\n?```'
+            json_match = re.search(json_pattern, response_content, re.DOTALL)
+
+            if json_match:
+                json_str = json_match.group(1).strip()
+                canvas.info("Extracted JSON from markdown code fences")
+            else:
+                json_str = response_content.strip()
+                canvas.info("Using response content directly")
+
+            canvas.info(f"JSON to parse: {json_str[:100]}...")
+
+            # Parse the extracted JSON
+            proc = json.loads(json_str)
             if not (isinstance(proc, dict) and "objective" in proc and "language" in proc):
                 raise ValueError("Invalid JSON from LLM")
             

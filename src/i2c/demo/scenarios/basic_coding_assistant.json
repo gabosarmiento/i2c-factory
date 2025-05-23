@@ -1,0 +1,160 @@
+{
+  "name": "Create AI-Powered Code Assistant with Smart Retrieval",
+  "description": "Build a sophisticated AI coding assistant using agentic evolution approach",
+  "steps": [
+    {
+      "type": "narration",
+      "name": "Demo Introduction",
+      "message": "🚀 Welcome to the I2C Factory AI Code Assistant Demo!\n\nWe're building a sophisticated coding assistant using agentic evolution approach that:\n• Understands your entire codebase through intelligent retrieval\n• Fetches real examples from GitHub repositories\n• Writes context-aware code using multiple AI agents\n• Adapts to your project's coding patterns automatically\n\nLet's create something amazing! 🌟",
+      "pause": 5
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Bootstrap AI Code Assistant Project",
+      "objective": {
+        "task": "Create a complete AI-powered code assistant application from scratch. Build a comprehensive Streamlit application with the following structure: 1) Main app.py with modern chat interface, 2) agents/ directory with specialized AI agents (code_analyst.py, code_implementer.py, github_researcher.py, test_generator.py), 3) retrieval/ directory with vector search and GitHub integration, 4) utils/ directory with code analysis tools, 5) requirements.txt with all dependencies. The app should have a beautiful dark-themed interface where users can request code generation and see multiple AI agents collaborating in real-time.",
+        "project_path": "/Users/caroco/Gabo-Dev/idea_to_code_factory/output/ai_code_assistant",
+        "constraints": [
+          "Create complete working application from scratch",
+          "Use Streamlit for the main interface with modern styling",
+          "Implement modular architecture with separate agent files",
+          "Include proper error handling and logging throughout",
+          "Use the existing I2C Factory LLM providers (llm_highest, llm_middle, llm_small)",
+          "Ensure all generated code follows Python best practices",
+          "Create a production-ready application structure"
+        ]
+      }
+    },
+    {
+      "type": "knowledge",
+      "name": "Add I2C Factory LLM Providers",
+      "doc_path": "./src/i2c/llm_providers.py",
+      "doc_type": "LLM Configuration",
+      "framework": "I2C Factory",
+      "version": "1.0"
+    },
+    {
+      "type": "knowledge",
+      "name": "Add Groq-Compatible Tools",
+      "doc_path": "./src/i2c/agents/modification_team/groq_compatible_tools.py",
+      "doc_type": "Retrieval Tools",
+      "framework": "I2C Factory", 
+      "version": "1.0"
+    },
+    {
+      "type": "knowledge_folder",
+      "name": "Add Agno Agent Framework",
+      "folder_path": "/projects/agno-main/libs/agno/agno",
+      "doc_type": "Agent Framework",
+      "framework": "Agno",
+      "version": "1.4.4",
+      "recursive": true
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Intelligent Code Analyst Agent",
+      "objective": {
+        "task": "Enhance agents/code_analyst.py to create a sophisticated Code Analyst Agent that can understand codebases, identify patterns, analyze project structure, and provide intelligent insights. This agent should use the groq_compatible_tools for vector search and project context analysis to understand the user's codebase deeply. The agent should be implemented using the Agno framework and leverage the I2C Factory LLM providers.",
+        "constraints": [
+          "Use the existing groq_compatible_tools (vector_retrieve, get_project_context, github_fetch)",
+          "Leverage llm_highest for complex analysis tasks using Agno Agent framework",
+          "Implement pattern recognition for coding styles and conventions",
+          "Provide detailed analysis reports with actionable insights",
+          "Include dependency analysis and architectural understanding",
+          "Make recommendations based on best practices and existing code patterns",
+          "Integrate seamlessly with the main Streamlit interface"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution", 
+      "name": "Build Smart Code Implementer Agent",
+      "objective": {
+        "task": "Develop agents/code_implementer.py as an advanced Code Implementer Agent that writes high-quality, context-aware code based on analysis from the Code Analyst. This agent should fetch relevant examples from GitHub, understand project patterns, and generate code that seamlessly integrates with existing codebases. Use Agno framework for implementation.",
+        "constraints": [
+          "Use analysis insights from the Code Analyst Agent",
+          "Leverage github_fetch to find relevant implementation examples",
+          "Use vector_retrieve to understand existing code patterns",
+          "Generate code that matches project style and conventions",
+          "Include proper error handling and edge case considerations",
+          "Provide multiple implementation options when appropriate",
+          "Integrate with Streamlit UI for real-time code display"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build GitHub Research Agent", 
+      "objective": {
+        "task": "Create agents/github_researcher.py as a GitHub Research Agent that intelligently searches for and fetches relevant code examples, best practices, and implementation patterns from popular repositories. This agent should understand the context of what's being built and find the most relevant examples using the I2C Factory tools.",
+        "constraints": [
+          "Use github_fetch tool to access popular repositories",
+          "Implement intelligent repository selection based on context",
+          "Focus on high-quality, well-maintained repositories",
+          "Extract and summarize relevant code patterns",
+          "Provide multiple examples from different sources",
+          "Include license information and attribution",
+          "Use Agno framework for agent implementation"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Test Generation Agent",
+      "objective": {
+        "task": "Develop agents/test_generator.py as a Test Generation Agent that creates comprehensive test suites for generated code. This agent should understand testing patterns in the project, generate various types of tests (unit, integration, edge cases), and ensure high code coverage.",
+        "constraints": [
+          "Analyze existing test patterns using vector_retrieve",
+          "Generate tests that match project testing conventions",
+          "Include unit tests, integration tests, and edge case testing",
+          "Use appropriate testing frameworks (pytest, unittest, etc.)",
+          "Generate meaningful test data and scenarios",
+          "Include performance and security test considerations",
+          "Integrate with the main application workflow"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Enhance Streamlit Interface and Integration",
+      "objective": {
+        "task": "Polish the main app.py Streamlit interface to showcase the multi-agent collaboration beautifully. The interface should provide real-time visibility into agent thinking, beautiful code display, interactive features, and an overall professional user experience. Also enhance retrieval/ and utils/ modules for production readiness.",
+        "constraints": [
+          "Create a modern, dark-themed interface with professional styling",
+          "Show real-time agent activity and thought processes in the UI", 
+          "Include interactive code viewing with syntax highlighting",
+          "Add agent conversation displays and collaboration visualization",
+          "Implement progress indicators and status updates",
+          "Include copy-to-clipboard and export functionality",
+          "Add responsive design for different screen sizes",
+          "Create collapsible sections for organized information display",
+          "Ensure all agents work together seamlessly end-to-end"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add Production Polish and Documentation",
+      "objective": {
+        "task": "Add final production-level polish including comprehensive error handling, proper requirements.txt, setup instructions, impressive demo scenarios, configuration options, and comprehensive documentation. Ensure the system works reliably end-to-end and creates a 'wow' experience.",
+        "constraints": [
+          "Ensure all agents work together smoothly without errors",
+          "Add robust error handling and recovery mechanisms",
+          "Create clear documentation and setup instructions",
+          "Include impressive demo scenarios and example queries",
+          "Add configuration options and customization features",
+          "Ensure compatibility with the I2C Factory environment",
+          "Include performance optimizations and caching",
+          "Create a README.md with clear instructions and examples",
+          "Add example .env configuration and requirements.txt"
+        ]
+      }
+    },
+    {
+      "type": "narration",
+      "name": "Demo Complete",
+      "message": "🎉 **WOW! Your AI Code Assistant is Ready!**\n\n**What you just built:**\n✨ Multi-agent AI system that understands codebases\n🔍 Intelligent retrieval from your code + GitHub examples\n🤖 Agents that collaborate like a senior dev team\n💻 Beautiful interface showing real-time AI thinking\n🚀 Production-ready code generation with context awareness\n\n**Try these impressive demos:**\n• 'Build a REST API with authentication using FastAPI'\n• 'Create a data pipeline with error handling and logging'\n• 'Add caching and optimization to my existing function'\n• 'Generate comprehensive tests for my new module'\n\n**Run with:** `cd output/ai_code_assistant && streamlit run app.py`\n\nWatch as multiple AI agents collaborate, search your codebase, fetch GitHub examples, and generate perfect code that matches your project! 🌟",
+      "pause": 8
+    }
+  ]
+}
