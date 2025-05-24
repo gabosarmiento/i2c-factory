@@ -199,6 +199,33 @@ def _apply_modular_modification(
             try:
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 file_path.write_text(modified, encoding="utf-8")
+                # Auto-generate unit tests for the modified code
+                try:
+                    from i2c.agents.sre_team.unit_test import unit_test_generator
+                    
+                    # Only generate tests for Python files that aren't already test files
+                    if file_rel.endswith('.py') and not file_rel.startswith('test_'):
+                        # Create a temporary code map for test generation
+                        temp_code_map = {file_rel: modified}
+                        
+                        # Generate unit tests
+                        code_map_with_tests = unit_test_generator.generate_tests(temp_code_map)
+                        
+                        # Write any new test files that were generated
+                        for test_file_path, test_content in code_map_with_tests.items():
+                            if test_file_path != file_rel:  # Skip the original file
+                                test_full_path = project_path / test_file_path
+                                test_full_path.parent.mkdir(parents=True, exist_ok=True)
+                                test_full_path.write_text(test_content, encoding="utf-8")
+                                
+                                # Also track test files in session state
+                                session_state.setdefault("modified_files", {})[test_file_path] = test_content
+                                
+                                print(f"✅ Auto-generated unit test: {test_file_path}")
+                                
+                except Exception as e:
+                    print(f"⚠️ Unit test generation failed (non-blocking): {e}")
+                    
             except Exception as e:
                 print(f"Write error: {e}")
         session_state.setdefault("modified_files", {})[file_rel] = modified

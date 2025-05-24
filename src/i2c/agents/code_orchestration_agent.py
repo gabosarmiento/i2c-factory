@@ -466,22 +466,128 @@ class CodeOrchestrationAgent(Agent):
                 "summary": {}
             }
 
-    
     async def _run_operational_checks(self, modification_result: Dict[str, Any]) -> Dict[str, Any]:
-        """Run operational checks on the modifications"""
-        # Track this step in the reasoning trajectory
-        self._add_reasoning_step("Operational Validation", 
-                               "Running SRE checks for operational stability")
+        """Run operational checks directly using SRE agents (no message delegation)"""
+        self._add_reasoning_step("Operational Validation", "Running direct SRE checks for deployment safety.")
         
-        # This is a placeholder - implement actual SRE Team integration
-        sre_results = {
-            "passed": True,
-            "check_results": {},
-            "issues": []
+        try:
+            project_path = Path(self.session_state.get("project_path", ""))
+            modified_files = modification_result.get("modified_files", {})
+            
+            # Import SRE agents directly
+            from i2c.agents.sre_team.sandbox import sandbox_executor
+            from i2c.agents.sre_team.dependency import dependency_verifier
+            
+            # Direct operational checks (no LLM calls)
+            issues = []
+            check_results = {}
+            
+            # 1. Sandbox check (syntax + tests)
+            try:
+                # Detect language
+                language = self._detect_primary_language_from_files(modified_files)
+                success, message = sandbox_executor.execute(project_path, language)
+                check_results["sandbox"] = {
+                    "passed": success,
+                    "issues": [] if success else [f"Sandbox: {message}"]
+                }
+                if not success:
+                    issues.append(f"Sandbox: {message}")
+            except Exception as e:
+                check_results["sandbox"] = {
+                    "passed": False,
+                    "issues": [f"Sandbox error: {str(e)}"]
+                }
+                issues.append(f"Sandbox error: {str(e)}")
+            
+            # 2. Dependency check
+            try:
+                dependency_issues = dependency_verifier.check_dependencies(project_path)
+                check_results["dependencies"] = {
+                    "passed": len(dependency_issues) == 0,
+                    "issues": dependency_issues
+                }
+                issues.extend(dependency_issues)
+            except Exception as e:
+                check_results["dependencies"] = {
+                    "passed": False,
+                    "issues": [f"Dependency error: {str(e)}"]
+                }
+                issues.append(f"Dependency error: {str(e)}")
+            
+            # 3. Version control check (simple)
+            try:
+                git_dir = project_path / ".git"
+                git_ready = git_dir.exists()
+                check_results["version_control"] = {
+                    "passed": True,  # Always pass, just informational
+                    "issues": [] if git_ready else ["Project not under version control"]
+                }
+            except Exception as e:
+                check_results["version_control"] = {
+                    "passed": True,  # Don't fail on this
+                    "issues": [f"Version control check error: {str(e)}"]
+                }
+            
+            # Overall result
+            all_passed = len(issues) == 0
+            
+            # Add success/failure reasoning
+            if all_passed:
+                self._add_reasoning_step("Operational Validation", "All SRE checks passed", success=True)
+            else:
+                self._add_reasoning_step("Operational Validation", f"Found {len(issues)} operational issues", success=False)
+            
+            return {
+                "passed": all_passed,
+                "issues": issues,
+                "check_results": check_results,
+                "summary": {
+                    "total_issues": len(issues),
+                    "deployment_ready": all_passed,
+                    "checks_run": len(check_results)
+                }
+            }
+            
+        except Exception as e:
+            canvas.error(f"[CodeOrchestrationAgent] Direct SRE checks failed: {e}")
+            import traceback
+            canvas.error(traceback.format_exc())
+            
+            self._add_reasoning_step("Operational Validation", f"SRE checks failed: {str(e)}", success=False)
+            
+            return {
+                "passed": False,
+                "issues": [f"SRE check error: {str(e)}"],
+                "check_results": {},
+                "summary": {"total_issues": 1, "deployment_ready": False}
+            }
+
+    def _detect_primary_language_from_files(self, modified_files: Dict[str, str]) -> str:
+        """Detect primary language from file extensions"""
+        extensions = {}
+        for file_path in modified_files:
+            ext = Path(file_path).suffix
+            if ext:
+                extensions[ext] = extensions.get(ext, 0) + 1
+        
+        if not extensions:
+            return "python"  # Default
+        
+        # Find most common extension
+        most_common_ext = max(extensions.items(), key=lambda x: x[1])[0]
+        
+        # Map to language
+        language_map = {
+            ".py": "python",
+            ".js": "javascript", 
+            ".ts": "typescript",
+            ".java": "java",
+            ".go": "go"
         }
         
-        return sre_results
-    
+        return language_map.get(most_common_ext, "python")
+
     async def _refine_based_on_feedback(
     self, plan: Dict[str, Any], quality_results: Dict[str, Any], sre_results: Dict[str, Any]
 ) -> Dict[str, Any]:
