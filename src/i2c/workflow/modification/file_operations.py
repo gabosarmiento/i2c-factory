@@ -50,22 +50,13 @@ def write_files_to_disk(code_map: dict[str, str], destination_dir: Path):
             canvas.info(f"Content length for {rel_path}: {len(content)} chars")
         
         for relative_path_str, content in code_map.items():
-            # 🔧 Skip entries that look like folders (no file extension)
-            if "." not in Path(relative_path_str).name and not relative_path_str.endswith("."):
-                canvas.info(f"   ⚠️ Skipping directory-like entry from code_map: {relative_path_str}")
-                continue
             full_path = destination_dir / relative_path_str
             
             # Skip empty or near-empty content if the file already exists
             if full_path.exists() and len(content.strip()) < 5:
                 canvas.warning(f"   ⚠️ Skipping write of empty content to existing file: {full_path}")
                 continue
-            
-            # Skip entries that look like directories, not files
-            if "." not in Path(relative_path_str).name:
-                canvas.info(f"✅ Ensuring directory exists: {full_path}")
-                full_path.mkdir(parents=True, exist_ok=True)
-                continue  # Don't try to write content into a folder    
+                
             canvas.info(f"   -> Writing {full_path} ({len(content)} chars)")
             
             try:
