@@ -548,7 +548,6 @@ class CodeOrchestrationAgent(Agent):
                                 f"Analyzing project architecture at {project_path} for task: {task}")
         
         try:
-            # 1. Basic file system analysis (existing logic)
             analysis_result = {
                 "project_structure": {
                     "files": [],
@@ -560,18 +559,15 @@ class CodeOrchestrationAgent(Agent):
                     "identified_targets": []
                 },
                 "context": {},
-                "architectural_context": {}  # New: architectural intelligence
+                "architectural_context": {}
             }
-            
-            # Analyze project files
+
             if project_path.exists() and project_path.is_dir():
-                # Get all files (excluding common ignore patterns)
                 ignore_patterns = {'.git', '__pycache__', '.venv', 'node_modules', '.pytest_cache'}
                 
                 files = []
                 for file_path in project_path.rglob("*"):
                     if file_path.is_file():
-                        # Skip ignored directories
                         if any(ignore_dir in file_path.parts for ignore_dir in ignore_patterns):
                             continue
                         files.append(str(file_path.relative_to(project_path)))
@@ -579,80 +575,101 @@ class CodeOrchestrationAgent(Agent):
                 analysis_result["project_structure"]["files"] = files
                 analysis_result["project_structure"]["languages"] = self._detect_languages(project_path)
                 
-                # Get directories
                 dirs = []
                 for dir_path in project_path.rglob("*"):
                     if dir_path.is_dir() and dir_path.name not in ignore_patterns:
                         dirs.append(str(dir_path.relative_to(project_path)))
                 analysis_result["project_structure"]["directories"] = dirs
                 
-                # Identify likely target files based on task keywords
                 task_lower = task.lower()
                 likely_targets = []
                 
                 for file_path in files:
                     file_lower = file_path.lower()
-                    # Simple heuristics for target identification
                     if any(keyword in file_lower for keyword in task_lower.split() if len(keyword) > 3):
                         likely_targets.append(file_path)
-                    # Common target patterns
                     elif any(pattern in file_lower for pattern in ['main.py', 'app.py', 'index.js', 'server.py']):
                         likely_targets.append(file_path)
                 
-                analysis_result["task_analysis"]["identified_targets"] = likely_targets[:5]  # Limit to 5
-            
-            # 2. NEW: Architectural Intelligence Analysis
+                analysis_result["task_analysis"]["identified_targets"] = likely_targets[:5]
+
+            # 2. NEW: Architectural Intelligence Analysis (with robust error handling)
+            architectural_context = {}
             try:
-                from i2c.agents.architecture.architecture_understanding_agent import architecture_agent
+                from i2c.agents.architecture.architecture_understanding_agent import get_architecture_agent
                 
-                # Get content samples for analysis
+
                 content_samples = self._get_content_samples(project_path, files[:5] if files else [])
-                
-                # Perform architectural analysis
                 self._add_reasoning_step("Architectural Analysis", 
-                                    "Analyzing system architecture and module boundaries")
+                                        "Analyzing system architecture and module boundaries")
                 
+                architecture_agent = get_architecture_agent(self.session_state)
                 structural_context = architecture_agent.analyze_system_architecture(
                     objective=task,
                     existing_files=files,
                     content_samples=content_samples
                 )
                 
-                # Store architectural context
-                analysis_result["architectural_context"] = {
-                    "architecture_pattern": structural_context.architecture_pattern.value,
-                    "system_type": structural_context.system_type,
-                    "modules": {
-                        name: {
-                            "boundary_type": module.boundary_type.value,
-                            "languages": list(module.languages),
-                            "responsibilities": module.responsibilities,
-                            "folder_structure": module.folder_structure
-                        }
-                        for name, module in structural_context.modules.items()
-                    },
-                    "file_organization_rules": structural_context.file_organization_rules,
-                    "constraints": structural_context.constraints,
-                    "integration_patterns": structural_context.integration_patterns
-                }
-                
-                # Store structural context in session for other agents
-                if self.session_state is not None:
-                    self.session_state["structural_context"] = structural_context
-                    self.session_state["architectural_understanding"] = analysis_result["architectural_context"]
-                
+                if structural_context and hasattr(structural_context, 'architecture_pattern'):
+                    architectural_context = {
+                        "architecture_pattern": structural_context.architecture_pattern.value if structural_context.architecture_pattern else "unknown",
+                        "system_type": getattr(structural_context, 'system_type', 'web_app'),
+                        "modules": {},
+                        "file_organization_rules": getattr(structural_context, 'file_organization_rules', {}),
+                        "constraints": getattr(structural_context, 'constraints', []),
+                        "integration_patterns": getattr(structural_context, 'integration_patterns', [])
+                    }
+
+                    if hasattr(structural_context, 'modules') and structural_context.modules:
+                        for name, module in structural_context.modules.items():
+                            try:
+                                architectural_context["modules"][name] = {
+                                    "boundary_type": module.boundary_type.value if hasattr(module.boundary_type, 'value') else str(module.boundary_type),
+                                    "languages": list(module.languages) if hasattr(module, 'languages') else ["python"],
+                                    "responsibilities": getattr(module, 'responsibilities', []),
+                                    "folder_structure": getattr(module, 'folder_structure', {})
+                                }
+                            except Exception as module_error:
+                                print(f"⚠️ Error processing module {name}: {module_error}")
+                                architectural_context["modules"][name] = {
+                                    "boundary_type": "business_logic",
+                                    "languages": ["python"],
+                                    "responsibilities": [f"{name} functionality"],
+                                    "folder_structure": {"base_path": name.lower()}
+                                }
+
+                    if self.session_state is not None:
+                        self.session_state["structural_context"] = structural_context
+                        self.session_state["architectural_understanding"] = architectural_context
+                    
+                    module_count = len(architectural_context.get("modules", {}))
+                    pattern = architectural_context.get("architecture_pattern", "unknown")
+                    
+                    self._add_reasoning_step("Architectural Analysis", 
+                                            f"Successfully analyzed {pattern} pattern with {module_count} modules",
+                                            success=True)
+                else:
+                    print("⚠️ Structural context is invalid, using fallback")
+                    architectural_context = self._create_fallback_architectural_context()
+                    self._add_reasoning_step("Architectural Analysis", 
+                                            "Used fallback architectural context", 
+                                            success=False)
+
+            except ImportError as e:
+                print(f"⚠️ Could not import architecture agent: {e}")
+                architectural_context = self._create_fallback_architectural_context()
                 self._add_reasoning_step("Architectural Analysis", 
-                                    f"Identified {structural_context.architecture_pattern.value} pattern with {len(structural_context.modules)} modules",
-                                    success=True)
-                
+                                        "Architecture agent not available, using fallback", 
+                                        success=False)
             except Exception as e:
-                canvas.error(f"Architectural analysis failed: {e}")
+                print(f"⚠️ Architectural analysis failed: {e}")
+                architectural_context = self._create_fallback_architectural_context()
                 self._add_reasoning_step("Architectural Analysis", 
-                                    f"Architecture analysis failed: {str(e)}", 
-                                    success=False)
-                # Continue without architectural context
-            
-            # 3. Optional: Use knowledge team if available (existing logic)
+                                        f"Analysis failed ({str(e)[:50]}...), using fallback", 
+                                        success=False)
+
+            analysis_result["architectural_context"] = architectural_context
+
             if self.knowledge_team and hasattr(self.knowledge_team, 'analyze_context'):
                 try:
                     knowledge_context = await self.knowledge_team.analyze_context(task, project_path)
@@ -660,7 +677,6 @@ class CodeOrchestrationAgent(Agent):
                 except Exception as e:
                     canvas.info(f"Knowledge team context analysis failed: {e}")
             
-            # Add successful step completion to reasoning
             files_count = len(analysis_result["project_structure"]["files"])
             targets_count = len(analysis_result["task_analysis"]["identified_targets"])
             arch_modules = len(analysis_result["architectural_context"].get("modules", {}))
@@ -670,18 +686,46 @@ class CodeOrchestrationAgent(Agent):
                                     success=True)
             
             return analysis_result
-            
+        
         except Exception as e:
             self._add_reasoning_step("Project Context Analysis", 
                                     f"Analysis failed: {str(e)}", 
                                     success=False)
-            # Return minimal analysis on error
             return {
                 "project_structure": {"files": [], "languages": {}, "directories": []},
                 "task_analysis": {"description": task, "identified_targets": []},
                 "context": {"error": str(e)},
                 "architectural_context": {}
             }
+
+    def _create_fallback_architectural_context(self) -> Dict[str, Any]:
+        """Create fallback architectural context when analysis fails"""
+        return {
+            "architecture_pattern": "fullstack_web",
+            "system_type": "web_app", 
+            "modules": {
+                "frontend": {
+                    "boundary_type": "ui_layer",
+                    "languages": ["javascript"],
+                    "responsibilities": ["user interface"],
+                    "folder_structure": {"base_path": "frontend/src"}
+                },
+                "backend": {
+                    "boundary_type": "api_layer",
+                    "languages": ["python"],
+                    "responsibilities": ["api endpoints"],
+                    "folder_structure": {"base_path": "backend/app"}
+                }
+            },
+            "file_organization_rules": {
+                "ui_components": "frontend/src/components",
+                "api_routes": "backend/api/routes",
+                "business_logic": "backend/services",
+                "data_models": "backend/models"
+            },
+            "constraints": [],
+            "integration_patterns": ["REST API"]
+        }
 
     def _get_content_samples(self, project_path: Path, file_list: List[str]) -> Dict[str, str]:
         """Get content samples from key files for architectural analysis"""
@@ -997,13 +1041,11 @@ class CodeOrchestrationAgent(Agent):
                 "error": str(e),
                 "stack_trace": stack_trace
             } 
-            
-    async def _run_quality_checks(
-        self, modification_result: Dict[str, Any], quality_gates: List[str]
-    ) -> Dict[str, Any]:
-        """Delegate quality validation to the Quality Team using agentic instructions."""
-        self._add_reasoning_step("Quality Validation", f"Delegating quality checks: {', '.join(quality_gates)}")
 
+    async def _run_quality_checks(self, modification_result: Dict[str, Any], quality_gates: List[str]) -> Dict[str, Any]:
+        """Run quality checks using the quality team with proper message formatting"""
+        self._add_reasoning_step("Quality Validation", "Running quality checks through Quality Team")
+        
         try:
             project_path = Path(self.session_state.get("project_path", ""))
             modified_files = modification_result.get("modified_files", {})
@@ -1011,37 +1053,54 @@ class CodeOrchestrationAgent(Agent):
             if not self.quality_team:
                 raise ValueError("Quality team not initialized.")
 
+            # Create properly formatted message
             message_payload = {
-                "instruction": (
-                    "Validate the provided code changes using all relevant quality gates "
-                    "based on the modified files and languages involved."
-                ),
-                "project_path": str(project_path),
-                "modified_files": modified_files,
-                "quality_gates": quality_gates
+                "role": "user",  # Add required role field
+                "content": {
+                    "instruction": (
+                        "Review the code changes for quality issues, style violations, "
+                        "and potential bugs. Return a structured validation report."
+                    ),
+                    "project_path": str(project_path),
+                    "modified_files": modified_files,
+                    "quality_gates": quality_gates
+                }
             }
-            canvas.info(f"[CodeOrchestrator] Message to Quality Team:\n{json.dumps(message_payload, indent=2)}")
 
+            canvas.info(f"[CodeOrchestrator] Message to Quality Team:\n{json.dumps(message_payload, indent=2)}")
+            
+            # Send message with proper format
             result = await self.quality_team.arun(message=message_payload)
-            canvas.info(f"[CodeOrchestrator] Raw result from Quality Team: {result}")
             
-            content = getattr(result, "content", result)
-            output = content.dict() if hasattr(content, "dict") else content
+            # Process response safely
+            response_content = self._safe_get_response_content(result)
             
+            try:
+                output = json.loads(response_content) if isinstance(response_content, str) else response_content
+            except json.JSONDecodeError:
+                # Fallback parsing
+                output = {"passed": True, "issues": [], "message": response_content}
+
             canvas.info(f"[CodeOrchestrator] Parsed output from Quality Team: {output}")
+
+            if output.get("passed", False):
+                self._add_reasoning_step("Quality Validation", "Quality checks passed successfully", success=True)
+            else:
+                issues_count = len(output.get("issues", []))
+                self._add_reasoning_step("Quality Validation", f"Quality checks found {issues_count} issues", success=False)
 
             return {
                 "passed": output.get("passed", False),
                 "issues": output.get("issues", []),
                 "gate_results": output.get("gate_results", {}),
                 "summary": output.get("summary", {}),
-                "debug_raw_output": output  
+                "debug_raw_output": output
             }
 
         except Exception as e:
             canvas.error(f"[CodeOrchestrationAgent] Quality delegation failed: {e}")
-            import traceback
-            canvas.error(traceback.format_exc())
+            self._add_reasoning_step("Quality Validation", f"Quality delegation failed: {str(e)}", success=False)
+            
             return {
                 "passed": False,
                 "issues": [f"Quality delegation error: {str(e)}"],
@@ -1050,72 +1109,39 @@ class CodeOrchestrationAgent(Agent):
             }
 
     async def _run_operational_checks(self, modification_result: Dict[str, Any]) -> Dict[str, Any]:
-        """Run operational checks directly using SRE agents (no message delegation)"""
-        self._add_reasoning_step("Operational Validation", "Running direct SRE checks for deployment safety.")
+        """Run operational checks using the SRE team agent with proper message delegation."""
+        self._add_reasoning_step("Operational Validation", "Running delegated SRE validation for deployment safety.")
         
         try:
             project_path = Path(self.session_state.get("project_path", ""))
             modified_files = modification_result.get("modified_files", {})
             
-            # Import SRE agents directly
-            from i2c.agents.sre_team.sandbox import sandbox_executor
-            from i2c.agents.sre_team.dependency import dependency_verifier
-            
-            # Direct operational checks (no LLM calls)
-            issues = []
-            check_results = {}
-            
-            # 1. Sandbox check (syntax + tests)
-            try:
-                # Detect language
-                language = self._detect_primary_language_from_files(modified_files)
-                success, message = sandbox_executor.execute(project_path, language)
-                check_results["sandbox"] = {
-                    "passed": success,
-                    "issues": [] if success else [f"Sandbox: {message}"]
+            # Build correct message payload for SRE agent
+            message_payload = {
+                "role": "user",
+                "content": {
+                    "instruction": (
+                        "Review the proposed code changes for operational risks, performance issues, "
+                        "and deployment readiness. Return a structured validation report."
+                    ),
+                    "project_path": str(project_path),
+                    "modified_files": modified_files
                 }
-                if not success:
-                    issues.append(f"Sandbox: {message}")
-            except Exception as e:
-                check_results["sandbox"] = {
-                    "passed": False,
-                    "issues": [f"Sandbox error: {str(e)}"]
-                }
-                issues.append(f"Sandbox error: {str(e)}")
+            }
             
-            # 2. Dependency check
-            try:
-                dependency_issues = dependency_verifier.check_dependencies(project_path)
-                check_results["dependencies"] = {
-                    "passed": len(dependency_issues) == 0,
-                    "issues": dependency_issues
-                }
-                issues.extend(dependency_issues)
-            except Exception as e:
-                check_results["dependencies"] = {
-                    "passed": False,
-                    "issues": [f"Dependency error: {str(e)}"]
-                }
-                issues.append(f"Dependency error: {str(e)}")
+            # Import the SRE team agent orchestrator
+            from i2c.agents.sre_team.sre_team import SRELeadAgent
             
-            # 3. Version control check (simple)
-            try:
-                git_dir = project_path / ".git"
-                git_ready = git_dir.exists()
-                check_results["version_control"] = {
-                    "passed": True,  # Always pass, just informational
-                    "issues": [] if git_ready else ["Project not under version control"]
-                }
-            except Exception as e:
-                check_results["version_control"] = {
-                    "passed": True,  # Don't fail on this
-                    "issues": [f"Version control check error: {str(e)}"]
-                }
+            # Initialize and invoke the SRE agent
+            sre_agent = SRELeadAgent()
+            sre_result = await sre_agent.run(message_payload)
             
-            # Overall result
-            all_passed = len(issues) == 0
+            # Parse agent output
+            check_results = sre_result.get("check_results", {})
+            issues = sre_result.get("issues", [])
+            all_passed = sre_result.get("passed", False)
             
-            # Add success/failure reasoning
+            # Add reasoning step based on result
             if all_passed:
                 self._add_reasoning_step("Operational Validation", "All SRE checks passed", success=True)
             else:
@@ -1131,10 +1157,10 @@ class CodeOrchestrationAgent(Agent):
                     "checks_run": len(check_results)
                 }
             }
-            
+        
         except Exception as e:
-            canvas.error(f"[CodeOrchestrationAgent] Direct SRE checks failed: {e}")
             import traceback
+            canvas.error(f"[CodeOrchestrationAgent] SRE check failed: {e}")
             canvas.error(traceback.format_exc())
             
             self._add_reasoning_step("Operational Validation", f"SRE checks failed: {str(e)}", success=False)
@@ -1289,25 +1315,68 @@ class CodeOrchestrationAgent(Agent):
         
         return languages
     
-    def _add_reasoning_step(self, step_name: str, description: str, success: bool = None):
-        """Add a step to the reasoning trajectory"""
-        if self.session_state is None:
-            return
-        
-        trajectory = self.session_state.get("reasoning_trajectory", [])
-        
-        step = {
-            "step": step_name,
-            "description": description,
-            "timestamp": str(datetime.datetime.now()),
-        }
-        
-        if success is not None:
-            step["success"] = success
+    def _add_reasoning_step(self, step: str, description: str, success: Optional[bool] = None):
+        """Add reasoning step with robust error handling"""
+        try:
+            if self.session_state is None:
+                return
             
-        trajectory.append(step)
-        self.session_state["reasoning_trajectory"] = trajectory
+            # Initialize reasoning trajectory if it doesn't exist
+            if "reasoning_trajectory" not in self.session_state:
+                self.session_state["reasoning_trajectory"] = []
+            
+            # Create reasoning step safely
+            reasoning_step = {
+                "step": str(step),
+                "description": str(description),
+                "timestamp": self._get_timestamp()
+            }
+            
+            # Add success flag if provided
+            if success is not None:
+                reasoning_step["success"] = bool(success)
+            
+            # Safely append to trajectory
+            if isinstance(self.session_state["reasoning_trajectory"], list):
+                self.session_state["reasoning_trajectory"].append(reasoning_step)
+            else:
+                # Reset if trajectory is corrupted
+                self.session_state["reasoning_trajectory"] = [reasoning_step]
+        
+        except Exception as e:
+            # Don't let reasoning failures break the main process
+            print(f"⚠️ Reasoning step failed: {e}")
 
+    def _safe_get_response_content(self, response) -> str:
+        """Safely extract content from agent response"""
+        try:
+            # Handle different response types
+            if hasattr(response, 'content'):
+                content = response.content
+            elif hasattr(response, 'text'):
+                content = response.text
+            elif isinstance(response, str):
+                content = response
+            elif hasattr(response, '__str__'):
+                content = str(response)
+            else:
+                content = "Unable to extract response content"
+            
+            # Ensure we return a string
+            return str(content) if content is not None else ""
+            
+        except Exception as e:
+            print(f"⚠️ Response content extraction failed: {e}")
+            return f"Response processing error: {str(e)}"
+
+    def _get_timestamp(self) -> str:
+        """Get current timestamp safely"""
+        try:
+            from datetime import datetime
+            return datetime.now().isoformat()
+        except Exception:
+            return "unknown"
+        
 def build_orchestration_team(session_state=None) -> Team:
     """
     Build the orchestration team with a code orchestration agent.

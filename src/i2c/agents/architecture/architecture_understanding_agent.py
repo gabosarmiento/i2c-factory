@@ -82,31 +82,75 @@ class ArchitectureUnderstandingAgent(Agent):
             ],
             **kwargs
         )
-    
+
     def analyze_system_architecture(self, objective: str, existing_files: List[str] = None, 
-                                  content_samples: Dict[str, str] = None) -> StructuralContext:
-        """Analyze and understand the system architecture from objective and existing code"""
+                                content_samples: Dict[str, str] = None) -> StructuralContext:
+        """Analyze and understand the system architecture with retry logic"""
         
         # Prepare analysis prompt
         analysis_prompt = self._build_analysis_prompt(objective, existing_files, content_samples)
         
+        # Retry configuration
+        max_retries = 3
+        base_delay = 1.0  # Start with 1 second
+        
+        for attempt in range(max_retries):
+            try:
+                # Add delay for retry attempts
+                if attempt > 0:
+                    import time
+                    delay = base_delay * (2 ** (attempt - 1))  # Exponential backoff
+                    print(f"⏳ Retrying architectural analysis in {delay} seconds (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(delay)
+                
+                # Get architectural analysis
+                response = self.run(analysis_prompt)
+                content = self._safe_get_response_content(response)
+                
+                # Parse architectural understanding
+                arch_data = self._parse_architectural_response(content)
+                
+                # Build structural context
+                structural_context = self._build_structural_context(arch_data)
+                
+                print("✅ Architectural analysis completed successfully")
+                return structural_context
+                
+            except Exception as e:
+                error_msg = str(e).lower()
+                
+                # Check if it's a retryable error
+                if any(retryable in error_msg for retryable in ['503', 'service unavailable', 'rate limit', 'timeout']):
+                    if attempt < max_retries - 1:
+                        print(f"⚠️ Retryable error on attempt {attempt + 1}: {e}")
+                        continue  # Retry
+                    else:
+                        print(f"❌ Max retries reached for architectural analysis: {e}")
+                else:
+                    print(f"❌ Non-retryable error in architectural analysis: {e}")
+                
+                # Final attempt failed or non-retryable error
+                break
+        
+        # All attempts failed, return fallback
+        print("🔄 Using fallback architectural context due to API issues")
+        return self._create_fallback_context(objective)
+
+    def _safe_get_response_content(self, response) -> str:
+        """Safely extract content from response"""
         try:
-            # Get architectural analysis
-            response = self.run(analysis_prompt)
-            content = response.content if hasattr(response, 'content') else str(response)
-            
-            # Parse architectural understanding
-            arch_data = self._parse_architectural_response(content)
-            
-            # Build structural context
-            structural_context = self._build_structural_context(arch_data)
-            
-            return structural_context
-            
+            if hasattr(response, 'content'):
+                return str(response.content)
+            elif hasattr(response, 'text'):
+                return str(response.text)
+            elif isinstance(response, str):
+                return response
+            else:
+                return str(response)
         except Exception as e:
-            print(f"⚠️ Architecture analysis failed: {e}")
-            return self._create_fallback_context(objective)
-    
+            print(f"⚠️ Error extracting response content: {e}")
+            return ""
+
     def _build_analysis_prompt(self, objective: str, existing_files: List[str] = None, 
                               content_samples: Dict[str, str] = None) -> str:
         """Build comprehensive analysis prompt"""
@@ -176,21 +220,96 @@ Focus on LOGICAL architecture, not just file paths. Understand the PURPOSE and B
         return "\n".join(formatted)
     
     def _parse_architectural_response(self, content: str) -> Dict[str, Any]:
-        """Parse the architectural analysis response"""
+        """Parse the architectural analysis response with robust error handling"""
         try:
+            # Handle different response types
+            if hasattr(content, 'content'):
+                content = content.content
+            elif hasattr(content, 'reasoning_steps'):
+                # Skip reasoning_steps attribute that causes errors
+                content = str(content)
+            else:
+                content = str(content)
+            
             # Clean response - remove markdown if present
             clean_content = content.strip()
-            if clean_content.startswith("```json"):
-                clean_content = clean_content[7:-3].strip()
-            elif clean_content.startswith("```"):
-                clean_content = clean_content[3:-3].strip()
             
-            return json.loads(clean_content)
+            # Remove markdown code blocks
+            if clean_content.startswith("```json"):
+                clean_content = clean_content[7:]
+                if clean_content.endswith("```"):
+                    clean_content = clean_content[:-3]
+            elif clean_content.startswith("```"):
+                clean_content = clean_content[3:]
+                if clean_content.endswith("```"):
+                    clean_content = clean_content[:-3]
+            
+            clean_content = clean_content.strip()
+            
+            # Try to parse JSON
+            parsed_data = json.loads(clean_content)
+            
+            # Validate required fields and provide defaults
+            validated_data = self._validate_and_fix_analysis_data(parsed_data)
+            
+            return validated_data
             
         except json.JSONDecodeError as e:
-            print(f"⚠️ Failed to parse architectural analysis: {e}")
+            print(f"⚠️ JSON parsing failed: {e}")
+            print(f"⚠️ Raw content: {content[:200]}...")
             return self._create_fallback_analysis()
-    
+        except Exception as e:
+            print(f"⚠️ Response parsing failed: {e}")
+            print(f"⚠️ Content type: {type(content)}")
+            return self._create_fallback_analysis()
+
+    def _validate_and_fix_analysis_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate and fix architectural analysis data structure"""
+        
+        # Ensure required fields exist with defaults
+        validated = {
+            "system_type": data.get("system_type", "web_app"),
+            "architecture_pattern": data.get("architecture_pattern", "fullstack_web"),
+            "modules": data.get("modules", {}),
+            "file_organization_rules": data.get("file_organization_rules", {}),
+            "constraints": data.get("constraints", []),
+            "integration_patterns": data.get("integration_patterns", ["REST API"]),
+            "quality_expectations": data.get("quality_expectations", {})
+        }
+        
+        # Fix modules structure if needed
+        if not isinstance(validated["modules"], dict):
+            validated["modules"] = {}
+        
+        # Ensure each module has required fields
+        for module_name, module_data in validated["modules"].items():
+            if not isinstance(module_data, dict):
+                validated["modules"][module_name] = {
+                    "boundary_type": "business_logic",
+                    "languages": ["python"],
+                    "responsibilities": [f"{module_name} functionality"],
+                    "dependencies": [],
+                    "folder_structure": {"base_path": module_name.lower()}
+                }
+            else:
+                # Fill in missing fields
+                module_data.setdefault("boundary_type", "business_logic")
+                module_data.setdefault("languages", ["python"])
+                module_data.setdefault("responsibilities", [f"{module_name} functionality"])
+                module_data.setdefault("dependencies", [])
+                module_data.setdefault("folder_structure", {"base_path": module_name.lower()})
+        
+        # Ensure file organization rules are reasonable
+        if not validated["file_organization_rules"]:
+            validated["file_organization_rules"] = {
+                "ui_components": "frontend/src/components",
+                "api_routes": "backend/api/routes",
+                "business_logic": "backend/services",
+                "data_models": "backend/models"
+            }
+        
+        return validated
+ 
     def _build_structural_context(self, arch_data: Dict[str, Any]) -> StructuralContext:
         """Build comprehensive structural context from analysis"""
         
@@ -339,4 +458,11 @@ Focus on LOGICAL architecture, not just file paths. Understand the PURPOSE and B
         return None
 
 # Global instance for easy access
-architecture_agent = ArchitectureUnderstandingAgent()
+architecture_agent = None
+
+def get_architecture_agent(session_state=None):
+    """Get or create architecture agent with proper session state"""
+    global architecture_agent
+    if architecture_agent is None:
+        architecture_agent = ArchitectureUnderstandingAgent(session_state=session_state)
+    return architecture_agent
