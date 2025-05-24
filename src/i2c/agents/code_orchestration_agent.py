@@ -543,12 +543,12 @@ class CodeOrchestrationAgent(Agent):
         self.sre_team = build_sre_team(session_state=shared_session)
 
     async def _analyze_project_context(self, project_path: Path, task: str) -> Dict[str, Any]:
-        """Analyze project context using file system analysis and optional knowledge team"""
+        """Analyze project context using architectural intelligence and file system analysis"""
         self._add_reasoning_step("Project Context Analysis", 
-                                f"Analyzing project at {project_path} for task: {task}")
+                                f"Analyzing project architecture at {project_path} for task: {task}")
         
         try:
-            # 1. File system analysis
+            # 1. Basic file system analysis (existing logic)
             analysis_result = {
                 "project_structure": {
                     "files": [],
@@ -559,7 +559,8 @@ class CodeOrchestrationAgent(Agent):
                     "description": task,
                     "identified_targets": []
                 },
-                "context": {}
+                "context": {},
+                "architectural_context": {}  # New: architectural intelligence
             }
             
             # Analyze project files
@@ -600,7 +601,58 @@ class CodeOrchestrationAgent(Agent):
                 
                 analysis_result["task_analysis"]["identified_targets"] = likely_targets[:5]  # Limit to 5
             
-            # 2. Optional: Use knowledge team if available
+            # 2. NEW: Architectural Intelligence Analysis
+            try:
+                from i2c.agents.architecture.architecture_understanding_agent import architecture_agent
+                
+                # Get content samples for analysis
+                content_samples = self._get_content_samples(project_path, files[:5] if files else [])
+                
+                # Perform architectural analysis
+                self._add_reasoning_step("Architectural Analysis", 
+                                    "Analyzing system architecture and module boundaries")
+                
+                structural_context = architecture_agent.analyze_system_architecture(
+                    objective=task,
+                    existing_files=files,
+                    content_samples=content_samples
+                )
+                
+                # Store architectural context
+                analysis_result["architectural_context"] = {
+                    "architecture_pattern": structural_context.architecture_pattern.value,
+                    "system_type": structural_context.system_type,
+                    "modules": {
+                        name: {
+                            "boundary_type": module.boundary_type.value,
+                            "languages": list(module.languages),
+                            "responsibilities": module.responsibilities,
+                            "folder_structure": module.folder_structure
+                        }
+                        for name, module in structural_context.modules.items()
+                    },
+                    "file_organization_rules": structural_context.file_organization_rules,
+                    "constraints": structural_context.constraints,
+                    "integration_patterns": structural_context.integration_patterns
+                }
+                
+                # Store structural context in session for other agents
+                if self.session_state is not None:
+                    self.session_state["structural_context"] = structural_context
+                    self.session_state["architectural_understanding"] = analysis_result["architectural_context"]
+                
+                self._add_reasoning_step("Architectural Analysis", 
+                                    f"Identified {structural_context.architecture_pattern.value} pattern with {len(structural_context.modules)} modules",
+                                    success=True)
+                
+            except Exception as e:
+                canvas.error(f"Architectural analysis failed: {e}")
+                self._add_reasoning_step("Architectural Analysis", 
+                                    f"Architecture analysis failed: {str(e)}", 
+                                    success=False)
+                # Continue without architectural context
+            
+            # 3. Optional: Use knowledge team if available (existing logic)
             if self.knowledge_team and hasattr(self.knowledge_team, 'analyze_context'):
                 try:
                     knowledge_context = await self.knowledge_team.analyze_context(task, project_path)
@@ -611,9 +663,10 @@ class CodeOrchestrationAgent(Agent):
             # Add successful step completion to reasoning
             files_count = len(analysis_result["project_structure"]["files"])
             targets_count = len(analysis_result["task_analysis"]["identified_targets"])
+            arch_modules = len(analysis_result["architectural_context"].get("modules", {}))
             
             self._add_reasoning_step("Project Context Analysis", 
-                                    f"Analyzed {files_count} files, identified {targets_count} potential targets",
+                                    f"Complete analysis: {files_count} files, {targets_count} targets, {arch_modules} architectural modules",
                                     success=True)
             
             return analysis_result
@@ -626,15 +679,34 @@ class CodeOrchestrationAgent(Agent):
             return {
                 "project_structure": {"files": [], "languages": {}, "directories": []},
                 "task_analysis": {"description": task, "identified_targets": []},
-                "context": {"error": str(e)}
+                "context": {"error": str(e)},
+                "architectural_context": {}
             }
+
+    def _get_content_samples(self, project_path: Path, file_list: List[str]) -> Dict[str, str]:
+        """Get content samples from key files for architectural analysis"""
+        content_samples = {}
         
+        for file_rel in file_list:
+            try:
+                file_path = project_path / file_rel
+                if file_path.exists() and file_path.is_file():
+                    # Read file content (limit size for analysis)
+                    content = file_path.read_text(encoding='utf-8')
+                    if len(content) > 1000:
+                        content = content[:1000] + "..."
+                    content_samples[file_rel] = content
+            except Exception as e:
+                canvas.warning(f"Could not read {file_rel}: {e}")
+        
+        return content_samples
+
     async def _create_modification_plan(
         self, task: str, constraints: List[str], analysis: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Create a modification plan using the planner"""
+        """Create a modification plan using architectural intelligence and planner"""
         self._add_reasoning_step("Modification Planning", 
-                            f"Creating modification plan for task: {task}")
+                            f"Creating architecturally-aware modification plan for task: {task}")
         
         try:
             from i2c.workflow.modification.plan_generator import generate_modification_plan
@@ -642,22 +714,42 @@ class CodeOrchestrationAgent(Agent):
             project_path = Path(self.session_state.get("project_path", ""))
             language = self.session_state.get("language", "python")
             
-            # Call the real planner
+            # Get architectural context for intelligent planning
+            architectural_context = analysis.get("architectural_context", {})
+            structural_context = self.session_state.get("structural_context")
+            
+            # Build enhanced context for planner
+            enhanced_context = self._build_planning_context(
+                architectural_context, structural_context, task, constraints
+            )
+            
+            # Call the planner with architectural context
             modification_steps = generate_modification_plan(
                 user_request=task,
-                retrieved_context_plan="",  # We'll enhance this later
+                retrieved_context_plan=enhanced_context,
                 project_path=project_path,
                 language=language
             )
             
+            # Validate and enhance modification steps using architectural intelligence
+            validated_steps = self._validate_steps_against_architecture(
+                modification_steps, architectural_context, structural_context
+            )
+            
             plan = {
-                "steps": modification_steps,
+                "steps": validated_steps,
                 "constraints": constraints,
-                "target_files": [step.get("file", "") for step in modification_steps if step.get("file")]
+                "target_files": [step.get("file", "") for step in validated_steps if step.get("file")],
+                "architectural_guidance": {
+                    "architecture_pattern": architectural_context.get("architecture_pattern"),
+                    "file_organization_rules": architectural_context.get("file_organization_rules", {}),
+                    "module_boundaries": list(architectural_context.get("modules", {}).keys()),
+                    "integration_patterns": architectural_context.get("integration_patterns", [])
+                }
             }
             
             self._add_reasoning_step("Modification Planning", 
-                                f"Generated plan with {len(modification_steps)} steps", 
+                                f"Generated architecturally-validated plan with {len(validated_steps)} steps", 
                                 success=True)
             
             return plan
@@ -670,9 +762,193 @@ class CodeOrchestrationAgent(Agent):
             return {
                 "steps": [],
                 "constraints": constraints, 
-                "target_files": []
+                "target_files": [],
+                "architectural_guidance": {}
             }
-    
+
+    def _build_planning_context(self, architectural_context: Dict[str, Any], 
+                            structural_context, task: str, constraints: List[str]) -> str:
+        """Build enhanced planning context with architectural intelligence"""
+        
+        context_parts = []
+        
+        # Add architectural understanding
+        if architectural_context:
+            context_parts.append("=== ARCHITECTURAL CONTEXT ===")
+            context_parts.append(f"System Type: {architectural_context.get('system_type', 'unknown')}")
+            context_parts.append(f"Architecture Pattern: {architectural_context.get('architecture_pattern', 'unknown')}")
+            
+            # Add module information
+            modules = architectural_context.get("modules", {})
+            if modules:
+                context_parts.append("\nMODULES AND BOUNDARIES:")
+                for module_name, module_info in modules.items():
+                    context_parts.append(f"- {module_name}: {module_info.get('boundary_type', 'unknown')}")
+                    context_parts.append(f"  Responsibilities: {', '.join(module_info.get('responsibilities', []))}")
+                    
+                    folder_structure = module_info.get('folder_structure', {})
+                    if folder_structure:
+                        base_path = folder_structure.get('base_path', '')
+                        if base_path:
+                            context_parts.append(f"  Location: {base_path}")
+            
+            # Add file organization rules
+            file_rules = architectural_context.get("file_organization_rules", {})
+            if file_rules:
+                context_parts.append("\nFILE ORGANIZATION RULES:")
+                for rule_type, path in file_rules.items():
+                    context_parts.append(f"- {rule_type}: {path}")
+            
+            # Add architectural constraints
+            arch_constraints = architectural_context.get("constraints", [])
+            if arch_constraints:
+                context_parts.append("\nARCHITECTURAL CONSTRAINTS:")
+                for constraint in arch_constraints:
+                    context_parts.append(f"- {constraint}")
+            
+            # Add integration patterns
+            integration_patterns = architectural_context.get("integration_patterns", [])
+            if integration_patterns:
+                context_parts.append("\nINTEGRATION PATTERNS:")
+                for pattern in integration_patterns:
+                    context_parts.append(f"- {pattern}")
+        
+        # Add task-specific guidance
+        context_parts.append(f"\n=== TASK GUIDANCE ===")
+        context_parts.append(f"Task: {task}")
+        
+        if constraints:
+            context_parts.append("Additional Constraints:")
+            for constraint in constraints:
+                context_parts.append(f"- {constraint}")
+        
+        # Add planning instructions
+        context_parts.append("\n=== PLANNING INSTRUCTIONS ===")
+        context_parts.append("When creating the modification plan:")
+        context_parts.append("1. Respect the identified architectural pattern and module boundaries")
+        context_parts.append("2. Place files according to the file organization rules")
+        context_parts.append("3. Consider the responsibilities of each module")
+        context_parts.append("4. Follow the integration patterns for cross-module communication")
+        context_parts.append("5. Validate that modifications don't violate architectural constraints")
+        
+        return "\n".join(context_parts)
+
+    def _validate_steps_against_architecture(self, steps: List[Dict[str, Any]], 
+                                        architectural_context: Dict[str, Any],
+                                        structural_context) -> List[Dict[str, Any]]:
+        """Validate and enhance modification steps using architectural intelligence"""
+        
+        if not architectural_context or not steps:
+            return steps
+        
+        validated_steps = []
+        file_org_rules = architectural_context.get("file_organization_rules", {})
+        modules = architectural_context.get("modules", {})
+        
+        for step in steps:
+            file_path = step.get("file", "")
+            action = step.get("action", "")
+            what = step.get("what", "")
+            
+            # Validate file placement against architectural rules
+            suggested_path = self._suggest_architectural_path(file_path, what, file_org_rules, modules)
+            
+            if suggested_path and suggested_path != file_path:
+                # Update file path based on architectural guidance
+                step["file"] = suggested_path
+                step["architectural_note"] = f"Path adjusted from '{file_path}' to follow architectural pattern"
+                
+                self._add_reasoning_step("Architectural Validation", 
+                                    f"Adjusted path: {file_path} → {suggested_path}")
+            
+            # Add architectural context to step
+            step["architectural_context"] = self._get_step_architectural_context(
+                step, architectural_context
+            )
+            
+            validated_steps.append(step)
+        
+        return validated_steps
+
+    def _suggest_architectural_path(self, original_path: str, what_description: str, 
+                                file_org_rules: Dict[str, str], 
+                                modules: Dict[str, Any]) -> Optional[str]:
+        """Suggest better file path based on architectural understanding"""
+        
+        what_lower = what_description.lower()
+        original_lower = original_path.lower()
+        
+        # Map common functionality to architectural rules
+        functionality_mapping = {
+            "component": "ui_components",
+            "route": "api_routes", 
+            "endpoint": "api_routes",
+            "service": "business_logic",
+            "model": "data_models",
+            "controller": "api_routes",
+            "view": "ui_components",
+            "repository": "data_access",
+            "util": "shared_utilities"
+        }
+        
+        # Find matching rule
+        for func_keyword, rule_name in functionality_mapping.items():
+            if func_keyword in what_lower or func_keyword in original_lower:
+                if rule_name in file_org_rules:
+                    rule_path = file_org_rules[rule_name]
+                    filename = Path(original_path).name
+                    return f"{rule_path}/{filename}"
+        
+        # Check module boundaries
+        for module_name, module_info in modules.items():
+            module_responsibilities = " ".join(module_info.get("responsibilities", [])).lower()
+            
+            if any(keyword in module_responsibilities for keyword in what_lower.split()):
+                folder_structure = module_info.get("folder_structure", {})
+                base_path = folder_structure.get("base_path", "")
+                if base_path:
+                    filename = Path(original_path).name
+                    return f"{base_path}/{filename}"
+        
+        return None
+
+    def _get_step_architectural_context(self, step: Dict[str, Any], 
+                                    architectural_context: Dict[str, Any]) -> Dict[str, Any]:
+        """Get relevant architectural context for a specific step"""
+        
+        file_path = step.get("file", "")
+        what = step.get("what", "")
+        
+        step_context = {
+            "relevant_modules": [],
+            "applicable_constraints": [],
+            "integration_guidance": []
+        }
+        
+        # Find relevant modules
+        modules = architectural_context.get("modules", {})
+        for module_name, module_info in modules.items():
+            folder_structure = module_info.get("folder_structure", {})
+            base_path = folder_structure.get("base_path", "")
+            
+            if base_path and file_path.startswith(base_path):
+                step_context["relevant_modules"].append({
+                    "name": module_name,
+                    "boundary_type": module_info.get("boundary_type"),
+                    "responsibilities": module_info.get("responsibilities", [])
+                })
+        
+        # Find applicable constraints
+        constraints = architectural_context.get("constraints", [])
+        for constraint in constraints:
+            if any(keyword in constraint.lower() for keyword in what.lower().split()):
+                step_context["applicable_constraints"].append(constraint)
+        
+        # Add integration guidance
+        integration_patterns = architectural_context.get("integration_patterns", [])
+        step_context["integration_guidance"] = integration_patterns
+        
+        return step_context
 
     async def _execute_modifications(self, plan: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the modification plan using the modification workflow"""

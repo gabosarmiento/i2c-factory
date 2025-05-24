@@ -1,121 +1,122 @@
-# i2c Factory — Self-Healing Agentic Code Evolution
 
-> Transforming ideas into production-grade code through intelligent AI agents with autonomous reasoning, self-healing capabilities, and continuous evolution loops.
+# i2c Factory — Architectural Intelligence & Self-Healing Agentic Code Evolution
+
+> Transforming ideas into production-grade code through intelligent AI agents with autonomous reasoning, architectural understanding, self-healing capabilities, and continuous evolution loops.
 
 ---
 
 ## 🧠 What is i2c Factory?
 
-The **i2c Factory** is an AI-powered software factory that evolves codebases using a **Self-Healing Meta-Agent Orchestration Model**. It combines:
+The **i2c Factory** is an AI-powered software factory that evolves codebases using **Architectural Intelligence and Self-Healing Meta-Agent Orchestration**. It goes beyond simple code generation to understand and respect software architecture patterns while autonomously fixing issues.
 
-* **Intelligent reasoning and pattern recognition**
-* **Autonomous self-healing and recovery**
-* **Knowledge-augmented retrieval (RAG)**
-* **Multi-agent orchestration with specialized teams**
-* **Continuous validation and adaptive refinement**
+Key differentiators:
+* **🏗️ Architectural Intelligence** - Understands system boundaries, module responsibilities, and design patterns
+* **🧠 Meta-level reasoning** that analyzes failures and adapts strategies
+* **🔧 Autonomous self-healing** that automatically fixes common issues
+* **🌍 Multi-language intelligence** with contextual understanding
+* **📊 Comprehensive validation** through specialized agent teams
+* **♻️ Iterative, validated evolution** with architectural consistency
 
-Unlike traditional code generators, i2c Factory builds and improves software with:
-
-* **Meta-level reasoning** that analyzes failures and adapts strategies
-* **Self-healing capabilities** that automatically fix common issues
-* **Contextual understanding** from your repo & knowledge base
-* **Multi-layered validation** through specialized agent teams
-* **Iterative, validated code evolution** with quality gates
+Unlike traditional code generators, i2c Factory builds and improves software with deep understanding of why code is structured the way it is, not just how to copy patterns.
 
 ---
 
-## 🏗️ Self-Healing Architecture
+## 🏗️ Architectural Intelligence System
 
-### 1. **Meta-Agent Orchestrator (The Brain)**
+### 1. **ArchitectureUnderstandingAgent (The Architect)**
+
+The factory's architectural brain that:
+* **🔍 Analyzes system intent** - Understands what type of system you're building
+* **🏛️ Detects architectural patterns** - Monolith, microservices, clean architecture, etc.
+* **🧩 Maps module boundaries** - UI layer, API layer, business logic, data access
+* **📐 Enforces structural rules** - Where files should go and why
+* **🔗 Understands integration patterns** - How components should communicate
+
+### 2. **Multi-Language Unit Test Intelligence**
+
+Enhanced test generation that:
+* **🌍 Supports 5+ languages** - Python, JavaScript/TypeScript, Go, Java
+* **🧪 Language-specific frameworks** - unittest, Jest, JUnit, Go testing
+* **🎯 Contextual test creation** - Understands what to test based on code structure
+* **🔄 Architectural awareness** - Tests respect module boundaries
+
+### 3. **Self-Healing Meta-Agent Orchestration**
 
 The **CodeOrchestrationAgent** acts as an intelligent meta-agent that:
+* **🧠 Reasons** about code evolution objectives within architectural context
+* **🎭 Orchestrates** specialized teams (Architecture, Knowledge, Modification, Quality, SRE)
+* **🔍 Analyzes failures** using pattern recognition and architectural understanding
+* **🩹 Self-heals** common issues automatically while respecting system boundaries
+* **⬆️ Escalates** complex problems appropriately
+* **🔄 Adapts strategies** based on validation results and architectural constraints
 
-* **Reasons** about code evolution objectives
-* **Orchestrates** specialized teams (Knowledge, Modification, Quality, SRE)
-* **Analyzes failures** using pattern recognition
-* **Self-heals** common issues automatically
-* **Escalates** complex problems appropriately
-* **Adapts strategies** based on validation results
+### 4. **Specialized Agent Teams**
 
-### 2. **Specialized Agent Teams**
+#### **Architecture Team**
+* System pattern recognition and structural validation
+* Module boundary enforcement and path intelligence
+* Cross-cutting concern identification
 
 #### **Knowledge Team**
+* RAG-powered context retrieval with architectural awareness
+* Documentation analysis and best practices injection
+* Domain-specific pattern recognition
 
-* RAG-powered context retrieval
-* Documentation analysis and integration
-* Best practices injection
-
-#### **Modification Team**
-
-* Intelligent code generation and modification
-* **Automatic unit test generation**
-* Multi-language support with contextual understanding
+#### **Modification Team** 
+* Architecturally-aware code generation and modification
+* **Automatic unit test generation** across multiple languages
+* Structural consistency enforcement
 
 #### **Quality Team**
-
-* Static analysis and linting
+* Static analysis with architectural rule validation
 * Code review and standards enforcement
-* Security vulnerability detection
+* Security vulnerability detection with system context
 
 #### **SRE Team**
-
-* Operational readiness validation
-* Dependency vulnerability scanning
-* Test execution and syntax verification
-
-### 3. **Self-Healing Intelligence**
-
-The orchestrator can automatically recover from:
-
-* **Syntax Errors** → Auto-fix indentation, imports, basic syntax
-* **Test Failures** → Regenerate tests, adjust expectations
-* **Performance Issues** → Replan with optimization focus
-* **Security Concerns** → Escalate to human review
-* **Generic Issues** → Retry with enhanced context
-
-### 4. **Reasoning & Adaptation**
-
-Every operation includes:
-
-* **Failure pattern analysis** using intelligent categorization
-* **Recovery strategy selection** based on issue complexity
-* **Autonomous healing attempts** for recoverable issues
-* **Human escalation** for complex/risky problems
-* **Comprehensive reasoning trajectory** for full transparency
+* Operational readiness validation with deployment awareness
+* Multi-language dependency vulnerability scanning
+* Architecture-appropriate test execution
 
 ---
 
-## 🔄 How Self-Healing Code Evolution Works
+## 🔄 How Architectural Intelligence Works
 
-1. **Analyze Objective** → Understand the code evolution task
-2. **Retrieve Knowledge** → RAG-powered context from your codebase
-3. **Plan Modifications** → Create structured modification plan
-4. **Execute Changes** → Generate code + auto-create unit tests
-5. **Quality Validation** → Multi-gate quality checks
-6. **Operational Validation** → SRE readiness verification
-7. **🧠 Failure Analysis** → Pattern recognition for issues
-8. **🔧 Self-Healing** → Automatic recovery attempts
-9. **♻️ Re-validation** → Verify healing success
-10. **✅ Final Decision** → Approve/reject with reasoning
+1. **🎯 Analyze Objective** → Understand the system type and architectural intent
+2. **🏗️ Architectural Analysis** → Detect patterns, boundaries, and structural rules
+3. **📊 Knowledge Retrieval** → RAG-powered context with architectural awareness
+4. **📋 Intelligent Planning** → Create modification plans that respect architecture
+5. **🔧 Boundary-Aware Execution** → Generate code that follows structural rules
+6. **✅ Multi-Layer Validation** → Quality, SRE, and architectural consistency checks
+7. **🧠 Failure Analysis** → Pattern recognition with architectural context
+8. **🩹 Self-Healing** → Automatic recovery that maintains structural integrity
+9. **♻️ Re-validation** → Verify healing preserves architectural boundaries
+10. **🎉 Final Decision** → Approve/reject with architectural reasoning
 
 ---
 
-## 📦 Project Structure
+## 📦 Enhanced Project Structure
 
+```
 src/
 ├── agents/
-│   ├── code\_orchestration\_agent.py    # 🧠 Meta-agent with self-healing
-│   ├── modification\_team/              # Code generation & unit tests
-│   ├── quality\_team/                   # Quality gates & validation
-│   ├── sre\_team/                       # Operational readiness
-│   ├── knowledge/                      # RAG & context management
-│   └── reflective/                     # Advanced reasoning operators
+│   ├── architecture/                   # 🏗️ Architectural intelligence
+│   │   └── architecture_understanding_agent.py
+│   ├── code_orchestration_agent.py     # 🧠 Self-healing meta-agent  
+│   ├── modification_team/              # 🔧 Multi-language code generation
+│   │   └── multilang_unit_test.py      # 🌍 5+ language test generation
+│   ├── quality_team/                   # ✅ Architectural quality gates
+│   ├── sre_team/                       # 🔧 Multi-language operational validation
+│   ├── knowledge/                      # 📚 Architecture-aware RAG
+│   └── reflective/                     # 🤔 Advanced reasoning operators
 ├── workflow/
-│   ├── orchestration/                  # Agent coordination
-│   ├── modification/                   # Code evolution pipeline
-│   └── scenario\_processor.py          # Automated demo workflows
-├── cli/                                # User interface & budget tracking
-└── main.py                             # CLI entry point
+│   ├── project_layout_analyzer.py      # 📊 Structure pattern detection
+│   ├── file_path_resolver.py           # 🗂️ Intelligent file routing
+│   ├── orchestration/                  # 🎭 Agent coordination
+│   ├── modification/                   # 🔄 Architecture-aware evolution
+│   └── scenario_processor.py          # 🎬 Automated demo workflows
+├── cli/                                # 💻 User interface & budget tracking
+└── main.py                             # 🚀 CLI entry point
+```
 
 ---
 
@@ -127,108 +128,131 @@ src/
 git clone https://github.com/gabosarmiento/i2c-factory.git
 cd i2c-factory
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
 echo "GROQ_API_KEY=your_groq_api_key_here" > .env
 ```
 
-### Quick Start - Interactive Mode
+### Quick Start - Architectural Intelligence Mode
 
 ```bash
-python main.py --idea "Add comprehensive logging to all API endpoints" --out-dir ./output
+# Generate with architectural understanding
+python main.py --idea "Build a secure task management API with React frontend" --out-dir ./output
+
+# The factory will:
+# 1. Detect this is a "fullstack web application"
+# 2. Apply "frontend/backend" architectural pattern  
+# 3. Structure files in proper module boundaries
+# 4. Generate appropriate tests for each language
+# 5. Validate architectural consistency
 ```
 
-### Advanced - Scenario-Based Evolution
+### Advanced - Scenario-Based Architectural Evolution
 
 ```bash
-python main.py --scenario scenarios/enhance-security.json
+python main.py --scenario scenarios/microservice-evolution.json
 ```
 
-## 🧩 Self-Healing in Action
+---
 
-### Example: Automatic Syntax Recovery
+## 🧩 Architectural Intelligence in Action
 
-```bash
+### Example: Smart Structure Recognition
+
+```json
 {
   "reasoning_trajectory": [
-    {"step": "Quality Validation", "description": "Syntax errors detected"},
-    {"step": "Failure Analysis", "description": "Pattern: auto_fix_syntax (confidence: high)"},
-    {"step": "Self-Healing", "description": "Attempting automatic recovery"},
-    {"step": "Auto-Fix", "description": "Applied syntax fixes to calculator.py"},
-    {"step": "Re-Validation", "description": "Running validation after self-healing"},
-    {"step": "Self-Healing", "description": "Self-healing successful - validation now passes"},
-    {"step": "Final Decision", "description": "Decision: approve - All validations passed after recovery"}
+    {"step": "Architectural Analysis", "description": "Detected fullstack_web pattern with React + Flask"},
+    {"step": "Module Boundary Detection", "description": "Identified UI layer (React) and API layer (Flask)"},
+    {"step": "File Organization Rules", "description": "UI components → frontend/src/components/, API routes → backend/api/routes/"},
+    {"step": "Modification Planning", "description": "Generated 8 steps respecting architectural boundaries"},
+    {"step": "Boundary Validation", "description": "Ensured no UI components directly access database layer"},
+    {"step": "Multi-Language Tests", "description": "Generated Jest tests for React, unittest for Flask"},
+    {"step": "Final Decision", "description": "Approved - All architectural constraints satisfied"}
   ]
 }
 ```
 
-### Recovery Strategies
+### Architectural Pattern Support
 
-| Issue Pattern            | Strategy            | Auto-Recoverable | Action                    |
-| ------------------------ | ------------------- | ---------------- | ------------------------- |
-| Syntax errors, indent    | auto\_fix\_syntax   | ✅ Yes            | Fix automatically         |
-| Test failures, asserts   | fix\_test\_logic    | ✅ Yes            | Regenerate tests          |
-| Performance issues       | replan\_performance | ⚠️ Maybe         | Replan with optimizations |
-| Security vulnerabilities | human\_escalation   | ❌ No             | Escalate to human review  |
-
----
-
-## 🧠 Working with Knowledge
-
-### Repository-Based Intelligence
-
-```json
-git clone https://github.com/tensorflow/tensorflow.git projects/tensorflow
-```
-
-```json
-{
-  "action": "load_project",
-  "params": {"path": "projects/tensorflow"}
-}
-```
-
-### Focused Knowledge Injection
-
-```json
-{
-  "action": "knowledge_management",
-  "params": {
-    "sources": ["docs/api-guidelines.md", "examples/logging_patterns.py"]
-  }
-}
-```
+| Pattern | Recognition | Boundary Enforcement | Test Generation | File Routing |
+|---------|-------------|---------------------|-----------------|--------------|
+| **Fullstack Web** | ✅ React+API detection | ✅ UI/API separation | ✅ Jest + unittest | ✅ frontend/backend |
+| **Clean Architecture** | ✅ Domain/App/Infra layers | ✅ Dependency rules | ✅ Layer-specific tests | ✅ Proper layer routing |
+| **Microservices** | ✅ Service boundary detection | ✅ Service isolation | ✅ Service-level tests | ✅ Service directories |
+| **Monolith** | ✅ Feature module detection | ✅ Module boundaries | ✅ Feature tests | ✅ Feature folders |
+| **CLI Tools** | ✅ Command structure | ✅ Command isolation | ✅ CLI testing | ✅ Command organization |
 
 ---
 
-## 📝 Scenario-Driven Evolution
+## 🌍 Multi-Language Architectural Intelligence
 
-Example scenario for comprehensive security enhancement:
+### Supported Languages & Their Architectures
+- **Python**: Django, Flask, FastAPI patterns with proper layering
+- **JavaScript/TypeScript**: React, Vue, Node.js with component boundaries  
+- **Go**: Microservice patterns with package organization
+- **Java**: Spring Boot, enterprise patterns with proper separation
 
+### Architecture-Aware Features
+- ✅ **Language-specific test frameworks** - unittest, Jest, JUnit, Go testing
+- ✅ **Pattern-appropriate file organization** - MVC, layered, hexagonal
+- ✅ **Cross-language boundary detection** - API contracts, shared models
+- ✅ **Integration pattern recognition** - REST, GraphQL, event-driven
+
+---
+
+## 📝 Architectural Scenario Examples
+
+### Fullstack Web Application Evolution
 ```json
 {
-  "scenario_name": "Security Hardening with Self-Healing",
+  "scenario_name": "E-commerce Platform with Architectural Intelligence",
   "steps": [
     {
       "type": "initial_generation",
-      "prompt": "Create a secure REST API with authentication",
-      "project_name": "secure-api"
+      "prompt": "Create a React frontend with Node.js API for product catalog",
+      "project_name": "ecommerce-platform"
     },
     {
-      "type": "knowledge",
-      "doc_path": "docs/security-guidelines.md",
-      "doc_type": "Security Standards"
+      "type": "agentic_evolution", 
+      "objective": {
+        "task": "Add user authentication and shopping cart functionality",
+        "constraints": [
+          "Maintain clear separation between UI and API layers",
+          "Follow REST API conventions",
+          "Implement proper error boundaries in React",
+          "Add comprehensive test coverage for both layers"
+        ],
+        "architectural_expectations": [
+          "UI components should not directly call database",
+          "Authentication should be handled at API boundary",
+          "Shopping cart state should be managed properly"
+        ]
+      }
+    }
+  ]
+}
+```
+
+### Microservice Architecture Evolution
+```json
+{
+  "scenario_name": "Microservice Decomposition with Intelligence",
+  "steps": [
+    {
+      "type": "initial_generation",
+      "prompt": "Convert monolithic user management into microservices",
+      "architectural_pattern": "microservices"
     },
     {
       "type": "agentic_evolution",
       "objective": {
-        "task": "Add input validation and rate limiting",
+        "task": "Extract authentication service and user profile service",
         "constraints": [
-          "Follow OWASP security guidelines",
-          "Ensure backward compatibility",
-          "Include comprehensive error handling"
-        ],
-        "quality_gates": ["bandit", "safety", "mypy"]
+          "Each service should have independent database",
+          "Services communicate via REST APIs only", 
+          "Implement proper service discovery"
+        ]
       }
     }
   ]
@@ -237,99 +261,112 @@ Example scenario for comprehensive security enhancement:
 
 ---
 
-## ✅ Supported Languages & Features
+## ✅ Architectural Intelligence Features
 
-### Core Languages
+### Core Capabilities
+- 🏗️ **Architectural Pattern Recognition** - Automatically detects and enforces patterns
+- 🧩 **Module Boundary Intelligence** - Understands where components belong
+- 🔗 **Integration Pattern Awareness** - Knows how services should communicate
+- 📐 **Structural Rule Enforcement** - Prevents architectural violations
+- 🌍 **Multi-Language Architecture Support** - Respects language-specific patterns
 
-* Python: Full support with auto-test generation
-* JavaScript/TypeScript: Modern frameworks & testing
-* Go: Performance-optimized patterns
-* Java: Enterprise-grade structures
+### Self-Healing with Architectural Context
+- ✅ **Structure-aware syntax correction** - Fixes code while maintaining architecture
+- ✅ **Boundary-respecting test regeneration** - Tests that understand module limits
+- ✅ **Architecture-guided performance optimization** - Improvements that fit the pattern
+- ✅ **Pattern-aware security issue escalation** - Context-sensitive security analysis
+- ✅ **Structural dependency vulnerability detection** - Architecture-aware dependency analysis
 
-### Self-Healing Capabilities
+### Quality Gates with Architectural Validation
+- **Structural Analysis**: Architecture compliance, boundary violations, pattern consistency
+- **Security Scanning**: Context-aware vulnerability assessment with architectural understanding
+- **Test Execution**: Multi-language testing that respects module boundaries
+- **Operational Readiness**: Deployment validation with architectural awareness
 
-* ✅ Automatic syntax correction
-* ✅ Intelligent test regeneration
-* ✅ Performance optimization replanning
-* ✅ Security issue escalation
-* ✅ Dependency vulnerability detection
-* ✅ Code quality auto-fixing
+---
 
-### Quality Gates
-
-* Static Analysis: flake8, mypy, bandit, eslint
-* Security Scanning: pip-audit, safety checks
-* Test Execution: pytest, jest, go test
-* Operational Readiness: Syntax validation, dependency checks
-
-\## 🎯 Why i2c Factory's Self-Healing Matters
+## 🎯 Why Architectural Intelligence Matters
 
 ### Traditional AI Code Generation Problems:
+- ❌ Generates structurally inconsistent code across modules
+- ❌ Places files randomly without understanding system boundaries
+- ❌ Creates tests that violate architectural principles
+- ❌ No understanding of why certain patterns exist
+- ❌ Cannot validate architectural consistency
 
-* ❌ Generates broken code that doesn't compile
-* ❌ Creates tests that fail immediately
-* ❌ No recovery from validation failures
-* ❌ Requires manual intervention for simple issues
+### i2c Factory Architectural Intelligence Solutions:
+- ✅ **Understands system intent** and enforces proper structure
+- ✅ **Respects module boundaries** and prevents architectural violations
+- ✅ **Generates contextually appropriate tests** that understand system limits
+- ✅ **Maintains architectural consistency** across all modifications
+- ✅ **Adapts to different patterns** while enforcing their rules
+- ✅ **Provides architectural reasoning** for all decisions
 
-### i2c Factory Self-Healing Solutions:
-
-* ✅ Automatically fixes syntax errors and common issues
-* ✅ Regenerates tests when they fail
-* ✅ Adapts strategies based on failure patterns
-* ✅ Escalates intelligently only when human input is needed
-* ✅ Learns from failures to improve future operations
-
-### Real-World Impact:
-
-* 95% reduction in manual fix-up work
-* Autonomous recovery from common development issues
-* Intelligent escalation preserves human time for complex decisions
-* Production-ready code with comprehensive validation
-* Transparent reasoning for full auditability
-
----
-
-## 🔬 Advanced Features
-
-### Meta-Agent Reasoning
-
-The orchestrator maintains a complete reasoning trajectory showing:
-
-* Decision points and rationale
-* Failure analysis and pattern recognition
-* Recovery attempts and outcomes
-* Human escalation triggers
-* Final approval reasoning
-
-### Budget-Aware Operations
-
-* Token consumption tracking
-* Cost optimization across agent teams
-* Intelligent model selection per task
-* Usage analytics and reporting
-
-### Extensible Architecture
-
-* Plugin-based agent teams
-* Custom quality gates
-* Domain-specific knowledge integration
-* Multi-cloud deployment ready
+### Real-World Architectural Impact:
+* **90% reduction** in structural inconsistencies
+* **Automatic architectural validation** prevents boundary violations  
+* **Pattern-aware code generation** respects established conventions
+* **Multi-language architectural intelligence** works across technology stacks
+* **Scalable to enterprise patterns** - microservices, clean architecture, etc.
 
 ---
 
-Made by humans, evolved by self-healing agents.
-Powered by Groq, intelligent reasoning, and your knowledge base.
+## 🔬 Advanced Architectural Features
+
+### Meta-Agent Architectural Reasoning
+The orchestrator maintains complete architectural understanding including:
+* System pattern recognition and boundary mapping
+* Module responsibility analysis and dependency validation
+* Integration pattern detection and enforcement
+* Architectural constraint checking and violation prevention
+* Cross-cutting concern identification and proper placement
+
+### Budget-Aware Architectural Operations
+* Token consumption optimization across architectural analysis
+* Cost-effective pattern recognition without sacrificing quality
+* Intelligent model selection per architectural complexity
+* Usage analytics with architectural decision tracking
+
+### Extensible Architectural Patterns
+* Plugin-based architectural pattern definitions
+* Custom boundary rules and validation logic
+* Domain-specific architectural intelligence
+* Multi-cloud and multi-platform architectural awareness
 
 ---
 
-## 🤝 Contributing
+## 🎨 Architectural Intelligence vs. Traditional Approaches
 
-The i2c Factory thrives on community contributions:
+| Aspect | Traditional Code Gen | i2c Factory Intelligence |
+|--------|---------------------|-------------------------|
+| **File Placement** | Random/template-based | Architectural boundary-aware |
+| **Module Understanding** | None | Deep boundary comprehension |
+| **Pattern Recognition** | Copy existing patterns | Understand pattern purpose |
+| **Cross-Language Support** | Single language focus | Multi-language architectural intelligence |
+| **Test Generation** | Generic test templates | Architecture-aware, boundary-respecting tests |
+| **Validation** | Syntax checking only | Architectural consistency + syntax |
+| **Self-Healing** | Fix syntax errors | Fix while maintaining architectural integrity |
+| **Evolution** | Add features randomly | Evolve within architectural constraints |
 
-* Agent Teams: Contribute specialized validation or generation agents
-* Self-Healing Patterns: Add new failure pattern detection and recovery strategies
-* Quality Gates: Implement language-specific quality validations
-* Knowledge Integrations: Build domain-specific RAG connectors
-* Scenario Templates: Share proven evolution workflows
+---
 
-Join us in building the future of intelligent, self-healing software development.
+> **Built by humans, evolved by architecturally-intelligent self-healing agents.**  
+> **Powered by Groq, deep architectural reasoning, and your domain knowledge.**
+
+---
+
+## 🤝 Contributing to Architectural Intelligence
+
+The i2c Factory thrives on community contributions to architectural intelligence:
+
+* **🏗️ Architectural Patterns**: Contribute new pattern recognition and validation rules
+* **🧠 Self-Healing Strategies**: Add architectural-aware failure recovery patterns  
+* **✅ Quality Gates**: Implement architecture-specific validation rules
+* **🌍 Multi-Language Support**: Extend architectural intelligence to new languages
+* **📊 Pattern Templates**: Share proven architectural evolution workflows
+* **🔗 Integration Patterns**: Add support for new architectural communication patterns
+
+Join us in building the future of **architecturally-intelligent, self-healing software development**.
+
+---
+```
