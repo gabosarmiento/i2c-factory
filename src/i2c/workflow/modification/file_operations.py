@@ -38,12 +38,34 @@ def post_process_code_map(code_map: dict) -> dict:
     return processed_map
 
 def write_files_to_disk(code_map: dict[str, str], destination_dir: Path):
-    """Writes the generated/modified code content to disk with enhanced error handling."""
-    canvas.step("Writing files to disk...")
+    """Writes the generated/modified code content to disk with intelligent path resolution."""
+    canvas.step("Writing files to disk with intelligent path resolution...")
     saved_count = 0
     
     try:
         destination_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Resolve file paths using project layout intelligence
+        try:
+            from i2c.workflow.file_path_resolver import resolve_code_map_paths
+            
+            canvas.info(f"🧠 Resolving {len(code_map)} file paths using project layout analysis...")
+            resolved_code_map = resolve_code_map_paths(code_map, destination_dir)
+            
+            # Show path resolutions
+            if len(resolved_code_map) != len(code_map) or any(orig != res for orig, res in zip(code_map.keys(), resolved_code_map.keys())):
+                canvas.info("📍 Path resolutions applied:")
+                for orig_path in code_map.keys():
+                    resolved_path = next((r for r in resolved_code_map.keys() if code_map[orig_path] == resolved_code_map[r]), orig_path)
+                    if orig_path != resolved_path:
+                        canvas.info(f"   {orig_path} → {resolved_path}")
+            
+            # Use resolved code map
+            code_map = resolved_code_map
+            
+        except Exception as e:
+            canvas.warning(f"⚠️ Path resolution failed, using original paths: {e}")
+            # Continue with original code_map
         
         # Add debug logging
         canvas.info(f"Files to write: {len(code_map)}")
