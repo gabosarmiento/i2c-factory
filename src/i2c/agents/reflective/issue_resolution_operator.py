@@ -53,7 +53,7 @@ class IssueResolutionOperator(ContextAwareOperator):
 
         # Dedicated reasoning LLM
         self.reasoning_agent = Agent(
-            model=llm_deepseek,
+            model=llm_highest,
             reasoning=True,
             name="IssueResolutionAgent",
             description="Diagnoses and fixes code issues",

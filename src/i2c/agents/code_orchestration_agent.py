@@ -542,49 +542,136 @@ class CodeOrchestrationAgent(Agent):
         self.quality_team = build_quality_team(session_state=shared_session)
         self.sre_team = build_sre_team(session_state=shared_session)
 
-
     async def _analyze_project_context(self, project_path: Path, task: str) -> Dict[str, Any]:
-        """Analyze project context using the knowledge team"""
-        # Track this step in the reasoning trajectory
+        """Analyze project context using file system analysis and optional knowledge team"""
         self._add_reasoning_step("Project Context Analysis", 
                                 f"Analyzing project at {project_path} for task: {task}")
         
-        # This is a placeholder - implement actual Knowledge Team integration
-        analysis_result = {
-            "project_structure": {
-                "files": [str(p) for p in project_path.glob("**/*") if p.is_file()],
-                "languages": self._detect_languages(project_path)
-            },
-            "task_analysis": {
-                "description": task,
-                "identified_targets": []  # Files likely to be modified
-            },
-            "context": {}  # RAG-retrieved context
-        }
+        try:
+            # 1. File system analysis
+            analysis_result = {
+                "project_structure": {
+                    "files": [],
+                    "languages": {},
+                    "directories": []
+                },
+                "task_analysis": {
+                    "description": task,
+                    "identified_targets": []
+                },
+                "context": {}
+            }
+            
+            # Analyze project files
+            if project_path.exists() and project_path.is_dir():
+                # Get all files (excluding common ignore patterns)
+                ignore_patterns = {'.git', '__pycache__', '.venv', 'node_modules', '.pytest_cache'}
+                
+                files = []
+                for file_path in project_path.rglob("*"):
+                    if file_path.is_file():
+                        # Skip ignored directories
+                        if any(ignore_dir in file_path.parts for ignore_dir in ignore_patterns):
+                            continue
+                        files.append(str(file_path.relative_to(project_path)))
+                
+                analysis_result["project_structure"]["files"] = files
+                analysis_result["project_structure"]["languages"] = self._detect_languages(project_path)
+                
+                # Get directories
+                dirs = []
+                for dir_path in project_path.rglob("*"):
+                    if dir_path.is_dir() and dir_path.name not in ignore_patterns:
+                        dirs.append(str(dir_path.relative_to(project_path)))
+                analysis_result["project_structure"]["directories"] = dirs
+                
+                # Identify likely target files based on task keywords
+                task_lower = task.lower()
+                likely_targets = []
+                
+                for file_path in files:
+                    file_lower = file_path.lower()
+                    # Simple heuristics for target identification
+                    if any(keyword in file_lower for keyword in task_lower.split() if len(keyword) > 3):
+                        likely_targets.append(file_path)
+                    # Common target patterns
+                    elif any(pattern in file_lower for pattern in ['main.py', 'app.py', 'index.js', 'server.py']):
+                        likely_targets.append(file_path)
+                
+                analysis_result["task_analysis"]["identified_targets"] = likely_targets[:5]  # Limit to 5
+            
+            # 2. Optional: Use knowledge team if available
+            if self.knowledge_team and hasattr(self.knowledge_team, 'analyze_context'):
+                try:
+                    knowledge_context = await self.knowledge_team.analyze_context(task, project_path)
+                    analysis_result["context"]["knowledge_insights"] = knowledge_context
+                except Exception as e:
+                    canvas.info(f"Knowledge team context analysis failed: {e}")
+            
+            # Add successful step completion to reasoning
+            files_count = len(analysis_result["project_structure"]["files"])
+            targets_count = len(analysis_result["task_analysis"]["identified_targets"])
+            
+            self._add_reasoning_step("Project Context Analysis", 
+                                    f"Analyzed {files_count} files, identified {targets_count} potential targets",
+                                    success=True)
+            
+            return analysis_result
+            
+        except Exception as e:
+            self._add_reasoning_step("Project Context Analysis", 
+                                    f"Analysis failed: {str(e)}", 
+                                    success=False)
+            # Return minimal analysis on error
+            return {
+                "project_structure": {"files": [], "languages": {}, "directories": []},
+                "task_analysis": {"description": task, "identified_targets": []},
+                "context": {"error": str(e)}
+            }
         
-        # Add successful step completion to reasoning
-        self._add_reasoning_step("Project Context Analysis", 
-                                "Analysis completed successfully",
-                                success=True)
-        
-        return analysis_result
-    
     async def _create_modification_plan(
         self, task: str, constraints: List[str], analysis: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Create a modification plan using the planner"""
-        # Track this step in the reasoning trajectory
         self._add_reasoning_step("Modification Planning", 
-                               f"Creating modification plan for task: {task}")
+                            f"Creating modification plan for task: {task}")
         
-        # This is a placeholder - implement actual Planner integration
-        plan = {
-            "steps": [],
-            "constraints": constraints,
-            "target_files": []
-        }
-        
-        return plan
+        try:
+            from i2c.workflow.modification.plan_generator import generate_modification_plan
+            
+            project_path = Path(self.session_state.get("project_path", ""))
+            language = self.session_state.get("language", "python")
+            
+            # Call the real planner
+            modification_steps = generate_modification_plan(
+                user_request=task,
+                retrieved_context_plan="",  # We'll enhance this later
+                project_path=project_path,
+                language=language
+            )
+            
+            plan = {
+                "steps": modification_steps,
+                "constraints": constraints,
+                "target_files": [step.get("file", "") for step in modification_steps if step.get("file")]
+            }
+            
+            self._add_reasoning_step("Modification Planning", 
+                                f"Generated plan with {len(modification_steps)} steps", 
+                                success=True)
+            
+            return plan
+            
+        except Exception as e:
+            self._add_reasoning_step("Modification Planning", 
+                                f"Planning failed: {str(e)}", 
+                                success=False)
+            # Fallback to basic plan
+            return {
+                "steps": [],
+                "constraints": constraints, 
+                "target_files": []
+            }
     
 
     async def _execute_modifications(self, plan: Dict[str, Any]) -> Dict[str, Any]:

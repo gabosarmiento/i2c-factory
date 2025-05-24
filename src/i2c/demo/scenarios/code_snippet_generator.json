@@ -1,0 +1,51 @@
+{
+  "name": "Build Code Snippet Generator MVP",
+  "description": "A web app that generates code snippets from natural language descriptions",
+  "steps": [
+    {
+      "type": "initial_generation",
+      "name": "Create Base Application",
+      "prompt": "Create a modern web application called 'SnippetForge' with React frontend and FastAPI backend. Users should be able to describe what code they need in plain English, select a programming language, and get a working code snippet. Include a beautiful dark theme UI with syntax highlighting.",
+      "project_name": "snippet_forge"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add Core Snippet Generation",
+      "objective": {
+        "task": "Implement the core snippet generation engine that can create code for common programming tasks like validation, sorting, API calls, and data processing. Support Python, JavaScript, and TypeScript initially.",
+        "constraints": [
+          "Generate syntactically correct code",
+          "Include helpful comments",
+          "Follow language-specific best practices",
+          "Handle edge cases gracefully"
+        ],
+        "quality_gates": ["python", "javascript", "typescript"]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add Smart Context Understanding",
+      "objective": {
+        "task": "Enhance the snippet generator with context awareness. It should understand variations in how users describe tasks and generate appropriate code. Add examples and test cases for each snippet.",
+        "constraints": [
+          "Parse natural language effectively",
+          "Provide multiple implementation options when relevant",
+          "Include usage examples with each snippet"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Polish UI and Deploy",
+      "objective": {
+        "task": "Create a stunning, professional UI with smooth animations, real-time syntax highlighting, one-click copy functionality, and share buttons. Add deployment configuration for Vercel/Netlify.",
+        "constraints": [
+          "Mobile-responsive design",
+          "Fast loading times",
+          "SEO-friendly",
+          "Include analytics to track usage"
+        ]
+      }
+    }
+  ]
+}

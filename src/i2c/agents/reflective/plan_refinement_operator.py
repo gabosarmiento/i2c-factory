@@ -51,7 +51,7 @@ class PlanRefinementOperator(ContextAwareOperator):
         self.embed_model = embed_model
 
         self.reasoning_agent = Agent(
-            model=llm_deepseek,
+            model=llm_highest,
             reasoning=True,
             name="PlanRefinementAgent",
             description="Improves and validates project modification plans",
