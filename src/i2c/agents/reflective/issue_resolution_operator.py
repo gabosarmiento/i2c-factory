@@ -18,7 +18,7 @@ from typing import Dict, List, Tuple
 
 from agno.agent import Agent
 from i2c.cli.controller import canvas
-from builtins import llm_highest
+from builtins import llm_highest, llm_deepseek
 
 from i2c.agents.sre_team import sandbox_executor
 from i2c.agents.reflective.context_aware_operator import (
@@ -53,7 +53,7 @@ class IssueResolutionOperator(ContextAwareOperator):
 
         # Dedicated reasoning LLM
         self.reasoning_agent = Agent(
-            model=llm_highest,
+            model=llm_deepseek,
             reasoning=True,
             name="IssueResolutionAgent",
             description="Diagnoses and fixes code issues",

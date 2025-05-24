@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from agno.agent import Agent
 from i2c.cli.controller import canvas
-from builtins import llm_highest
+from builtins import llm_highest,llm_deepseek
 from i2c.workflow.modification.rag_retrieval import retrieve_context_for_planner
 
 from i2c.agents.reflective.context_aware_operator import (
@@ -51,7 +51,7 @@ class PlanRefinementOperator(ContextAwareOperator):
         self.embed_model = embed_model
 
         self.reasoning_agent = Agent(
-            model=llm_highest,
+            model=llm_deepseek,
             reasoning=True,
             name="PlanRefinementAgent",
             description="Improves and validates project modification plans",
