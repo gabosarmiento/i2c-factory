@@ -18,6 +18,7 @@ from .chunkers.ast_chunker import ASTChunker
 from .chunkers.css_code import CSSCodeChunkingStrategy
 from .chunkers.markdown_code import MarkdownChunkingStrategy
 from .chunkers.shell_script import ShellScriptChunkingStrategy
+from .chunkers.jsx_code import JSXCodeChunkingStrategy
 
 from agno.document.chunking.fixed import FixedSizeChunking
 from agno.document.chunking.recursive import RecursiveChunking
@@ -31,6 +32,7 @@ _EXTENSION_MAP = {
     '.ts':   'TSCodeChunkingStrategy',
     '.tsx':  'TSCodeChunkingStrategy',
     '.js':   'JSCodeChunkingStrategy',
+    '.jsx':  'JSXCodeChunkingStrategy',
     '.html': 'HTMLCodeChunkingStrategy',
     '.htm':  'HTMLCodeChunkingStrategy',
     '.go':   'GoCodeChunkingStrategy',
@@ -71,6 +73,7 @@ _CLASS_BASED_CHUNKERS = {
     '.ts': TSCodeChunkingStrategy,
     '.tsx': TSCodeChunkingStrategy,
     '.js': JSCodeChunkingStrategy,
+    '.jsx': JSXCodeChunkingStrategy,
     '.html': HTMLCodeChunkingStrategy,
     '.htm': HTMLCodeChunkingStrategy,
     '.go': GoCodeChunkingStrategy,
