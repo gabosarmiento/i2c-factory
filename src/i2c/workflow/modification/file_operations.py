@@ -6,6 +6,7 @@ from i2c.cli.controller import canvas # For logging
 # In file_operations.py, modify the write_files_to_disk function:
 
 # In file_operations.py or a related file
+
 def post_process_code_map(code_map: dict) -> dict:
     """Fix common quality issues in the code map before writing to disk."""
     processed_map = code_map.copy()
@@ -37,7 +38,7 @@ def post_process_code_map(code_map: dict) -> dict:
     return processed_map
 
 def write_files_to_disk(code_map: dict[str, str], destination_dir: Path):
-    """Writes the generated/modified code content to disk with integrity checks."""
+    """Writes the generated/modified code content to disk with enhanced error handling."""
     canvas.step("Writing files to disk...")
     saved_count = 0
     
@@ -53,77 +54,77 @@ def write_files_to_disk(code_map: dict[str, str], destination_dir: Path):
             full_path = destination_dir / relative_path_str
             
             # Skip empty or near-empty content if the file already exists
-            if full_path.exists() and len(content.strip()) < 5:
+            try:
+                file_exists = full_path.exists()
+            except (PermissionError, OSError):
+                file_exists = False  # Assume doesn't exist if we can't check
+            
+            if file_exists and len(content.strip()) < 5:
                 canvas.warning(f"   ⚠️ Skipping write of empty content to existing file: {full_path}")
                 continue
                 
             canvas.info(f"   -> Writing {full_path} ({len(content)} chars)")
             
             try:
-                # Ensure parent directories for the file exist
+                # Ensure parent directories exist - force creation
                 full_path.parent.mkdir(parents=True, exist_ok=True)
                 
-                # If the file exists but the content is just a comment/placeholder
-                # and the original file has substantial content, preserve the original
-                if full_path.exists():
-                    original_content = full_path.read_text(encoding='utf-8')
-                    is_placeholder = content.strip().startswith("#") and len(content.strip().splitlines()) <= 3
-                    has_substantial_original = len(original_content) > 100
-                    
-                    if is_placeholder and has_substantial_original:
-                        canvas.warning(f"   ⚠️ Preserving original content - new content appears to be just a placeholder")
-                        content = original_content + f"\n\n# Updated: {content}"
+                # Verify directory was created
+                if not full_path.parent.exists():
+                    canvas.error(f"   ❌ Failed to create directory: {full_path.parent}")
+                    continue
                 
-                # Check if content is a diff format and extract actual content
-                if content.startswith("# === Diff for") or (content.startswith("---") and "+++ " in content):
-                    from i2c.workflow.modification.code_executor import apply_diff_to_content
+                # Clean content - remove diff artifacts if present
+                clean_content = content
+                if content.startswith("# === Diff for") or content.startswith("---"):
+                    # This is diff format, extract actual content
+                    lines = content.splitlines()
+                    clean_lines = []
+                    in_diff_header = True
                     
-                    if full_path.exists():
-                        # For existing files
-                        original_content = full_path.read_text(encoding='utf-8')
-                        modified_content = apply_diff_to_content(original_content, content)
-                        
-                        # Safety check - don't replace substantive content with empty
-                        if len(modified_content.strip()) < 5 and len(original_content.strip()) > 100:
-                            canvas.warning(f"   ⚠️ Diff would result in empty file - preserving original")
-                            modified_content = original_content
+                    for line in lines:
+                        if line.startswith("+++") and in_diff_header:
+                            in_diff_header = False
+                            continue
+                        elif not in_diff_header:
+                            if line.startswith("+"):
+                                clean_lines.append(line[1:])  # Remove + prefix
+                            elif not line.startswith("-") and not line.startswith("@@"):
+                                clean_lines.append(line)
+                    
+                    clean_content = "\n".join(clean_lines)
+                
+                # Final check - don't write empty content
+                if len(clean_content.strip()) < 10 and full_path.exists():
+                    canvas.warning(f"   ⚠️ Preserving existing file - new content too short")
+                    continue
+                
+                # Write the file
+                full_path.write_text(clean_content, encoding='utf-8')
+                
+                # Verify file was written (safely handle permission errors)
+                try:
+                    if full_path.exists() and full_path.stat().st_size > 0:
+                        saved_count += 1
+                        canvas.info(f"   ✅ Successfully wrote {full_path}")
                     else:
-                        # For new files, extract content after +++ line
-                        if "def square" not in content and "square function" in content:
-                            # Special case for square function test
-                            modified_content = """
-# Math utilities module
-def square(x):
-    \"\"\"
-    Calculate the square of a number
-    
-    Args:
-        x: Number to square
-        
-    Returns:
-        The square of x
-    \"\"\"
-    return x * x
-"""
-                        else:
-                            # Extract actual content from diff
-                            modified_content = apply_diff_to_content("", content)
-                            
-                            # If extraction fails (empty result), create placeholder
-                            if not modified_content.strip():
-                                modified_content = f"# {relative_path_str}\n\ndef main():\n    pass\n"
-                            
-                    full_path.write_text(modified_content, encoding='utf-8')
-                else:
-                    # Normal content - write directly
-                    full_path.write_text(content, encoding='utf-8')
-                
-                saved_count += 1
+                        canvas.error(f"   ❌ File write verification failed: {full_path}")
+                except (PermissionError, OSError):
+                    # Can't verify file stats due to permissions, assume success if no write error
+                    saved_count += 1
+                    canvas.info(f"   ✅ File written (verification skipped due to permissions): {full_path}")
+            except PermissionError as e:
+                canvas.error(f"   ❌ Permission denied writing {full_path}: {e}")
+                # Continue without failing the entire process
+                continue
+            except FileNotFoundError as e:
+                canvas.error(f"   ❌ Directory creation failed for {full_path}: {e}")
+                continue
             except OSError as e:
-                canvas.error(f"   ❌ Error writing file {full_path}: {e}")
-                # Decide if one error should stop all writing? For now, continue.
+                canvas.error(f"   ❌ OS error writing {full_path}: {e}")
+                continue
             except Exception as e:
-                 canvas.error(f"   ❌ Unexpected error writing file {full_path}: {e}")
+                canvas.error(f"   ❌ Unexpected error writing {full_path}: {e}")
 
         if saved_count == len(code_map):
             canvas.success(f"✅ All {saved_count} files saved successfully!")
@@ -132,8 +133,8 @@ def square(x):
 
     except Exception as e:
         canvas.error(f"❌ Critical error setting up destination directory {destination_dir}: {e}")
-        raise  # Re-raise critical errors
-
+        raise
+    
 def delete_files(files_to_delete: list[Path], project_path: Path):
     """Deletes the specified files."""
     if not files_to_delete:
