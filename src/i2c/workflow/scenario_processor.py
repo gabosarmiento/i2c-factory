@@ -24,6 +24,7 @@ from i2c.cli.budget_display import show_budget_status, show_operation_cost, show
 # Import orchestrator for generating and modifying projects
 from i2c.workflow.orchestrator import route_and_execute
 from i2c.workflow.utils import sanitize_filename, ensure_project_path
+from i2c.utils.json_extraction import extract_json
 
 # Import knowledge management
 from i2c.workflow.session_handlers import (
@@ -385,12 +386,7 @@ class ScenarioProcessor:
         time.sleep(pause_time)
         
     def _process_initial_generation_step(self, step: Dict[str, Any]) -> None:
-        """
-        Proces  s an initial generation step - create a new project
-        
-        Args:
-            step: The initial generation step configuration
-        """
+        """Process an initial generation step with architectural intelligence enforcement"""
         raw_idea = step.get("prompt", "")
         if not raw_idea:
             canvas.warning("Initial generation step has empty prompt. Skipping...")
@@ -408,12 +404,15 @@ class ScenarioProcessor:
             canvas.warning("Clarification cancelled due to budget rejection.")
             return
             
-        canvas.step("Clarifying new idea…")
+        canvas.step("Clarifying new idea with architectural intelligence…")
         try:
             # Get start cost for operation tracking
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
             
-            resp = input_processor_agent.run(raw_idea)
+            # ENHANCED: Add architectural context to the input processing
+            enhanced_prompt = self._enhance_prompt_with_architectural_guidance(raw_idea)
+            
+            resp = input_processor_agent.run(enhanced_prompt)
             
             # Update budget manager with metrics from Agno agent
             self.budget_manager.update_from_agno_metrics(input_processor_agent)
@@ -448,33 +447,19 @@ class ScenarioProcessor:
             canvas.info(f"JSON to parse: {json_str[:100]}...")
 
             # Parse the extracted JSON
-            proc = json.loads(json_str)
+            proc = extract_json(json_str)
             if not (isinstance(proc, dict) and "objective" in proc and "language" in proc):
                 raise ValueError("Invalid JSON from LLM")
             
-            # Add quality constraints for code generation
-            if "constraints" not in proc:
-                proc["constraints"] = []
-            
-            quality_constraints = [
-                "Use a consistent data model across all files",
-                "Avoid creating duplicate implementations of the same functionality",
-                "Ensure tests do not have duplicate unittest.main() calls",
-                "If creating a CLI app, use a single approach for the interface",
-                "Use consistent file naming for data storage (e.g., todos.json)"
-            ]
-            
-            # Add constraints if they don't already exist
-            for constraint in quality_constraints:
-                if constraint not in proc["constraints"]:
-                    proc["constraints"].append(constraint)
-                    
-            canvas.info(f"📏 Quality constraints added to generation goal: {len(quality_constraints)}")
+            # ENHANCED: Add architectural-specific constraints based on detected system type
+            proc = self._enhance_objective_with_architectural_rules(proc, raw_idea)
             
             self.current_structured_goal = proc
             canvas.success(f"Objective: {proc['objective']}")
             canvas.success(f"Language:  {proc['language']}")
-                        
+            canvas.success(f"System Type: {proc.get('system_type', 'auto-detected')}")
+            canvas.success(f"Architecture: {proc.get('architecture_pattern', 'auto-detected')}")
+                            
         except Exception as e:
             canvas.error(f"Error clarifying idea: {e}")
             return
@@ -493,6 +478,9 @@ class ScenarioProcessor:
             canvas.error("Project path validation failed. Stopping generation step.")
             return
         
+        # ENHANCED: Initialize architectural context early
+        self._initialize_architectural_context()
+        
         # Ensure database tables exist before context indexing
         self.ensure_database_tables()
         
@@ -504,7 +492,7 @@ class ScenarioProcessor:
         status = self.reader_agent.index_project_context()
         canvas.info(f"Indexing Status: {status}")
         
-        canvas.info(f"Preparing new project generation in: {self.current_project_path}")
+        canvas.info(f"Preparing architecturally-aware project generation in: {self.current_project_path}")
         
         # Standard approval without visual display
         if self.budget_manager.request_approval(
@@ -515,7 +503,7 @@ class ScenarioProcessor:
             # Get start cost for operation tracking
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
             
-            # Call route_and_execute without budget_manager parameter
+            # ENHANCED: Pass architectural context to generation
             ok = route_and_execute(
                 action_type='generate',
                 action_detail=self.current_structured_goal,
@@ -525,67 +513,15 @@ class ScenarioProcessor:
             
             # Check for generation failures or syntax errors
             if not ok or self._check_for_syntax_errors(self.current_project_path):
-                canvas.error("Action 'generate' failed or syntax errors found. Creating minimal working project...")
+                canvas.error("Action 'generate' failed or syntax errors found.")
                 
-                # Create minimal working files directly
-                minimal_code = {
-                    "main.py": '#!/usr/bin/env python3\n\ndef main():\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    main()'
-                }
-                
-                # Write files directly
-                try:
-                    for file_name, content in minimal_code.items():
-                        file_path = self.current_project_path / file_name
-                        file_path.write_text(content)
-                        canvas.success(f"Created minimal working file: {file_path}")
-                    
-                    # Create __init__.py
-                    init_path = self.current_project_path / "__init__.py"
-                    if not init_path.exists():
-                        init_path.touch()
-                        canvas.success(f"Created missing __init__.py at {init_path}")
-                        
-                    canvas.success("Created minimal working project as fallback")
-                except Exception as e:
-                    canvas.error(f"Failed to create minimal working project: {e}")
-                    canvas.error(traceback.format_exc())
+                # ENHANCED: Create architectural-appropriate fallback instead of generic
+                self._create_architectural_fallback_project()
             
-            # Calculate operation cost manually if no tokens were tracked
+            # Calculate operation cost
             end_tokens, end_cost = self.budget_manager.get_session_consumption()
-            
-            # If no tokens were counted, estimate based on complexity
-            if end_tokens == start_tokens:
-                # Estimate tokens based on complexity
-                estimated_tokens = 5000  # Reasonable estimate for generation
-                model_id = "groq/llama-3.1-8b-instant"  # Default model
-                
-                # Import pricing info
-                from i2c.workflow.utils import MODEL_PRICING_PER_1K_TOKENS, DEFAULT_PRICE_PER_1K
-                
-                # Calculate estimated cost
-                price_per_1k = MODEL_PRICING_PER_1K_TOKENS.get(model_id, DEFAULT_PRICE_PER_1K)
-                estimated_cost = (estimated_tokens / 1000) * price_per_1k
-                
-                # Manually update budget manager
-                self.budget_manager.consumed_tokens_session += estimated_tokens
-                self.budget_manager.consumed_cost_session += estimated_cost
-                
-                # Update provider stats
-                provider = 'groq'
-                if provider in self.budget_manager.provider_stats:
-                    self.budget_manager.provider_stats[provider]['tokens'] += estimated_tokens
-                    self.budget_manager.provider_stats[provider]['cost'] += estimated_cost
-                    self.budget_manager.provider_stats[provider]['calls'] += 1
-                
-                # Use estimated values
-                op_tokens = estimated_tokens
-                op_cost = estimated_cost
-                
-                canvas.info(f"Using estimated token count: {op_tokens} tokens, ${op_cost:.6f}")
-            else:
-                # Use actual difference
-                op_tokens = end_tokens - start_tokens
-                op_cost = end_cost - start_cost
+            op_tokens = end_tokens - start_tokens if end_tokens > start_tokens else 5000
+            op_cost = end_cost - start_cost if end_cost > start_cost else 0.01
             
             # Show operation cost
             show_operation_cost(
@@ -595,7 +531,242 @@ class ScenarioProcessor:
             )
         else:
             canvas.warning("Generation cancelled due to budget rejection.")
-             
+
+    def _enhance_prompt_with_architectural_guidance(self, raw_idea: str) -> str:
+        """Enhance the input prompt with architectural intelligence guidance"""
+        
+        enhanced_prompt = f"""
+    {raw_idea}
+
+    IMPORTANT: Analyze this idea and determine the appropriate system architecture.
+
+    Pay special attention to these indicators:
+    - If mentions: "web app", "frontend", "backend", "React", "API", "FastAPI", "Flask" → FULLSTACK WEB APP
+    - If mentions: "CLI", "command line", "script", "terminal" → CLI TOOL  
+    - If mentions: "API", "REST", "endpoints", "microservice" → API SERVICE
+    - If mentions: "library", "package", "module" → LIBRARY
+
+    For FULLSTACK WEB APPS, ensure you specify:
+    - Frontend technology (React, Vue, etc.)
+    - Backend technology (FastAPI, Flask, Express, etc.)
+    - Proper file structure requirements
+    - API communication patterns
+
+    Your response should include:
+    - "system_type": one of ["fullstack_web_app", "api_service", "cli_tool", "library", "desktop_app"]
+    - "architecture_pattern": appropriate pattern for the system type
+    - Constraints that enforce proper architectural boundaries
+    """
+        
+        return enhanced_prompt
+
+    def _enhance_objective_with_architectural_rules(self, proc: Dict[str, Any], raw_idea: str) -> Dict[str, Any]:
+        """Enhance the processed objective with architectural rules based on system detection"""
+        
+        objective = proc.get("objective", "")
+        
+        # Detect system type from objective and raw idea
+        combined_text = f"{objective} {raw_idea}".lower()
+        
+        # Fullstack web app detection
+        if any(indicator in combined_text for indicator in [
+            "web app", "frontend", "backend", "react", "api", "fastapi", 
+            "flask", "express", "vue", "angular", "full stack", "fullstack"
+        ]):
+            proc["system_type"] = "fullstack_web_app"
+            proc["architecture_pattern"] = "fullstack_web"
+            
+            # Add fullstack-specific constraints
+            fullstack_constraints = [
+                "Frontend must be in frontend/ directory with proper React structure",
+                "Backend must be in backend/ directory with FastAPI endpoints", 
+                "Main backend file must be backend/main.py with FastAPI app",
+                "React components must be in frontend/src/components/",
+                "Main React app must be frontend/src/App.jsx",
+                "No mixing of frontend and backend code in same files",
+                "Use proper file extensions: .jsx for React, .py for Python",
+                "API endpoints must follow REST conventions",
+                "Include proper CORS configuration for development"
+            ]
+            
+            existing_constraints = proc.get("constraints", [])
+            proc["constraints"] = existing_constraints + fullstack_constraints
+            
+            canvas.info("🏗️ Detected FULLSTACK WEB APP - added architectural constraints")
+        
+        # CLI tool detection
+        elif any(indicator in combined_text for indicator in [
+            "cli", "command line", "terminal", "script", "command"
+        ]):
+            proc["system_type"] = "cli_tool"
+            proc["architecture_pattern"] = "cli_tool"
+            
+            cli_constraints = [
+                "Main entry point must handle command line arguments",
+                "Use argparse or click for argument parsing",
+                "Include proper help text and usage examples",
+                "Structure commands in organized modules"
+            ]
+            
+            existing_constraints = proc.get("constraints", [])
+            proc["constraints"] = existing_constraints + cli_constraints
+            
+            canvas.info("💻 Detected CLI TOOL - added CLI-specific constraints")
+        
+        # API service detection
+        elif any(indicator in combined_text for indicator in [
+            "api", "rest", "endpoints", "microservice", "service"
+        ]):
+            proc["system_type"] = "api_service"
+            proc["architecture_pattern"] = "clean_architecture"
+            
+            api_constraints = [
+                "Use FastAPI or Flask for API framework",
+                "Organize endpoints in api/ directory",
+                "Include proper request/response models",
+                "Add input validation and error handling",
+                "Include API documentation (OpenAPI/Swagger)"
+            ]
+            
+            existing_constraints = proc.get("constraints", [])
+            proc["constraints"] = existing_constraints + api_constraints
+            
+            canvas.info("🔌 Detected API SERVICE - added API-specific constraints")
+        
+        return proc
+
+    def _initialize_architectural_context(self) -> None:
+        """Initialize architectural context early in the process"""
+        
+        if not self.current_structured_goal:
+            return
+        
+        # Create initial architectural context based on detected system type
+        system_type = self.current_structured_goal.get("system_type", "web_app")
+        architecture_pattern = self.current_structured_goal.get("architecture_pattern", "fullstack_web")
+        
+        if system_type == "fullstack_web_app":
+            architectural_context = {
+                "architecture_pattern": "fullstack_web",
+                "system_type": "fullstack_web_app",
+                "modules": {
+                    "frontend": {
+                        "boundary_type": "ui_layer",
+                        "languages": ["javascript", "jsx"],
+                        "responsibilities": ["React components", "user interface", "client-side logic"],
+                        "folder_structure": {
+                            "base_path": "frontend",
+                            "subfolders": ["src", "src/components", "public"]
+                        }
+                    },
+                    "backend": {
+                        "boundary_type": "api_layer",
+                        "languages": ["python"],
+                        "responsibilities": ["REST API endpoints", "business logic", "data management"],
+                        "folder_structure": {
+                            "base_path": "backend",
+                            "subfolders": ["api", "models", "services"]
+                        }
+                    }
+                },
+                "file_organization_rules": {
+                    "react_components": "frontend/src/components",
+                    "main_app": "frontend/src",
+                    "api_endpoints": "backend/api",
+                    "data_models": "backend/models",
+                    "business_logic": "backend/services",
+                    "main_backend": "backend"
+                },
+                "constraints": self.current_structured_goal.get("constraints", []),
+                "integration_patterns": ["REST API", "JSON data exchange", "CORS configuration"]
+            }
+            
+            # Store in session state for use by other components
+            self.session_state = self.session_state or {}
+            self.session_state["architectural_context"] = architectural_context
+            self.session_state["system_type"] = system_type
+            
+            canvas.success("🏗️ Initialized fullstack web app architectural context")
+
+    def _create_architectural_fallback_project(self) -> None:
+        """Create architectural-appropriate fallback project instead of generic"""
+        
+        system_type = self.current_structured_goal.get("system_type", "web_app")
+        
+        if system_type == "fullstack_web_app":
+            canvas.info("Creating fullstack web app fallback structure...")
+            
+            # Backend structure
+            backend_main = self.current_project_path / "backend" / "main.py"
+            backend_main.parent.mkdir(parents=True, exist_ok=True)
+            backend_main.write_text("""from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app = FastAPI(title="Generated App")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3000"],
+        allow_methods=["*"],
+        allow_headers=["*"]
+    )
+
+    @app.get("/")
+    def read_root():
+        return {"message": "Hello World"}
+
+    @app.get("/api/health")
+    def health_check():
+        return {"status": "healthy"}
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+    """)
+            
+            # Frontend structure
+            frontend_app = self.current_project_path / "frontend" / "src" / "App.jsx"
+            frontend_app.parent.mkdir(parents=True, exist_ok=True)
+            frontend_app.write_text("""import React from 'react';
+    import './App.css';
+
+    function App() {
+    return (
+        <div className="App">
+        <h1>Generated Web App</h1>
+        <p>Your fullstack application is ready!</p>
+        </div>
+    );
+    }
+
+    export default App;
+    """)
+            
+            # Frontend CSS
+            frontend_css = self.current_project_path / "frontend" / "src" / "App.css"
+            frontend_css.write_text(""".App {
+    text-align: center;
+    padding: 20px;
+    }
+
+    h1 {
+    color: #333;
+    }
+    """)
+            
+            canvas.success("✅ Created fullstack web app fallback structure")
+        
+        else:
+            # Default fallback for other system types
+            main_file = self.current_project_path / "main.py"
+            main_file.write_text('''def main():
+        print("Hello, World!")
+
+    if __name__ == "__main__":
+        main()
+    ''')
+            canvas.success("✅ Created basic fallback structure")
+      
     def _process_modification_step(self, step: Dict[str, Any]) -> None:
         """
         Process a modification step - modify an existing project with RAG context

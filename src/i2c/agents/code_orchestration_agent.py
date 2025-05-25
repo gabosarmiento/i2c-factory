@@ -812,20 +812,59 @@ class CodeOrchestrationAgent(Agent):
 
     def _build_planning_context(self, architectural_context: Dict[str, Any], 
                             structural_context, task: str, constraints: List[str]) -> str:
-        """Build enhanced planning context with architectural intelligence"""
+        """Build enhanced planning context with fullstack app intelligence"""
         
         context_parts = []
         
         # Add architectural understanding
         if architectural_context:
-            context_parts.append("=== ARCHITECTURAL CONTEXT ===")
-            context_parts.append(f"System Type: {architectural_context.get('system_type', 'unknown')}")
-            context_parts.append(f"Architecture Pattern: {architectural_context.get('architecture_pattern', 'unknown')}")
+            system_type = architectural_context.get('system_type', 'unknown')
+            architecture_pattern = architectural_context.get('architecture_pattern', 'unknown')
             
-            # Add module information
+            context_parts.append("=== ARCHITECTURAL CONTEXT ===")
+            context_parts.append(f"System Type: {system_type}")
+            context_parts.append(f"Architecture Pattern: {architecture_pattern}")
+            
+            # FULLSTACK WEB APP SPECIFIC RULES
+            if system_type == "fullstack_web_app":
+                context_parts.append("\n=== FULLSTACK WEB APP RULES ===")
+                context_parts.append("This is a FULLSTACK WEB APPLICATION - follow these mandatory patterns:")
+                context_parts.append("")
+                context_parts.append("FRONTEND STRUCTURE (React):")
+                context_parts.append("- Main app: frontend/src/App.jsx (React functional component)")
+                context_parts.append("- Components: frontend/src/components/ComponentName.jsx")
+                context_parts.append("- Styles: frontend/src/index.css or component-specific CSS")
+                context_parts.append("- Entry: frontend/src/main.jsx (Vite/React entry point)")
+                context_parts.append("- Config: frontend/vite.config.js or similar")
+                context_parts.append("")
+                context_parts.append("BACKEND STRUCTURE (FastAPI):")
+                context_parts.append("- Main app: backend/main.py (FastAPI application)")
+                context_parts.append("- API routes: backend/api/routes.py or backend/api/[domain].py")
+                context_parts.append("- Data models: backend/models/[domain].py (Pydantic models)")
+                context_parts.append("- Services: backend/services/[domain].py (business logic)")
+                context_parts.append("- Database: backend/db/database.py (SQLAlchemy or similar)")
+                context_parts.append("")
+                context_parts.append("MANDATORY CODE PATTERNS:")
+                context_parts.append("1. Backend main.py MUST include:")
+                context_parts.append("   from fastapi import FastAPI")
+                context_parts.append("   app = FastAPI()")
+                context_parts.append("   @app.get('/api/...') endpoints")
+                context_parts.append("   uvicorn.run() or equivalent")
+                context_parts.append("")
+                context_parts.append("2. Frontend App.jsx MUST include:")
+                context_parts.append("   import React from 'react'")
+                context_parts.append("   Functional component with JSX return")
+                context_parts.append("   Export default App")
+                context_parts.append("")
+                context_parts.append("3. Components MUST be in separate files:")
+                context_parts.append("   Each React component in its own .jsx file")
+                context_parts.append("   Proper imports and exports")
+                context_parts.append("")
+            
+            # Add module information with enforcement
             modules = architectural_context.get("modules", {})
             if modules:
-                context_parts.append("\nMODULES AND BOUNDARIES:")
+                context_parts.append("MODULES AND BOUNDARIES:")
                 for module_name, module_info in modules.items():
                     context_parts.append(f"- {module_name}: {module_info.get('boundary_type', 'unknown')}")
                     context_parts.append(f"  Responsibilities: {', '.join(module_info.get('responsibilities', []))}")
@@ -833,20 +872,62 @@ class CodeOrchestrationAgent(Agent):
                     folder_structure = module_info.get('folder_structure', {})
                     if folder_structure:
                         base_path = folder_structure.get('base_path', '')
+                        subfolders = folder_structure.get('subfolders', [])
                         if base_path:
-                            context_parts.append(f"  Location: {base_path}")
+                            context_parts.append(f"  Location: {base_path}/")
+                            if subfolders:
+                                context_parts.append(f"  Subfolders: {', '.join(subfolders)}")
             
-            # Add file organization rules
-            file_rules = architectural_context.get("file_organization_rules", {})
-            if file_rules:
-                context_parts.append("\nFILE ORGANIZATION RULES:")
-                for rule_type, path in file_rules.items():
-                    context_parts.append(f"- {rule_type}: {path}")
+            # Add code generation rules with specific examples
+            code_gen_rules = architectural_context.get("code_generation_rules", {})
+            if code_gen_rules:
+                context_parts.append("\n=== CODE GENERATION RULES ===")
+                
+                if system_type == "fullstack_web_app":
+                    context_parts.append("BACKEND main.py template:")
+                    context_parts.append("```python")
+                    context_parts.append("from fastapi import FastAPI")
+                    context_parts.append("from fastapi.middleware.cors import CORSMiddleware")
+                    context_parts.append("from api import routes")
+                    context_parts.append("")
+                    context_parts.append("app = FastAPI(title='Your App Name')")
+                    context_parts.append("")
+                    context_parts.append("app.add_middleware(")
+                    context_parts.append("    CORSMiddleware,")
+                    context_parts.append("    allow_origins=['http://localhost:3000'],")
+                    context_parts.append("    allow_methods=['*'],")
+                    context_parts.append("    allow_headers=['*']")
+                    context_parts.append(")")
+                    context_parts.append("")
+                    context_parts.append("app.include_router(routes.router, prefix='/api')")
+                    context_parts.append("")
+                    context_parts.append("if __name__ == '__main__':")
+                    context_parts.append("    import uvicorn")
+                    context_parts.append("    uvicorn.run(app, host='0.0.0.0', port=8000)")
+                    context_parts.append("```")
+                    context_parts.append("")
+                    
+                    context_parts.append("FRONTEND App.jsx template:")
+                    context_parts.append("```jsx")
+                    context_parts.append("import React from 'react'")
+                    context_parts.append("import './App.css'")
+                    context_parts.append("")
+                    context_parts.append("function App() {")
+                    context_parts.append("  return (")
+                    context_parts.append("    <div className='App'>")
+                    context_parts.append("      <h1>Your App Title</h1>")
+                    context_parts.append("      {/* Your components here */}")
+                    context_parts.append("    </div>")
+                    context_parts.append("  )")
+                    context_parts.append("}")
+                    context_parts.append("")
+                    context_parts.append("export default App")
+                    context_parts.append("```")
             
-            # Add architectural constraints
+            # Add architectural constraints with enforcement
             arch_constraints = architectural_context.get("constraints", [])
             if arch_constraints:
-                context_parts.append("\nARCHITECTURAL CONSTRAINTS:")
+                context_parts.append("\nARCHITECTURAL CONSTRAINTS (MANDATORY):")
                 for constraint in arch_constraints:
                     context_parts.append(f"- {constraint}")
             
@@ -866,14 +947,17 @@ class CodeOrchestrationAgent(Agent):
             for constraint in constraints:
                 context_parts.append(f"- {constraint}")
         
-        # Add planning instructions
+        # Add planning instructions with architectural enforcement
         context_parts.append("\n=== PLANNING INSTRUCTIONS ===")
         context_parts.append("When creating the modification plan:")
-        context_parts.append("1. Respect the identified architectural pattern and module boundaries")
-        context_parts.append("2. Place files according to the file organization rules")
-        context_parts.append("3. Consider the responsibilities of each module")
-        context_parts.append("4. Follow the integration patterns for cross-module communication")
-        context_parts.append("5. Validate that modifications don't violate architectural constraints")
+        context_parts.append("1. RESPECT the identified architectural pattern and module boundaries")
+        context_parts.append("2. PLACE files according to the file organization rules")
+        context_parts.append("3. GENERATE code that matches the architectural templates")
+        context_parts.append("4. FOLLOW the integration patterns for cross-module communication")
+        context_parts.append("5. VALIDATE that modifications don't violate architectural constraints")
+        context_parts.append("6. FOR FULLSTACK APPS: Never mix frontend and backend code in same files")
+        context_parts.append("7. ENSURE proper file extensions (.jsx for React, .py for Python)")
+        context_parts.append("8. CREATE separate files for each component/service/model")
         
         return "\n".join(context_parts)
 

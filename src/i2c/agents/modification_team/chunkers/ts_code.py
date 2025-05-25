@@ -1,4 +1,4 @@
-# agents/modification_team/chunkers/ts_code.py
+# src/agents/modification_team/chunkers/ts_code.py
 
 import os
 import re
@@ -18,29 +18,34 @@ except ImportError:
         def error(self, msg):   print(f"[ERROR_TS] {msg}")
     canvas = FallbackCanvas()
 
-
 class TSCodeChunkingStrategy(ChunkingStrategy):
     """
-    Chunk TypeScript/JSX code into functions, classes, interfaces, and types using regex.
+    Chunk TypeScript code into top-level declarations: classes, interfaces,
+    enums, functions, types, and variables.
     """
 
     def __init__(
         self,
         chunk_size: Optional[int] = None,
-        overlap: Optional[int] = None,
-        max_content_length: int = int(os.getenv('MAX_TS_CHUNK_CONTENT', '100000'))
+        overlap: Optional[int] = None
     ):
+        # chunk_size/overlap ignored for TS; use env var
         self.chunk_size = chunk_size
         self.overlap = overlap
-        self.max_content_length = max_content_length
 
-        # Matches function, class, interface, or type declarations
-        self.pattern = re.compile(
-            r"\b(function|class|interface|type)\s+(\w+)"
-        )
+        # loaded by your config.yaml → os.environ
+        self.max_content_length = int(os.getenv('MAX_TS_CHUNK_CONTENT', '100000'))
 
         if chunk_size or overlap:
-            canvas.warning(f"Ignoring chunk_size={chunk_size}, overlap={overlap} for TS chunker")
+            canvas.warning(
+                f"Ignoring chunk_size={chunk_size}, overlap={overlap} for TS chunker"
+            )
+
+        # Patterns for top-level declarations
+        self.patterns = [
+            (r'^(?:export\s+)?(class|interface|enum|function|type)\s+(\w+)', 'declaration'),
+            (r'^(?:export\s+)?(?:const|let|var)\s+(\w+)',           'variable'),
+        ]
 
     def chunk(self, document: Document) -> List[Document]:
         content = document.content or ""
@@ -51,48 +56,81 @@ class TSCodeChunkingStrategy(ChunkingStrategy):
             )
             return [document]
 
+        lines = content.splitlines(keepends=True)
         chunks: List[Document] = []
-        for match in self.pattern.finditer(content):
-            start_idx = match.start()
+        current: List[str]     = []
+        current_name: str      = ''
+        current_type: str      = ''
+        current_start_pos: int = 0
+        open_braces: int       = 0
+        pos: int               = 0
+        limit = self.max_content_length
 
-            # Find opening brace or semicolon (for type aliases)
-            brace_pos = content.find('{', match.end())
-            semi_pos = content.find(';', match.end())
-
-            if brace_pos >= 0 and (semi_pos < 0 or brace_pos < semi_pos):
-                # Block declaration
-                depth = 1
-                idx = brace_pos + 1
-                while idx < len(content) and depth > 0:
-                    if content[idx] == '{':
-                        depth += 1
-                    elif content[idx] == '}':
-                        depth -= 1
-                    idx += 1
-                end_idx = idx
-            elif semi_pos >= 0:
-                # Single-line type or interface alias
-                end_idx = semi_pos + 1
-            else:
-                continue
-
-            snippet = content[start_idx:end_idx].strip()
-            if not snippet:
-                continue
-
-            # Metadata
-            decl_type = match.group(1)
-            name = match.group(2)
+        def flush_chunk():
+            nonlocal current_name, current_type, current_start_pos
+            if not current:
+                return
+            snippet = ''.join(current)
+            end_pos = current_start_pos + len(snippet)
             h = hashlib.sha256(snippet.encode()).hexdigest()
             meta = {
-                'chunk_name': name,
-                'chunk_type': decl_type,
+                'chunk_name': current_name,
+                'chunk_type': current_type,
                 'content_hash': h,
                 'language': 'typescript',
                 'file_path': document.meta_data.get('file_path', ''),
+                'start_pos': current_start_pos,
+                'end_pos': end_pos,
             }
-
             chunks.append(Document(content=snippet, meta_data=meta))
+            current.clear()
+            current_name = ''
+            current_type = ''
+            current_start_pos = pos
 
-        canvas.info(f"Chunked {len(chunks)} TS blocks")
+        for line in lines:
+            # detect new top-level decl only when balanced
+            for pattern, decl_type in self.patterns:
+                m = re.match(pattern, line)
+                if m and open_braces == 0:
+                    if current:
+                        flush_chunk()
+                    current_name = m.group(m.lastindex)
+                    current_type = decl_type
+                    current_start_pos = pos
+                    break
+
+            open_braces += line.count('{') - line.count('}')
+            current.append(line)
+            pos += len(line)
+
+            if len(''.join(current)) > limit:
+                flush_chunk()
+
+        flush_chunk()
+
+        # fallback if nothing emitted
+        if not chunks:
+            h = hashlib.sha256(content.encode()).hexdigest()
+            meta = {
+                'chunk_name': 'ts_content',
+                'chunk_type': 'ts_file',
+                'content_hash': h,
+                'language': 'typescript',
+                'file_path': document.meta_data.get('file_path', ''),
+                'start_pos': 0,
+                'end_pos': len(content),
+            }
+            chunks.append(Document(content=content, meta_data=meta))
+
+        canvas.info(
+            f"Chunked {len(chunks)} TS blocks "
+            f"({self.max_content_length=} max length)"
+        )
         return chunks
+
+    def __repr__(self):
+        return (
+            f"TSCodeChunkingStrategy(chunk_size={self.chunk_size}, "
+            f"overlap={self.overlap}, max_content_length={self.max_content_length})"
+        )

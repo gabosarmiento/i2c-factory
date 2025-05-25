@@ -27,7 +27,13 @@ SKIP_DIRS:
 MIN_THRESHOLD: 0
 # Maximum number of lines before we switch to coarse chunking
 MAX_LINES_COARSE: 5000
-
+MAX_TS_CHUNK_CONTENT: 100000
+# AST-based chunker settings:
+# Max number of AST top-level nodes to emit as separate chunks;
+# if exceeded, you can group into larger “coarse” chunks.
+MAX_AST_CHUNK_NODES: 50
+# Alternatively, limit by total lines per AST chunk
+MAX_AST_CHUNK_LINES: 500
 # ── reflective agent settings ──────────────────────────────────────
 reflective:
   plan_refinement:

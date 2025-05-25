@@ -133,15 +133,23 @@ class FilePathResolver:
         )
     
     def _intelligent_resolve(self, path: str, content: str, conflicts: List[str]) -> ResolvedPath:
-        """Use layout intelligence to resolve ambiguous paths"""
+        """Use layout intelligence to resolve ambiguous paths with fullstack awareness"""
+        
         # Extract logical component from path
         logical_component = self._extract_logical_component(path)
         
-        # Determine target component type
+        # Determine target component type and file extension
         component_type = self._infer_component_from_content(content)
         file_type = self._analyze_content_type(content)
         
-        # Use layout routing rules
+        # FULLSTACK WEB APP SPECIAL HANDLING
+        if logical_component == "frontend" or component_type == ComponentType.FRONTEND:
+            return self._resolve_frontend_structure(path, content, file_type)
+        
+        elif logical_component == "backend" or component_type == ComponentType.BACKEND:
+            return self._resolve_backend_structure(path, content, file_type)
+        
+        # Use layout routing rules (existing logic)
         if self.layout and logical_component in self.layout.routing_rules:
             base_path = self.layout.routing_rules[logical_component]
             filename = self._generate_filename_from_path(path, file_type)
@@ -158,16 +166,164 @@ class FilePathResolver:
             conflicts=[],
             suggestions=[]
         )
+
+    def _resolve_frontend_structure(self, path: str, content: str, file_type: str) -> ResolvedPath:
+        """Resolve frontend files to proper React structure"""
+        
+        # Detect specific frontend file types
+        content_lower = content.lower()
+        
+        # Main App component
+        if "function app" in content_lower or "const app" in content_lower or path.lower() == "frontend":
+            resolved_path = f"frontend/src/App{file_type}"
+        
+        # Component files (detect component names from content)
+        elif "component" in content_lower or any(comp in content_lower for comp in ["editor", "selector", "toggle", "preview"]):
+            # Extract component name from content or path
+            component_name = self._extract_component_name(content, path)
+            resolved_path = f"frontend/src/components/{component_name}{file_type}"
+        
+        # CSS files
+        elif file_type == ".css" or "css" in path.lower():
+            if "index" in path.lower() or "main" in path.lower():
+                resolved_path = "frontend/src/index.css"
+            else:
+                css_name = self._extract_file_name(path)
+                resolved_path = f"frontend/src/{css_name}.css"
+        
+        # Config files (vite, webpack, etc.)
+        elif any(config in content_lower for config in ["vite", "webpack", "config"]):
+            config_name = self._extract_file_name(path)
+            resolved_path = f"frontend/{config_name}{file_type}"
+        
+        # Main entry file
+        elif "main" in path.lower() or "index" in path.lower():
+            resolved_path = f"frontend/src/main{file_type}"
+        
+        # Default frontend file
+        else:
+            filename = self._extract_file_name(path)
+            resolved_path = f"frontend/src/{filename}{file_type}"
+        
+        return ResolvedPath(
+            original_path=path,
+            resolved_path=resolved_path,
+            component_type=ComponentType.FRONTEND,
+            is_valid=True,
+            conflicts=[],
+            suggestions=[]
+        )
+
+    def _resolve_backend_structure(self, path: str, content: str, file_type: str) -> ResolvedPath:
+        """Resolve backend files to proper API structure"""
+        
+        content_lower = content.lower()
+        
+        # Main FastAPI app
+        if ("fastapi" in content_lower or "app = " in content_lower) and "main" in path.lower():
+            resolved_path = f"backend/main{file_type}"
+        
+        # API routes
+        elif "router" in content_lower or "@app." in content_lower or "route" in path.lower():
+            route_name = self._extract_file_name(path)
+            resolved_path = f"backend/api/{route_name}{file_type}"
+        
+        # Models/Schemas  
+        elif "model" in content_lower or "schema" in content_lower or "pydantic" in content_lower:
+            model_name = self._extract_file_name(path)
+            resolved_path = f"backend/models/{model_name}{file_type}"
+        
+        # Services/Business Logic
+        elif "service" in content_lower or "business" in path.lower():
+            service_name = self._extract_file_name(path)
+            resolved_path = f"backend/services/{service_name}{file_type}"
+        
+        # Database/Repository
+        elif "database" in content_lower or "repository" in content_lower or "db" in path.lower():
+            db_name = self._extract_file_name(path)
+            resolved_path = f"backend/db/{db_name}{file_type}"
+        
+        # Default backend file
+        else:
+            filename = self._extract_file_name(path)
+            resolved_path = f"backend/{filename}{file_type}"
+        
+        return ResolvedPath(
+            original_path=path,
+            resolved_path=resolved_path,
+            component_type=ComponentType.BACKEND,
+            is_valid=True,
+            conflicts=[],
+            suggestions=[]
+        )
+
+    def _extract_component_name(self, content: str, path: str) -> str:
+        """Extract React component name from content or path"""
+        
+        # SAFETY: Skip if content has markdown artifacts
+        if '```' in content:
+            content = self._extract_code_from_markdown(content)
+        
+        # Try to find component name in content
+        import re
+        
+        # Look for component declarations
+        patterns = [
+            r'(?:const|function)\s+(\w+)\s*[=\(].*?(?:React\.Component|=>)',
+            r'class\s+(\w+)\s+extends',
+            r'export\s+(?:default\s+)?(?:const|function)\s+(\w+)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        
+        # Fallback to path-based naming
+        if "editor" in path.lower():
+            return "CodeEditor"
+        elif "selector" in path.lower():
+            return "LanguageSelector" 
+        elif "toggle" in path.lower():
+            return "ThemeToggle"
+        elif "preview" in path.lower():
+            return "CodePreview"
+        
+        # Generic component name
+        return "Component"
+
+    def _extract_file_name(self, path: str) -> str:
+        """Extract clean file name from path"""
+        if "/" in path:
+            name = path.split("/")[-1]
+        else:
+            name = path
+        
+        # Remove extension if present
+        if "." in name:
+            name = name.split(".")[0]
+        
+        return name
     
     def _analyze_content_type(self, content: str) -> str:
-        """Analyze content to determine file type/extension"""
+        """Analyze content to determine file type/extension - IMPROVED ROBUSTNESS"""
         content_lower = content.lower().strip()
         
-        # React/JSX patterns
+        # SAFETY CHECK: Skip if content contains markdown artifacts
+        if content.strip().startswith('```') or '```' in content:
+            # This indicates malformed content from LLM - extract actual code
+            content = self._extract_code_from_markdown(content)
+            content_lower = content.lower().strip()
+        
+        # React/JSX patterns (CHECK FIRST - most specific)
         if any(pattern in content for pattern in ['import React', 'export default', 'useState', 'jsx', 'tsx']):
             if 'typescript' in content or 'interface ' in content:
                 return '.tsx'
             return '.jsx'
+        
+        # PURE CSS (must be very specific to avoid false positives)
+        if self._is_pure_css_content(content_lower):
+            return '.css'
         
         # JavaScript patterns
         if any(pattern in content for pattern in ['function', 'const ', 'let ', 'var ', 'export']):
@@ -188,10 +344,6 @@ class FilePathResolver:
             else:
                 return '.py'  # Default test to Python
         
-        # CSS/Styling
-        if any(pattern in content for pattern in ['{', '}', 'color:', 'margin:', '@media']):
-            return '.css'
-        
         # HTML
         if any(pattern in content for pattern in ['<html', '<div', '<body', '<!DOCTYPE']):
             return '.html'
@@ -205,10 +357,41 @@ class FilePathResolver:
             return '.java'
         
         # Default
-        return '.txt'
+        return '.py'
+
+    def _is_pure_css_content(self, content_lower: str) -> bool:
+        """Check if content is pure CSS (not JS/JSON with braces)"""
+        # Must have CSS-specific patterns, not just braces
+        css_indicators = ['color:', 'margin:', 'padding:', 'font-', 'background-', '@media', 'display:', 'position:']
+        js_indicators = ['function', 'const ', 'let ', 'var ', 'import', 'export', 'return']
+        
+        has_css_patterns = any(indicator in content_lower for indicator in css_indicators)
+        has_js_patterns = any(indicator in content_lower for indicator in js_indicators)
+        
+        # Only CSS if it has CSS patterns and NO JS patterns
+        return has_css_patterns and not has_js_patterns
+
+    def _extract_code_from_markdown(self, content: str) -> str:
+        """Extract actual code from markdown code blocks"""
+        lines = content.split('\n')
+        code_lines = []
+        in_code_block = False
+        
+        for line in lines:
+            if line.strip().startswith('```'):
+                in_code_block = not in_code_block
+                continue
+            if in_code_block:
+                code_lines.append(line)
+        
+        return '\n'.join(code_lines) if code_lines else content
     
     def _infer_component_from_content(self, content: str) -> Optional[ComponentType]:
         """Infer component type from content analysis"""
+        # SAFETY: Clean content first
+        if '```' in content:
+            content = self._extract_code_from_markdown(content)
+            
         content_lower = content.lower()
         
         # Frontend indicators

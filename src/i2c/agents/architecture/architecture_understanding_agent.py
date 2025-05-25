@@ -152,61 +152,92 @@ class ArchitectureUnderstandingAgent(Agent):
             return ""
 
     def _build_analysis_prompt(self, objective: str, existing_files: List[str] = None, 
-                              content_samples: Dict[str, str] = None) -> str:
-        """Build comprehensive analysis prompt"""
+                            content_samples: Dict[str, str] = None) -> str:
+        """Build comprehensive analysis prompt with fullstack app detection"""
         
         prompt = f"""Analyze this software system architecture:
 
-OBJECTIVE: {objective}
+    OBJECTIVE: {objective}
 
-EXISTING FILES: {existing_files or ['None - new project']}
+    EXISTING FILES: {existing_files or ['None - new project']}
 
-CONTENT SAMPLES:
-{self._format_content_samples(content_samples or {})}
+    CONTENT SAMPLES:
+    {self._format_content_samples(content_samples or {})}
 
-Please provide a comprehensive architectural analysis in JSON format:
+    CRITICAL: Pay special attention to these patterns to detect system type:
 
-{{
-    "system_type": "web_app|cli_tool|api_service|library|microservice|desktop_app",
-    "architecture_pattern": "monolith|layered_monolith|fullstack_web|clean_architecture|hexagonal|microservices",
-    "modules": {{
-        "module_name": {{
-            "boundary_type": "ui_layer|api_layer|business_logic|data_access|infrastructure|shared_utilities",
-            "languages": ["python", "javascript"],
-            "responsibilities": ["handle user interactions", "manage data persistence"],
-            "dependencies": ["other_module_names"],
-            "folder_structure": {{
-                "base_path": "frontend/src",
-                "subfolders": ["components", "services", "utils"]
+    FULLSTACK WEB APP indicators:
+    - Mentions: "React", "frontend", "backend", "API", "web app", "FastAPI", "Express"
+    - Should have: frontend (React/Vue) + backend (FastAPI/Flask/Express) separation
+    - File structure: frontend/src/ for UI, backend/api/ for endpoints
+
+    API SERVICE indicators:
+    - Mentions: "API", "endpoints", "REST", "GraphQL", "microservice"
+    - Should have: organized API routes, models, services
+
+    CLI TOOL indicators:
+    - Mentions: "command line", "CLI", "terminal", "script"
+    - Should have: main entry point, argument parsing
+
+    Please provide architectural analysis in JSON format:
+
+    {{
+        "system_type": "fullstack_web_app|api_service|cli_tool|library|desktop_app",
+        "architecture_pattern": "fullstack_web|clean_architecture|microservices|layered_monolith",
+        "modules": {{
+            "frontend": {{
+                "boundary_type": "ui_layer",
+                "languages": ["javascript", "typescript"],
+                "responsibilities": ["React components", "user interface", "client-side logic"],
+                "dependencies": ["backend"],
+                "folder_structure": {{
+                    "base_path": "frontend",
+                    "subfolders": ["src", "src/components", "public"]
+                }}
+            }},
+            "backend": {{
+                "boundary_type": "api_layer", 
+                "languages": ["python"],
+                "responsibilities": ["REST API endpoints", "business logic", "data management"],
+                "dependencies": [],
+                "folder_structure": {{
+                    "base_path": "backend",
+                    "subfolders": ["api", "models", "services"]
+                }}
             }}
+        }},
+        "file_organization_rules": {{
+            "react_components": "frontend/src/components",
+            "main_app": "frontend/src",
+            "api_endpoints": "backend/api",
+            "data_models": "backend/models",
+            "business_logic": "backend/services",
+            "main_backend": "backend"
+        }},
+        "constraints": [
+            "Frontend components must be in frontend/src/components/",
+            "Main React app in frontend/src/App.jsx",
+            "Backend must use FastAPI with proper endpoints",
+            "API routes in backend/api/ directory",
+            "No mixing of frontend and backend code in same files"
+        ],
+        "integration_patterns": [
+            "REST API communication between frontend and backend",
+            "JSON data exchange",
+            "CORS configuration for development"
+        ],
+        "code_generation_rules": {{
+            "main_backend_file": "FastAPI application with proper imports and app instance",
+            "main_frontend_file": "React App component with proper structure", 
+            "api_endpoints": "FastAPI router patterns with proper HTTP methods",
+            "react_components": "Functional components with hooks"
         }}
-    }},
-    "file_organization_rules": {{
-        "ui_components": "frontend/src/components",
-        "api_routes": "backend/api/routes",
-        "business_logic": "backend/services",
-        "data_models": "backend/models"
-    }},
-    "constraints": [
-        "UI components must not directly access database",
-        "API layer should validate all inputs",
-        "Business logic should be framework-agnostic"
-    ],
-    "integration_patterns": [
-        "REST API between frontend and backend",
-        "Repository pattern for data access"
-    ],
-    "quality_expectations": {{
-        "test_coverage": "component_tests_and_integration_tests",
-        "code_organization": "clear_separation_of_concerns",
-        "documentation": "api_documentation_required"
     }}
-}}
 
-Focus on LOGICAL architecture, not just file paths. Understand the PURPOSE and BOUNDARIES of each module."""
+    IMPORTANT: If objective mentions web app, React, FastAPI, frontend+backend, always classify as "fullstack_web_app" with proper module separation."""
 
         return prompt
-    
+
     def _format_content_samples(self, content_samples: Dict[str, str]) -> str:
         """Format content samples for analysis"""
         if not content_samples:
@@ -246,8 +277,23 @@ Focus on LOGICAL architecture, not just file paths. Understand the PURPOSE and B
             
             clean_content = clean_content.strip()
             
-            # Try to parse JSON
-            parsed_data = json.loads(clean_content)
+            # --- Robust JSON extraction -----------------------------------
+            parsed_data: Dict[str, Any] | None = None
+
+            try:
+                # happy-path: the whole string is valid JSON
+                parsed_data = json.loads(clean_content)
+            except json.JSONDecodeError:
+                # tolerate leading / trailing chatter from the LLM
+                first = clean_content.find("{")
+                last  = clean_content.rfind("}")
+                if first != -1 and last != -1 and last > first:
+                    json_block = clean_content[first : last + 1]
+                    parsed_data = json.loads(json_block)
+                else:
+                    raise  # will be caught by outer except
+
+            # At this point we have a dict
             
             # Validate required fields and provide defaults
             validated_data = self._validate_and_fix_analysis_data(parsed_data)
@@ -267,7 +313,7 @@ Focus on LOGICAL architecture, not just file paths. Understand the PURPOSE and B
         """Validate and fix architectural analysis data structure"""
         
         # Ensure required fields exist with defaults
-        validated = {
+        validated: Dict[str, Any] = {
             "system_type": data.get("system_type", "web_app"),
             "architecture_pattern": data.get("architecture_pattern", "fullstack_web"),
             "modules": data.get("modules", {}),
@@ -276,7 +322,26 @@ Focus on LOGICAL architecture, not just file paths. Understand the PURPOSE and B
             "integration_patterns": data.get("integration_patterns", ["REST API"]),
             "quality_expectations": data.get("quality_expectations", {})
         }
-        
+        # Auto-upgrade generic “web_app” into a specific type when possible
+        modules = validated.get("modules", {})
+        if validated["system_type"] == "web_app":
+            if {"frontend", "backend"} <= modules.keys():
+                validated["system_type"] = "fullstack_web_app"
+            elif modules.keys() == {"api"}:
+                validated["system_type"] = "api_service"
+            elif modules.keys() == {"cli"}:
+                validated["system_type"] = "cli_tool"
+
+        # ----- Keep pattern consistent with the chosen system_type ----------
+        type_to_pattern: dict[str, str] = {
+            "fullstack_web_app": "fullstack_web",
+            "api_service": "api_service",
+            "cli_tool": "cli_tool",
+        }
+        expected_pattern = type_to_pattern.get(validated["system_type"])
+        if expected_pattern and validated["architecture_pattern"] != expected_pattern:
+            validated["architecture_pattern"] = expected_pattern
+            
         # Fix modules structure if needed
         if not isinstance(validated["modules"], dict):
             validated["modules"] = {}
@@ -463,6 +528,34 @@ architecture_agent = None
 def get_architecture_agent(session_state=None):
     """Get or create architecture agent with proper session state"""
     global architecture_agent
+    
+    # Always create a new agent if current one is None
     if architecture_agent is None:
-        architecture_agent = ArchitectureUnderstandingAgent(session_state=session_state)
+        try:
+            # Try to create with session state
+            if session_state:
+                architecture_agent = ArchitectureUnderstandingAgent(session_state=session_state)
+            else:
+                architecture_agent = ArchitectureUnderstandingAgent()
+                
+        except Exception as e:
+            print(f"⚠️ Error creating architecture agent with session state: {e}")
+            # Fallback: create basic agent
+            try:
+                architecture_agent = ArchitectureUnderstandingAgent()
+            except Exception as e2:
+                print(f"❌ Failed to create basic architecture agent: {e2}")
+                # Return None and let calling code handle it
+                return None
+    
+    # Verify the agent is properly created
+    if architecture_agent is None:
+        print("❌ Architecture agent is still None after creation attempts")
+        return None
+        
+    # Verify the agent has the required method
+    if not hasattr(architecture_agent, 'analyze_system_architecture'):
+        print("❌ Architecture agent missing analyze_system_architecture method")
+        return None
+    
     return architecture_agent

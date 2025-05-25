@@ -3,6 +3,7 @@
 import os
 import hashlib
 import logging
+from typing import List
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -13,13 +14,42 @@ from i2c.db_utils import (
     TABLE_CODE_CONTEXT,
     SCHEMA_CODE_CONTEXT,
 )
-from agno.document.base import Document as AgnoDocument
+from agno.document.base import Document
 
 # Plug-and-play chunker factory and embedding utility
 from ..factory import get_chunker_for_path
 from ..utils import embed_text
 from ..config import load_config
+from ..chunkers.jsx_code import JSXCodeChunkingStrategy
+from ..chunkers.js_code  import JSCodeChunkingStrategy
+from ..chunkers.generic  import GenericTextChunkingStrategy
+from i2c.cli.controller import canvas
+import esprima
 
+def get_js_chunks(document: Document) -> List[Document]:
+    """
+    1) Try treating it as JSX (regex-based).
+    2) If that yields more than one chunk, assume it had JSX and return.
+    3) Otherwise try the normal JS parser (Esprima).
+    4) If that fails, fallback to generic text chunking.
+    """
+    # 1) Run through your JSX chunker first
+    jsx_chunks = JSXCodeChunkingStrategy().chunk(document)
+    if len(jsx_chunks) > 1:
+        canvas.info(f"JSX patterns matched, returning {len(jsx_chunks)} chunks")
+        return jsx_chunks
+
+    # 2) No JSX components detected?  Try pure-JS parser
+    try:
+        js_chunks = JSCodeChunkingStrategy().chunk(document)
+        canvas.info(f"Esprima JS parsed into {len(js_chunks)} chunks")
+        return js_chunks
+    except Exception as e:
+        canvas.warning(f"Esprima parse failed ({e}); falling back to generic text")
+
+    # 3) Last resort: generic text splitter
+    return GenericTextChunkingStrategy().chunk(document)
+ 
 # Load configuration
 config = load_config()
 
@@ -224,15 +254,21 @@ class ContextIndexer:
             )
             chunks = FixedSizeChunking(chunk_size=500, overlap=50).chunk(doc)
         else:
-            # Fine-grained chunking via language-specific strategy
+            # Fine-grained chunking: route .js through get_js_chunks, everything else via factory
             try:
-                from i2c.agents.modification_team.factory import get_chunker_for_path
-                chunker = get_chunker_for_path(file_path)
-                chunks = chunker.chunk(doc)
+                # for .js files, first attempt JSX-regex then Esprima then generic
+                if file_path.suffix.lower() == '.js':
+                    from ..chunkers.jsx_code import JSXCodeChunkingStrategy
+                    from ..chunkers.js_code   import JSCodeChunkingStrategy
+                    from ..chunkers.generic   import GenericTextChunkingStrategy
+                    chunks = get_js_chunks(doc)   
+                else:
+                    from i2c.agents.modification_team.factory import get_chunker_for_path
+                    chunker = get_chunker_for_path(file_path)
+                    chunks  = chunker.chunk(doc)
             except Exception as e:
                 logger.error(f"Failed to chunk {file_path}: {e}")
                 return []
-
         if not chunks:
             logger.warning(f"No chunks returned for {file_path}")
             return []
