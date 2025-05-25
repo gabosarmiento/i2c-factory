@@ -1,6 +1,7 @@
 # In orchestrator.py
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
+
 import json
 import traceback
 
@@ -97,6 +98,7 @@ def route_and_execute(
     action_detail: any,
     current_project_path: Path,
     current_structured_goal: dict | None,
+    architectural_context: Dict[str, Any] = None,
     budget_manager: Any = None 
 ) -> bool:
     """
@@ -112,8 +114,16 @@ def route_and_execute(
         bool: Success status
     """
     """Routes action to appropriate workflows using WorkflowController."""
+    # Store architectural context in structured goal if provided
+    if architectural_context:
+        current_structured_goal = current_structured_goal.copy()
+        current_structured_goal["architectural_context"] = architectural_context
+    
+    # Rest of function stays exactly the same
+    
+    
     print(f"=== ROUTE_AND_EXECUTE CALLED ===")
-    print(f"Action type: {action_type}")
+    canvas.info(f"🎯 Routing action: {action_type}")
     print(f"Action detail: {action_detail}")
     try:
         # Create workflow controller for this action

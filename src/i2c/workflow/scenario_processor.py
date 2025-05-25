@@ -508,7 +508,8 @@ class ScenarioProcessor:
                 action_type='generate',
                 action_detail=self.current_structured_goal,
                 current_project_path=self.current_project_path,
-                current_structured_goal=self.current_structured_goal
+                current_structured_goal=self.current_structured_goal,
+                architectural_context=self.session_state.get("architectural_context", {})  # NEW
             )
             
             # Check for generation failures or syntax errors
