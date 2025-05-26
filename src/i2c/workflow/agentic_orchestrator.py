@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -6,18 +7,57 @@ import asyncio
 import datetime
 import json
 import re
-from i2c.utils.json_extraction import extract_json
+
 from agno.team import Team
 from agno.agent import Message
 from i2c.workflow.orchestration_team import build_orchestration_team
-from i2c.cli.controller import canvas
+try:
+    from i2c.cli.controller import canvas
+except ImportError:
+    class DummyCanvas:
+        def info(self, *args, **kwargs): pass
+        def warning(self, *args, **kwargs): pass
+        def success(self, *args, **kwargs): pass
+    canvas = DummyCanvas()
 from i2c.workflow.modification.file_operations import write_files_to_disk
 from i2c.agents.quality_team.utils.language_detector import LanguageDetector
 
-# ----------------------------------------------------------------------
-# Put this somewhere above execute_agentic_evolution(), e.g. right after
-# _apply_modifications_if_any() or together with your other utils.
-# ----------------------------------------------------------------------
+"""
+Agentic orchestrator for evolving software projects using AGNO agents.
+
+Handles:
+- Orchestration of AI agents for software synthesis
+- Architectural context enrichment
+- Smart file writing with language-aware stubs
+- Dependency initialization and folder normalization
+"""
+# --------------------------------------------------------------------------- #
+#  Smart directory resolver                                                   #
+# --------------------------------------------------------------------------- #
+from collections import defaultdict
+LANG_SIGNS = {
+    "python":  [".py", "fastapi", "pydantic"],
+    "javascript": [".js", ".jsx", ".ts", ".tsx", "react", "vite"],
+    "go":      [".go", "module", "fiber"],
+    "java":    [".java", ".kt", "spring", "pom.xml"],
+}
+
+def _detect_lang_roots(project_path: Path) -> dict[str, Path]:
+    """
+    Walk the tree once and record where each language first appears.
+    Returns {lang: directory_path}
+    """
+    roots: dict[str, Path] = {}
+    for p in project_path.rglob("*"):
+        if p.is_dir():
+            continue
+        lower_name = p.name.lower()
+        for lang, signs in LANG_SIGNS.items():
+            if any(lower_name.endswith(s) or s in lower_name for s in signs):
+                roots.setdefault(lang, p.parent)
+    return roots
+
+
 TEMPLATES_BY_LANG: dict[str, str] = {
     # ------------------------------------------------------------------
     # 🐍 Python – FastAPI entry point
@@ -128,6 +168,12 @@ COMPONENT_STUB = (
 )
 SPECIAL_CASE_STUBS["frontend/src/components/Placeholder.jsx"] = COMPONENT_STUB
 
+# helper: crude keyword gate
+FRONTEND_HINTS = {"react", "vue", "svelte", "angular", "vite", "tailwind",
+                  "next.js", "nuxt", "frontend", "ui", "browser"}
+
+def _guess_needs_frontend(text: str) -> bool:
+    return any(k in text for k in FRONTEND_HINTS)
 
 def _stub_for(rel_path: str, lang: str) -> str:
     """
@@ -185,7 +231,7 @@ def _ensure_mandatory_files(project_path: Path, arch_ctx: dict):
         ],
         "api_service": [("backend/main.py", "python")],
         "cli_tool": [("main.py", "python")],
-    }.get(arch_ctx.get("system_type"), [])
+    }.get(arch_ctx.get("architecture_pattern"), [])
 
     for rel_path, lang in required:
         target = project_path / rel_path
@@ -200,51 +246,64 @@ def is_json_like_string(s: str) -> bool:
 
 def ensure_dependency_file(project_path: Path, arch_ctx: dict):
     preferred = arch_ctx.get("preferred_stacks", {})
+    lang_roots = _detect_lang_roots(project_path)
 
+    # ---------- Python ------------------------------------------------------
     if "python" in preferred:
-        req_file = project_path / "requirements.txt"
-        if not req_file.exists():
-            req_file.write_text("fastapi\nuvicorn[standard]\npydantic\nhttpx\npytest\n")
+        root = lang_roots.get("python", project_path / "backend")
+        root.mkdir(parents=True, exist_ok=True)
+        req = root / "requirements.txt"
+        if not req.exists():
+            req.write_text(
+                "fastapi\nuvicorn[standard]\npydantic\nhttpx\npytest\n",
+                encoding="utf-8",
+            )
 
+    # ---------- JavaScript / TypeScript ------------------------------------
     if "javascript" in preferred:
-        # --- Force a single, root-level package.json for the Vite/React/Tailwind stack ---
-        root_pkg = project_path / "package.json"
-        root_pkg.write_text(
-            """{
-    "name": "app",
-    "version": "1.0.0",
-    "private": true,
-    "scripts": {
-        "dev": "vite",
-        "build": "vite build",
-        "preview": "vite preview"
-    },
-    "dependencies": {
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0"
-    },
-    "devDependencies": {
-        "vite": "^4.0.0",
-        "@vitejs/plugin-react": "^4.0.0",
-        "tailwindcss": "^3.3.0"
-    }
-    }"""
-        )
+        root = lang_roots.get("javascript", project_path / "frontend")
+        root.mkdir(parents=True, exist_ok=True)
+        pkg = root / "package.json"
+        if not pkg.exists():
+            pkg.write_text(
+                """{
+  "name": "app",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "vite": "^4.0.0",
+    "tailwindcss": "^3.3.0"
+  }
+}""",
+                encoding="utf-8",
+            )
 
-    # Nuke any nested package.json (e.g. frontend/package.json) to avoid confusion
-    nested_pkg = project_path / "frontend" / "package.json"
-    if nested_pkg.exists():
-        nested_pkg.unlink()
-        
+    # ---------- Go ----------------------------------------------------------
     if "go" in preferred:
-        go_mod = project_path / "go.mod"
+        root = lang_roots.get("go", project_path)
+        go_mod = root / "go.mod"
         if not go_mod.exists():
-            go_mod.write_text("module app\n\ngo 1.20\nrequire github.com/gofiber/fiber/v2 v2.42.0\n")
+            go_mod.write_text(
+                "module app\n\ngo 1.21\nrequire github.com/gofiber/fiber/v2 v2.50.0\n",
+                encoding="utf-8",
+            )
 
+    # ---------- Java / Maven -----------------------------------------------
     if "java" in preferred:
-        pom_file = project_path / "pom.xml"
-        if not pom_file.exists():
-            pom_file.write_text("""<project>
+        root = lang_roots.get("java", project_path / "java")
+        root.mkdir(parents=True, exist_ok=True)
+        pom = root / "pom.xml"
+        if not pom.exists():
+            pom.write_text(
+                """<project>
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.example</groupId>
   <artifactId>app</artifactId>
@@ -253,10 +312,12 @@ def ensure_dependency_file(project_path: Path, arch_ctx: dict):
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter</artifactId>
-      <version>2.7.0</version>
+      <version>3.2.0</version>
     </dependency>
   </dependencies>
-</project>""")
+</project>""",
+                encoding="utf-8",
+            )
 
 
 async def execute_agentic_evolution(
@@ -305,23 +366,34 @@ async def execute_agentic_evolution(
             "avoid": ["monolith", "too many codegen layers"]
         }
     }
+    
     # Infer desired stacks from the scenario objective
     objective_text = json.dumps(objective).lower()
-    desired_stacks = set()
-    if "react" in objective_text or "vite" in objective_text:
-        desired_stacks.add("javascript")
-    if "fastapi" in objective_text or "streamlit" in objective_text:
+    needs_front = _guess_needs_frontend(objective_text)
+    desired_stacks: set[str] = set()
+    if "fastapi" in objective_text or "django" in objective_text:
         desired_stacks.add("python")
-    if "spring boot" in objective_text:
-        desired_stacks.add("java")
-    if "go" in objective_text or "fiber" in objective_text:
-        desired_stacks.add("go")
-    # Apply strict filtering
-    filtered_stacks = {
-        lang: config
-        for lang, config in preferred_stacks.items()
-        if lang in desired_stacks
-    }
+    if needs_front:
+        desired_stacks.add("javascript")
+        
+    filtered_stacks = {lang: cfg for lang, cfg in preferred_stacks.items()
+                   if lang in desired_stacks}
+    
+    # choose architecture
+    arch_pattern = "fullstack_web" if needs_front else "api_service"
+    enhanced_objective["architecture_pattern"] = arch_pattern
+
+    # make it crystal-clear for downstream agents
+    if not needs_front:
+        enhanced_objective.setdefault("constraints", []).append(
+            "No UI/client-side code; produce a pure backend service."
+        )
+
+    # Always fall back to Python so at least one stack exists
+    if not desired_stacks:
+        desired_stacks = {"python"}
+
+    filtered_stacks = {lang: preferred_stacks[lang] for lang in desired_stacks}
     enhanced_objective.setdefault("architectural_context", {})["preferred_stacks"] = filtered_stacks
     session_state.setdefault("architectural_context", {})["preferred_stacks"] = filtered_stacks
 
@@ -368,7 +440,7 @@ async def execute_agentic_evolution(
 
             # Clean up tool-call wrapper
             if "<function=" in clean_content and "{" in clean_content:
-                json_match = re.search(r'\{.*\}', clean_content, re.DOTALL)
+                json_match = re.search(r'\{.*\}\s*$', clean_content.strip(), re.DOTALL)
                 if json_match:
                     clean_content = json_match.group(0)
 
@@ -382,6 +454,7 @@ async def execute_agentic_evolution(
         ensure_dependency_file(project_path, arch_ctx)
 
         return {
+            "status": "ok",
             "result": result_dict,
             "session_state": session_state
         }
@@ -397,6 +470,7 @@ async def execute_agentic_evolution(
             "reasoning_trajectory": []
         }
         return {
+            "status": "error",
             "result": fallback_result,
             "session_state": session_state
         }
@@ -603,3 +677,9 @@ def execute_agentic_evolution_sync(
     return asyncio.get_event_loop().run_until_complete(
         execute_agentic_evolution(objective, project_path, session_state)
     )
+
+__all__ = [
+    "execute_agentic_evolution",
+    "execute_agentic_evolution_sync",
+    "_enhance_objective_with_architectural_intelligence"
+]

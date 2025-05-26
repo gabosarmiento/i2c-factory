@@ -1,0 +1,53 @@
+{
+  "name": "Realtime AI Meeting Summarizer MVP",
+  "description": "End\u2011to\u2011end demo that shows Idea\u2011to\u2011Code Factory turning a single product vision into a production\u2011ready, multi\u2011language app in a few autonomous cycles. It builds *MinuteMind* \u2013 a realtime meeting\u2011transcription and AI\u2010summary tool with a sleek React/Tailwind UI, a FastAPI+WebSocket backend, and OpenAI Whisper/GPT summarisation. Perfect for wowing investors.",
+  "steps": [
+    {
+      "type": "initial_generation",
+      "name": "Create Base Application",
+      "prompt": "Build a modern web application called **MinuteMind**.\n* **Frontend**: React + Vite + Tailwind (dark\u2011mode by default).\n* **Backend**: FastAPI with WebSocket endpoint `/ws/transcribe`.\n* Users can join a room, grant microphone access and stream audio via WebSocket.\n* Server streams back partial Whisper transcripts in real\u2011time.\nProvide a clean, mobile\u2011first UI with mic\u2011level indicator and transcript panel.",
+      "project_name": "minutemind"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add AI Summarisation Engine",
+      "objective": {
+        "task": "Implement summarisation of completed meetings. At the end of a session, aggregate the transcript and use GPT\u20114 to produce: (a) concise summary, (b) bullet\u2011point decisions, (c) action\u2011items with owners and due\u2011dates if detected.",
+        "constraints": [
+          "Use OpenAI Whisper for transcription (fallback to Vosk for offline).",
+          "Use system + few\u2011shot prompts for consistent sections and tone.",
+          "Handle >30\u2011minute meetings without timeout (chunk + merge).",
+          "Include unit tests for the summariser module."
+        ],
+        "quality_gates": [
+          "python"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add Collaborative Notes & Storage",
+      "objective": {
+        "task": "Allow participants to collaboratively edit notes live (y\u2011js / CRDT). Store transcripts, summaries and notes in Postgres via SQLModel. Provide REST endpoints + Swagger.",
+        "constraints": [
+          "WebSocket channel for y\u2011js updates.",
+          "Auth with magic email links (no passwords).",
+          "Include Docker compose for postgres + backend.",
+          "100% type\u2011hinted Python code."
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Polish UI & Deploy",
+      "objective": {
+        "task": "Add polished landing page, slick page transitions (Framer\u2011Motion), and PWA install banner. Provide one\u2011click deployment configs for Vercel (frontend) and Fly.io (backend).",
+        "constraints": [
+          "Lighthouse performance > 90.",
+          "SEO meta tags & OpenGraph images.",
+          "Collect anonymous usage analytics (umami)."
+        ]
+      }
+    }
+  ]
+}
