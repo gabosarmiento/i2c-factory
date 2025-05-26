@@ -36,6 +36,24 @@ def build_orchestration_team(initial_session_state=None) -> Team:
         "Follow the lead of the CodeOrchestrator with full architectural intelligence.",
         "Your final response **must be strictly valid JSON**.",
         "Do not explain. Do not add text. Do not use Markdown. Output only JSON.",
+        "",
+        "CRITICAL: Your response must be valid JSON that matches this exact format:",
+        "{",
+        '  "decision": "approve",',
+        '  "reason": "Clear reason for the decision",',
+        '  "modifications": {},',
+        '  "quality_results": {},',
+        '  "sre_results": {},',
+        '  "reasoning_trajectory": []',
+        "}",
+        "",
+        "Do NOT include:",
+        "- Function calls or function references",
+        "- Markdown code blocks",
+        "- Any text before or after the JSON",
+        "- Comments or explanations",
+        "",
+        "ONLY return the JSON object above with your actual values."
     ]
     
     # Add architectural-specific instructions
@@ -79,8 +97,9 @@ def build_orchestration_team(initial_session_state=None) -> Team:
         session_state=initial_session_state,
         instructions=instructions,
         response_model=OrchestrationResult,  
-        show_tool_calls=True,
-        debug_mode=True,
-        markdown=True,
-        enable_agentic_context=True
+        show_tool_calls=False,
+        debug_mode=False,   
+        markdown=False,
+        enable_agentic_context=False,
+        tools=[] 
     )

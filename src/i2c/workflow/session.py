@@ -152,7 +152,7 @@ def run_session():
                 # Use the recovery-enabled version
                 try:
                     from i2c.workflow.orchestrator import route_and_execute_with_recovery
-                    ok = route_and_execute_with_recovery(
+                    result = route_and_execute_with_recovery(
                         action_type='generate',
                         action_detail=current_structured_goal,
                         current_project_path=current_project_path,
@@ -160,16 +160,20 @@ def run_session():
                     )
                 except ImportError:
                     # Fallback if the recovery function isn't available
-                    ok = route_and_execute(
+                    result = route_and_execute(
                         action_type='generate',
                         action_detail=current_structured_goal,
                         current_project_path=current_project_path,
                         current_structured_goal=current_structured_goal
                     )
-                
-                if not ok:
-                    canvas.error("Action 'generate' failed. Please review logs.")
-       
+                if isinstance(result, dict):
+                    success = result.get("success", False)
+                    if not success:
+                        error = result.get("error", "Unknown error")
+                        canvas.error("Action 'generate' failed. Please review logs.")
+                else:
+                    success = bool(result)  # backward compatibility                
+     
                 # Calculate operation cost
                 end_tokens, end_cost = budget_manager.get_session_consumption()
                 op_tokens = end_tokens - start_tokens
@@ -205,7 +209,7 @@ def run_session():
                 # Use the recovery-enabled version
                 try:
                     from i2c.workflow.orchestrator import route_and_execute_with_recovery
-                    ok = route_and_execute_with_recovery(
+                    result = route_and_execute_with_recovery(
                         action_type='modify',
                         action_detail=command_detail,
                         current_project_path=current_project_path,
@@ -213,16 +217,20 @@ def run_session():
                     )
                 except ImportError:
                     # Fallback if the recovery function isn't available
-                    ok = route_and_execute(
+                    result = route_and_execute(
                         action_type='modify',
                         action_detail=command_detail,
                         current_project_path=current_project_path,
                         current_structured_goal=current_structured_goal
                     )
-                
-                if not ok:
-                    canvas.error("Action 'modify' failed. Please review logs.")
-                    
+                if isinstance(result, dict):
+                    success = result.get("success", False)
+                    if not success:
+                        error = result.get("error", "Unknown error")
+                        canvas.error("Action 'modify' failed. Please review logs.")
+                else:
+                    success = bool(result)  # backward compatibility
+   
                 # Calculate operation cost
                 end_tokens, end_cost = budget_manager.get_session_consumption()
                 op_tokens = end_tokens - start_tokens

@@ -1,0 +1,12 @@
+{
+  "name": "Backend\u2011only FastAPI Example",
+  "description": "Generate a lean FastAPI service (no frontend) so we can test the new dependency\u2011file logic.",
+  "steps": [
+    {
+      "type": "initial_generation",
+      "name": "Create Minimal FastAPI Service",
+      "prompt": "Create a minimal FastAPI application that exposes CRUD endpoints for a `Todo` item (id, title, completed). Use an in\u2011memory list store, include Pydantic models, and add a basic pytest test. No database, no frontend, no Docker \u2013 keep it lean.",
+      "project_name": "todo_api"
+    }
+  ]
+}

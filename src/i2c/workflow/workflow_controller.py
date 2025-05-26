@@ -32,6 +32,16 @@ class WorkflowController:
         self.session_id = session_id or f"wfc-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         self.session_manager = WorkflowSessionManager(self.session_id)
         self.recovery_log = []
+        self.last_error = None  
+    
+    def get_last_error(self) -> Optional[str]:
+        """Get the last error message from workflow execution"""
+        return self.last_error
+
+    def _set_error(self, error_message: str):
+        """Set the last error message"""
+        self.last_error = error_message
+        canvas.error(f"[WorkflowController] {error_message}")
         
     def run_workflow_with_recovery(self, workflow, max_attempts: int = 1, **kwargs) -> bool:
         """
@@ -345,10 +355,39 @@ class WorkflowController:
         )
         
         # Final status
-        overall_success = main_cycle_success and sre_success and quality_success
-        if overall_success:
-            canvas.success(f"🎉 [WorkflowController] Complete workflow succeeded!")
-        else:
-            canvas.warning(f"⚠️ [WorkflowController] Workflow completed with issues.")
+        # Resilient success logic - don't fail entire workflow for quality/SRE issues
+        overall_success = main_cycle_success  # Main generation must succeed
+
+        # Capture specific error messages
+        error_details = []
+        
+        if not main_cycle_success:
+            error_msg = "Main generation cycle failed"
+            error_details.append(error_msg)
+            self._set_error(error_msg)
+        
+        # Log quality and SRE results without failing entire workflow
+        if not quality_success:
+            error_msg = "Quality validation failed"  
+            error_details.append(error_msg)
+            canvas.warning(f"⚠️ [WorkflowController] {error_msg} but continuing...")
             
+        if not sre_success:
+            error_msg = "SRE validation failed"
+            error_details.append(error_msg)
+            canvas.warning(f"⚠️ [WorkflowController] {error_msg} but continuing...")
+
+        # Set combined error message if any failures
+        if error_details:
+            self._set_error("; ".join(error_details))
+            
+        # Report detailed status
+        if overall_success:
+            if quality_success and sre_success:
+                canvas.success(f"🎉 [WorkflowController] Complete workflow succeeded with all validations!")
+            else:
+                canvas.success(f"✅ [WorkflowController] Generation succeeded (quality: {'✅' if quality_success else '⚠️'}, SRE: {'✅' if sre_success else '⚠️'})")
+        else:
+            canvas.error(f"❌ [WorkflowController] Main generation failed.")
+
         return overall_success

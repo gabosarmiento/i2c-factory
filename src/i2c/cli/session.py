@@ -192,7 +192,7 @@ def run_session():
         # --- Call Orchestrator ---
         if perform_action and action_type and action_detail and project_path_for_action:
             # Orchestrator calls cycles, which use direct .run() within try/except
-            success = route_and_execute(
+            result = route_and_execute(
                 action_type=action_type,
                 action_detail=action_detail,
                 current_project_path=project_path_for_action,
@@ -200,10 +200,16 @@ def run_session():
                 # Pass budget_manager if orchestrator needs it for per-step checks later
                 # budget_manager=budget_manager
             )
-            if not success:
-                 canvas.error(f"Action '{action_type}' failed. Please review logs.")
-            # If action failed, should we reset current_project_path? Maybe not yet.
-
+            if isinstance(result, dict):
+                success = result.get("success", False)
+                if not success:
+                    error = result.get("error", "Unknown error")
+                    canvas.error(f"Action '{action_type}' failed. Please review logs.")
+                    # handle error with message
+            else:
+                success = bool(result)  # backward compatibility
+           
+                 
         print("-" * 30) # Separator
 
     # Final summary is printed when 'q' is entered

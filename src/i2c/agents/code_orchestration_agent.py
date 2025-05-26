@@ -24,6 +24,13 @@ class OrchestrationResult(BaseModel):
     sre_results: Dict[str, Any] = Field(..., description="Results of operational checks")
     reasoning_trajectory: List[Dict[str, Any]] = Field(..., description="Reasoning steps taken during the process")
 
+    class Config:
+        # Allow extra fields in case response has additional data
+        extra = "allow"
+        # Be more lenient with JSON parsing
+        json_encoders = {
+            # Handle any problematic types
+        }
 
 class CodeOrchestrationAgent(Agent):
     def __init__(
@@ -498,16 +505,30 @@ class CodeOrchestrationAgent(Agent):
             decision, reason = self._make_final_decision(
                 quality_results, sre_results, modification_result
             )
-            
-            # 9. Return comprehensive result
-            return {
-                "decision": decision,
-                "reason": reason,
-                "modifications": modification_result.get('summary', {}),
-                "quality_results": quality_results,
-                "sre_results": sre_results,
-                "reasoning_trajectory": self.session_state.get("reasoning_trajectory", []) if self.session_state else []
-            }
+
+            # 9. Return comprehensive result with clean formatting
+            try:
+                final_result = {
+                    "decision": decision,
+                    "reason": reason,
+                    "modifications": modification_result.get("summary", {}),
+                    "quality_results": self._clean_results(quality_results),
+                    "sre_results": self._clean_results(sre_results),
+                    "reasoning_trajectory": self.session_state.get("reasoning_trajectory", []) if self.session_state else []
+                }
+
+                # Ensure clean JSON without function refs
+                return self._sanitize_response(final_result)
+
+            except Exception as e:
+                return {
+                    "decision": "reject",
+                    "reason": f"Execution error: {str(e)}",
+                    "modifications": {},
+                    "quality_results": {},
+                    "sre_results": {},
+                    "reasoning_trajectory": []
+                }
             
         except Exception as e:
             import traceback
@@ -521,7 +542,24 @@ class CodeOrchestrationAgent(Agent):
                 "reason": f"Orchestration error: {str(e)}",
                 "error_details": error_details
             }
-    
+
+    # --- Add this utility method to the class as well ---
+    def _sanitize_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove function references and ensure JSON serializable"""
+        import json
+        try:
+            json_str = json.dumps(response, default=str)
+            return json.loads(json_str)
+        except Exception:
+            return {
+                "decision": "reject",
+                "reason": "Response serialization failed",
+                "modifications": {},
+                "quality_results": {},
+                "sre_results": {},
+                "reasoning_trajectory": []
+            }
+        
     async def _setup_teams(self, project_path: Path):
         """Initialize all specialized teams for this execution"""
         shared_session = self.session_state  # Ensure shared dict ref
@@ -1533,8 +1571,9 @@ def build_orchestration_team(session_state=None) -> Team:
         ],
         session_state=session_state,
         response_model=OrchestrationResult,  
-        show_tool_calls=True,
-        debug_mode=True,
-        markdown=True,
-        enable_agentic_context=True,
+        show_tool_calls=False,
+        debug_mode=False,
+        markdown=False,
+        enable_agentic_context=False,
+        tools=[]
     )

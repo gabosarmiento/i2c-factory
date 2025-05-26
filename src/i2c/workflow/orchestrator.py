@@ -126,6 +126,9 @@ def route_and_execute(
     canvas.info(f"🎯 Routing action: {action_type}")
     print(f"Action detail: {action_detail}")
     try:
+        # Here we would integrate with your feature pipeline implementation
+        from i2c.workflow.feature_integration import FeatureIntegration
+        from i2c.agents.budget_manager import BudgetManagerAgent
         # Create workflow controller for this action
         controller = WorkflowController(
             session_id=f"{action_type}-{current_project_path.name}"
@@ -158,17 +161,16 @@ def route_and_execute(
                 show_progress("Project Generation", steps, len(steps))
                 
                 # Show generated files
-                generated_files = []
-                for file_path in current_project_path.rglob('*'):
-                    if file_path.is_file():
-                        generated_files.append(file_path)
-                
+                generated_files = [
+                    file_path for file_path in current_project_path.rglob('*') if file_path.is_file()
+                ]
                 if generated_files:
                     show_file_list("Generated Files", generated_files, current_project_path)
-                
                 canvas.success(f"✅ Project generated successfully!")
-                
-            return success
+                return {"success": True, "error": None}
+            else:
+                error_msg = controller.get_last_error() or "Generation workflow failed"
+                return {"success": False, "error": error_msg}
             
             
         elif action_type == 'modify':
@@ -192,15 +194,13 @@ def route_and_execute(
                     "Running tests",
                     "Finalizing changes"
                 ]
-                
+            
+            canvas.info(f"\n🛠️ Modifying project...")    
             # Show initial progress
             show_progress("Modification", steps, 0)
             
             # Get list of files before modification
-            files_before = set()
-            for file_path in current_project_path.rglob('*'):
-                if file_path.is_file():
-                    files_before.add(str(file_path))
+            files_before = {str(p) for p in current_project_path.rglob('*') if p.is_file()}
             
             # Execute with original workflow
             success = controller.run_complete_workflow(
@@ -215,21 +215,16 @@ def route_and_execute(
                 show_progress("Modification", steps, len(steps))
                 
                 # Determine which files were added or modified
-                files_after = set()
-                for file_path in current_project_path.rglob('*'):
-                    if file_path.is_file():
-                        files_after.add(str(file_path))
-                
-                # New files
+                files_after = {str(p) for p in current_project_path.rglob('*') if p.is_file()}
                 new_files = [Path(f) for f in files_after - files_before]
+                
                 if new_files:
                     show_file_list("New Files", new_files, current_project_path)
-                
-                # Modified files (harder to determine accurately without tracking)
-                # This is just a placeholder
                 canvas.success(f"✅ Modifications completed successfully!")
-                
-            return success
+                return {"success": True, "error": None}
+            else:
+                error_msg = controller.get_last_error() or "Modification workflow failed"
+                return {"success": False, "error": error_msg}
             
         elif action_type == 'feature_pipeline':
             # Story implementation through feature pipeline
@@ -246,14 +241,7 @@ def route_and_execute(
             show_progress("Story Implementation", steps, 0)
             
             # Get list of files before modification
-            files_before = set()
-            for file_path in current_project_path.rglob('*'):
-                if file_path.is_file():
-                    files_before.add(str(file_path))
-            
-            # Here we would integrate with your feature pipeline implementation
-            from i2c.workflow.feature_integration import FeatureIntegration
-            from i2c.agents.budget_manager import BudgetManagerAgent
+            files_before = {str(p) for p in current_project_path.rglob('*') if p.is_file()}
             
             # Initialize integration with minimal dependencies
             budget_manager = BudgetManagerAgent(session_budget=None)
@@ -270,26 +258,21 @@ def route_and_execute(
                 show_progress("Story Implementation", steps, len(steps))
                 
                 # Determine which files were added or modified
-                files_after = set()
-                for file_path in current_project_path.rgloc('*'):
-                    if file_path.is_file():
-                        files_after.add(str(file_path))
-                
-                # New files
+                files_after = {str(p) for p in current_project_path.rglob('*') if p.is_file()}
                 new_files = [Path(f) for f in files_after - files_before]
                 if new_files:
                     show_file_list("Files Created", new_files, current_project_path)
-                
                 canvas.success(f"✅ Story implemented successfully!")
-                return True
+                return {"success": True, "error": None}
             else:
-                canvas.error(f"❌ Story implementation failed: {result.get('error', 'Unknown error')}")
-                return False
+                error_msg = controller.get_last_error() or "Story implementation failed"
+                canvas.error(f"❌ {error_msg}")
+                return {"success": False, "error": error_msg}
             
         else:
             canvas.error(f"❌ Unknown action type: {action_type}")
-            return False
+            return {"success": False, "error": f"Unknown action type: {action_type}"}
             
     except Exception as e:
         canvas.error(f"❌ Error during workflow execution: {e}")
-        return False
+        return {"success": False, "error": f"Exception during {action_type}: {str(e)}"}

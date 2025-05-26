@@ -504,7 +504,7 @@ class ScenarioProcessor:
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
             
             # ENHANCED: Pass architectural context to generation
-            ok = route_and_execute(
+            result = route_and_execute(
                 action_type='generate',
                 action_detail=self.current_structured_goal,
                 current_project_path=self.current_project_path,
@@ -512,8 +512,28 @@ class ScenarioProcessor:
                 architectural_context=self.session_state.get("architectural_context", {})  # NEW
             )
             
+            # Handle detailed result
+            if isinstance(result, dict):
+                ok = result.get("success", False)
+                if not ok:
+                    error_msg = result.get("error", "No reason provided")
+                    canvas.error(f"❌ Generation failed: {error_msg}")
+                else:
+                    canvas.success("✅ Generation completed successfully")
+            else:
+                # Backward compatibility - treat as boolean
+                ok = bool(result)
+                if not ok:
+                    canvas.error("❌ Generation failed: Legacy workflow error")
+            
             # Check for generation failures or syntax errors
-            if not ok or self._check_for_syntax_errors(self.current_project_path):
+            if isinstance(result, dict) and not result.get("success", False):
+                error_msg = result.get("error", "No reason provided")
+                canvas.error(f"❌ Evolution rejected: {error_msg}")
+                
+                # ENHANCED: Create architectural-appropriate fallback instead of generic
+                self._create_architectural_fallback_project()
+            elif not ok or self._check_for_syntax_errors(self.current_project_path):
                 canvas.error("Action 'generate' failed or syntax errors found.")
                 
                 # ENHANCED: Create architectural-appropriate fallback instead of generic
@@ -942,14 +962,19 @@ class ScenarioProcessor:
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
             
             # Call route_and_execute without budget_manager parameter to match interface
-            ok = route_and_execute(
+            result = route_and_execute(
                 action_type='modify',
                 action_detail='r',  # 'r' is the refinement command
                 current_project_path=self.current_project_path,
                 current_structured_goal=self.current_structured_goal
             )
-            if not ok:
-                canvas.error("Action 'refine' failed. Please review logs.")
+            if isinstance(result, dict):
+                success = result.get("success", False)
+                if not success:
+                    error = result.get("error", "Unknown error")
+                    canvas.error("Action 'refine' failed. Please review logs.")
+            else:
+                success = bool(result)  # backward compatibility
             
             # Calculate operation cost
             end_tokens, end_cost = self.budget_manager.get_session_consumption()

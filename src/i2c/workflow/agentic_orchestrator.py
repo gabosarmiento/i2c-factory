@@ -5,6 +5,7 @@ import os
 import asyncio
 import datetime
 import json
+import re
 from i2c.utils.json_extraction import extract_json
 from agno.team import Team
 from agno.agent import Message
@@ -197,6 +198,67 @@ def is_json_like_string(s: str) -> bool:
     s = s.strip()
     return s.startswith("{") and s.endswith("}")
 
+def ensure_dependency_file(project_path: Path, arch_ctx: dict):
+    preferred = arch_ctx.get("preferred_stacks", {})
+
+    if "python" in preferred:
+        req_file = project_path / "requirements.txt"
+        if not req_file.exists():
+            req_file.write_text("fastapi\nuvicorn[standard]\npydantic\nhttpx\npytest\n")
+
+    if "javascript" in preferred:
+        # --- Force a single, root-level package.json for the Vite/React/Tailwind stack ---
+        root_pkg = project_path / "package.json"
+        root_pkg.write_text(
+            """{
+    "name": "app",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0"
+    },
+    "devDependencies": {
+        "vite": "^4.0.0",
+        "@vitejs/plugin-react": "^4.0.0",
+        "tailwindcss": "^3.3.0"
+    }
+    }"""
+        )
+
+    # Nuke any nested package.json (e.g. frontend/package.json) to avoid confusion
+    nested_pkg = project_path / "frontend" / "package.json"
+    if nested_pkg.exists():
+        nested_pkg.unlink()
+        
+    if "go" in preferred:
+        go_mod = project_path / "go.mod"
+        if not go_mod.exists():
+            go_mod.write_text("module app\n\ngo 1.20\nrequire github.com/gofiber/fiber/v2 v2.42.0\n")
+
+    if "java" in preferred:
+        pom_file = project_path / "pom.xml"
+        if not pom_file.exists():
+            pom_file.write_text("""<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>app</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter</artifactId>
+      <version>2.7.0</version>
+    </dependency>
+  </dependencies>
+</project>""")
+
+
 async def execute_agentic_evolution(
     objective: Dict[str, Any],
     project_path: Path,
@@ -204,13 +266,8 @@ async def execute_agentic_evolution(
 ) -> Dict[str, Any]:
     """
     Orchestrate an agentic evolution run with architectural intelligence enforcement.
-
-    :param objective: The dictionary describing task, constraints, and metadata.
-    :param project_path: Path to the current project directory.
-    :param session_state: Optional initial session state passed through runs.
-    :returns: Final parsed JSON response from the agent team.
     """
-    # Prepare or initialize session state
+
     if session_state is None:
         session_state = {
             "project_path": str(project_path),
@@ -220,32 +277,71 @@ async def execute_agentic_evolution(
             "existing_files": os.listdir(project_path) if project_path.exists() else []
         }
 
-    # ENHANCED: Add architectural intelligence early in the process
     enhanced_objective = await _enhance_objective_with_architectural_intelligence(
         objective, project_path, session_state
     )
-    
-    # Store enhanced objective back in session state
+    # === Multi-language lean stack preferences ===
+    preferred_stacks = {
+        "javascript": {
+            "frontend_template": "vite_react_tailwind",
+            "framework": "React",
+            "style": "Tailwind CSS",
+            "builder": "Vite",
+            "avoid": ["Next.js monorepo", "Electron", "Theia"]
+        },
+        "python": {
+            "ui_framework": "streamlit",
+            "api_framework": "fastapi",
+            "avoid": ["Dash", "Flask boilerplates"]
+        },
+        "java": {
+            "framework": "Spring Boot",
+            "build_tool": "Maven",
+            "avoid": ["heavy enterprise scaffolds"]
+        },
+        "go": {
+            "framework": "Fiber",
+            "style": "minimalist",
+            "avoid": ["monolith", "too many codegen layers"]
+        }
+    }
+    # Infer desired stacks from the scenario objective
+    objective_text = json.dumps(objective).lower()
+    desired_stacks = set()
+    if "react" in objective_text or "vite" in objective_text:
+        desired_stacks.add("javascript")
+    if "fastapi" in objective_text or "streamlit" in objective_text:
+        desired_stacks.add("python")
+    if "spring boot" in objective_text:
+        desired_stacks.add("java")
+    if "go" in objective_text or "fiber" in objective_text:
+        desired_stacks.add("go")
+    # Apply strict filtering
+    filtered_stacks = {
+        lang: config
+        for lang, config in preferred_stacks.items()
+        if lang in desired_stacks
+    }
+    enhanced_objective.setdefault("architectural_context", {})["preferred_stacks"] = filtered_stacks
+    session_state.setdefault("architectural_context", {})["preferred_stacks"] = filtered_stacks
+
     session_state["enhanced_objective"] = enhanced_objective
     session_state["architectural_context"] = enhanced_objective.get("architectural_context", {})
 
-    # Build or retrieve the orchestration team with enhanced context
     team_input = {
-        "objective": enhanced_objective,  # Use enhanced objective instead of original
+        "objective": enhanced_objective,
         "session_state": session_state
     }
-    team: Team = build_orchestration_team(team_input)
 
-    # Kick off the async run, passing enhanced objective and state
+    team = build_orchestration_team(team_input)
     message = Message(role="user", content=json.dumps(team_input))
     result = await team.arun(message=message)
 
-    # Loop until we get a terminal event (no longer paused/intermediate)
+    # Handle intermediate events if paused
     intermediate_events = {"run_paused", "waiting", "intermediate"}
     while getattr(result, "event", None) in intermediate_events:
         canvas.info(f"Waiting on agentic evolution, current state: {result.event}")
         await asyncio.sleep(1)
-        # Resume or fetch next result
         if hasattr(team, "resume_run"):
             result = await team.resume_run(result.run_id)
         else:
@@ -253,54 +349,58 @@ async def execute_agentic_evolution(
 
     # Once final, parse the content safely
     content = getattr(result, "content", None)
-    arch_ctx = session_state.get("architectural_context", {})
-    if hasattr(content, "dict"):
-        _apply_modifications_if_any(content.dict(), project_path)
-        _ensure_mandatory_files(project_path, arch_ctx)
-        return {
-            "result": content.dict(),
-            "session_state": session_state
-        }
-    elif isinstance(content, dict):
-        _apply_modifications_if_any(content, project_path)
-        _ensure_mandatory_files(project_path, arch_ctx)
-        return {
-            "result": content,
-            "session_state": session_state
-        }
-    elif isinstance(content, str):
-        # ❶ Strip Markdown ``` fences if present
-        if content.lstrip().startswith("```"):
-            # Drop the first fence line and the closing ```
-            lines = content.strip().splitlines()
-            if len(lines) >= 3 and lines[0].startswith("```") and lines[-1].startswith("```"):
-                content = "\n".join(lines[1:-1]).strip()
+    arch_ctx = enhanced_objective.get("architectural_context", {})
+    session_state["architectural_context"] = arch_ctx
 
-        # ------------------------------------------------------------------
-        # NEW ❶  — clean up tool-call wrapper so we keep only the JSON block
-        if "<function=" in content and "{" in content:
-            first = content.find("{")
-            last  = content.rfind("}")
-            if first != -1 and last != -1 and last > first:
-                content = content[first:last + 1]
-        # ------------------------------------------------------------------
-        if is_json_like_string(content):
-            try:
-                result_json = json.loads(content)
-                # NEW line – make sure files are written
-                _apply_modifications_if_any(result_json, project_path)
-                _ensure_mandatory_files(project_path, arch_ctx)
-                return {
-                    "result": result_json,
-                    "session_state": session_state
-                }
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Failed to parse JSON from string: {e}")
+    try:
+        if hasattr(content, "dict"):
+            result_dict = content.dict()
+        elif isinstance(content, dict):
+            result_dict = content
+        elif isinstance(content, str):
+            clean_content = content.strip()
+
+            # Remove Markdown fences
+            if clean_content.startswith("```"):
+                lines = clean_content.splitlines()
+                if lines[0].startswith("```") and lines[-1].startswith("```"):
+                    clean_content = "\n".join(lines[1:-1]).strip()
+
+            # Clean up tool-call wrapper
+            if "<function=" in clean_content and "{" in clean_content:
+                json_match = re.search(r'\{.*\}', clean_content, re.DOTALL)
+                if json_match:
+                    clean_content = json_match.group(0)
+
+            # Try parsing
+            result_dict = json.loads(clean_content)
         else:
-            raise ValueError(f"String content received but not valid JSON: {content[:80]}")
-    else:
-        raise ValueError(f"Unexpected content format: {type(content)}")
+            raise ValueError(f"Unexpected content type: {type(content)}")
 
+        _apply_modifications_if_any(result_dict, project_path)
+        _ensure_mandatory_files(project_path, arch_ctx)
+        ensure_dependency_file(project_path, arch_ctx)
+
+        return {
+            "result": result_dict,
+            "session_state": session_state
+        }
+
+    except (json.JSONDecodeError, ValueError) as e:
+        # Self-healing fallback structure
+        fallback_result = {
+            "decision": "reject",
+            "reason": f"Failed to parse team response: {str(e)}",
+            "modifications": {},
+            "quality_results": {},
+            "sre_results": {},
+            "reasoning_trajectory": []
+        }
+        return {
+            "result": fallback_result,
+            "session_state": session_state
+        }
+        
 async def _enhance_objective_with_architectural_intelligence(
     objective: Dict[str, Any],
     project_path: Path,
