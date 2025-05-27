@@ -335,8 +335,88 @@ async def execute_agentic_evolution(
             "objective": objective,
             "reasoning_trajectory": [],
             "start_time": datetime.datetime.now().isoformat(),
-            "existing_files": os.listdir(project_path) if project_path.exists() else []
+            "existing_files": [
+                f for f in os.listdir(project_path) if os.path.isfile(project_path / f)
+            ] if project_path.exists() else []
         }
+    
+    # Add reflection memory if not already present
+    if "reflection_memory" not in session_state:
+        session_state["reflection_memory"] = []
+
+    # Enhance objective with reflection context if we have previous steps
+
+    if session_state["reflection_memory"]:
+        # Extract common patterns and issues
+        failures = [step for step in session_state["reflection_memory"] if not step.get('success', False)]
+        incomplete_tasks = []
+        recurring_patterns = {}
+        
+        # Analyze failures and incomplete work
+        for step in session_state["reflection_memory"]:
+            task = step.get('task', '')
+            success = step.get('success', False)
+            summary = step.get('summary', '')
+            
+            # Identify incomplete tasks
+            if not success:
+                incomplete_tasks.append({
+                    "task": task,
+                    "summary": summary,
+                    "files_modified": step.get('files_modified', [])
+                })
+            
+            # Track common terms/patterns
+            for term in ["test", "feature", "component", "UI", "backend", "API", "incomplete"]:
+                if term.lower() in task.lower() or term.lower() in summary.lower():
+                    recurring_patterns[term] = recurring_patterns.get(term, 0) + 1
+        
+        # Create enhanced reflection with structured insights
+        reflection_insights = {
+            "incomplete_tasks": incomplete_tasks,
+            "recurring_issues": [k for k, v in recurring_patterns.items() if v > 1],
+            "success_rate": f"{sum(1 for s in session_state['reflection_memory'] if s.get('success', False))}/{len(session_state['reflection_memory'])}"
+        }
+        
+        # Create concise summaries as before
+        step_summaries = []
+        for i, step in enumerate(session_state["reflection_memory"]):
+            success_str = "✅" if step.get('success', False) else "❌"
+            summary = (
+                f"Step {i+1}: {success_str} {step.get('task', 'Unknown')[:50]}... "
+                f"Files: {', '.join(step.get('files_modified', [])[:3])} "
+                f"Outcome: {step.get('summary', 'No details')[:100]}..."
+            )
+            step_summaries.append(summary)
+        
+        # Create enhanced reflection prompt with structured insights
+        reflection_context = "\n== REFLECTION FROM PREVIOUS STEPS ==\n" + "\n".join(step_summaries)
+        
+        if incomplete_tasks:
+            reflection_context += "\n\n== INCOMPLETE TASKS REQUIRING ATTENTION ==\n"
+            for task in incomplete_tasks:
+                reflection_context += f"• {task['task'][:80]}...\n  Reason: {task['summary'][:100]}...\n"
+        
+        if reflection_insights["recurring_issues"]:
+            reflection_context += f"\n\n== RECURRING THEMES ==\n• {', '.join(reflection_insights['recurring_issues'])}\n"
+        
+        reflection_context += f"\n== PROGRESS SUMMARY ==\nSuccess rate: {reflection_insights['success_rate']}\n"
+        
+        # Log for debugging
+        print(f"Enhanced reflection context: {reflection_context}")
+        
+        # Inject into objective
+        if isinstance(objective.get("task"), str):
+            reflection_prompt = "\n\nIMPORTANT - REVIEW PREVIOUS STEPS BEFORE PROCEEDING:\n" + reflection_context
+            objective["task"] = objective["task"] + reflection_prompt
+        
+        # Add structured insights for more advanced agents
+        objective["reflection_insights"] = reflection_insights
+        objective["reflection_context"] = reflection_context
+        
+        # Store enhanced objective
+        session_state["enhanced_objective"] = objective
+    
 
     enhanced_objective = await _enhance_objective_with_architectural_intelligence(
         objective, project_path, session_state
@@ -452,6 +532,20 @@ async def execute_agentic_evolution(
         _apply_modifications_if_any(result_dict, project_path)
         _ensure_mandatory_files(project_path, arch_ctx)
         ensure_dependency_file(project_path, arch_ctx)
+        
+        # Store reflection about this step
+        step_reflection = {
+            "task": objective.get("task", ""),
+            "files_modified": list(result_dict.get("modifications", {}).keys()) if result_dict else [],
+            "success": result_dict.get("decision", "") == "approve" if result_dict else False,
+            "summary": result_dict.get("reason", "") if result_dict else "No summary available"
+        }
+        session_state["reflection_memory"].append(step_reflection)
+
+        # Cap reflection memory to prevent unbounded growth
+        MAX_REFLECTIONS = 10
+        if len(session_state["reflection_memory"]) > MAX_REFLECTIONS:
+            session_state["reflection_memory"] = session_state["reflection_memory"][-MAX_REFLECTIONS:]
 
         return {
             "status": "ok",

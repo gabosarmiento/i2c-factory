@@ -22,7 +22,7 @@ def initialize_environment():
     # 2) Initialize a global budget manager if not already present
     if not hasattr(builtins, 'global_budget_manager'):
         from i2c.agents.budget_manager import BudgetManagerAgent
-        builtins.global_budget_manager = BudgetManagerAgent(session_budget=10.0)
+        builtins.global_budget_manager = BudgetManagerAgent(session_budget=None)
         
     # 3) Auto-create/migrate our tables *here*, before any agent loads
     from i2c.db_utils import (

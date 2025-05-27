@@ -26,11 +26,13 @@
       "type": "agentic_evolution",
       "name": "Add Smart Context Understanding",
       "objective": {
-        "task": "Enhance the snippet generator with context awareness. It should understand variations in how users describe tasks and generate appropriate code. Add examples and test cases for each snippet.",
+        "task": "Enhance the snippet generator with context awareness. It should parse and understand variations in how users describe tasks and generate appropriate code. Specifically implement: 1) Keyword extraction from user input, 2) Task classification logic, 3) Multiple implementation options, 4) Usage examples for each snippet.",
         "constraints": [
-          "Parse natural language effectively",
-          "Provide multiple implementation options when relevant",
-          "Include usage examples with each snippet"
+          "Must implement keyword extraction from user input",
+          "Must include task classification logic (e.g., sorting, validation, API)",
+          "Must provide at least 2 implementation options when relevant",
+          "Must include usage examples with each snippet",
+          "The implementation must be functional, not just placeholders"
         ]
       }
     },
@@ -44,6 +46,19 @@
           "Fast loading times",
           "SEO-friendly",
           "Include analytics to track usage"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Implement Keyword Extraction Only",
+      "objective": {
+        "task": "Add ONLY keyword extraction functionality to the backend. Create a specific Python function called extract_keywords(prompt: str) -> List[str] in backend/nlp_utils.py that takes a user prompt and returns a list of programming task keywords. For example 'sort a list of numbers' should return ['sort', 'list', 'numbers']. This must be a working implementation, not a placeholder.",
+        "constraints": [
+          "Function must be called extract_keywords",
+          "Function must be in backend/nlp_utils.py",
+          "Function must use simple NLP techniques (tokenization, stopword removal)",
+          "Function must be called from the main API endpoint"
         ]
       }
     }
