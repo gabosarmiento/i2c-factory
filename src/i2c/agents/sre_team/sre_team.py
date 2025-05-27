@@ -1,4 +1,5 @@
 # src/i2c/agents/sre_team/sre_team.py
+# Phase 5: Enhanced Docker-Integrated SRE Pipeline
 
 from typing import Dict, Any, List, Optional
 from pathlib import Path
@@ -7,27 +8,39 @@ from builtins import llm_highest, llm_middle
 from agno.team import Team
 from agno.agent import Agent
 
-# Import existing SRE components
+# Import enhanced SRE components with Docker integration
 from i2c.agents.sre_team.code_quality import code_quality_sentinel
-from i2c.agents.sre_team.dependency import dependency_verifier
-from i2c.agents.sre_team.sandbox import sandbox_executor
+from i2c.agents.sre_team.docker import DockerConfigAgent   
+from i2c.agents.sre_team.dependency import DependencyVerifierAgent
+from i2c.agents.sre_team.sandbox import SandboxExecutorAgent
 from i2c.agents.sre_team.version_control import version_controller
 from i2c.agents.sre_team.multilang_unit_test import unit_test_generator
 
 class SRELeadAgent(Agent):
-    """Lead agent for the SRE Team that coordinates operational checks"""
+    """Enhanced Lead agent for the SRE Team with Docker-integrated operational checks"""
     
-    def __init__(self, **kwargs):
+    def __init__(self, *, project_path: Path, session_state: dict[str,Any], **kwargs):
         super().__init__(
             name="SRELead",
             model=llm_highest,  
-            role="Leads the SRE team to ensure operational excellence",
+            role="Leads the SRE team to ensure operational excellence with Docker-integrated pipeline",
             instructions=[
-                "You are the lead of the SRE Team, responsible for operational checks.",
-                "Your job is to coordinate operational validation of code changes.",
-                "You must ensure that the code meets operational standards and is safe to deploy.",
+                "You are the lead of the enhanced SRE Team with Docker-integrated operational pipeline.",
+                "Your job is to coordinate the complete Docker-aware validation workflow:",
+                "1. Generate dependency manifests (requirements.txt, package.json)",
+                "2. Generate Docker configurations (Dockerfile, docker-compose.yml)",
+                "3. Run container-based testing for production-like validation",
+                "4. Execute container-aware security scanning",
+                "5. Perform version control readiness checks",
                 
-                # Message parsing instructions
+                # Docker-specific workflow instructions
+                "DOCKER-INTEGRATED WORKFLOW:",
+                "- Always generate manifests before Docker configs",
+                "- Use container-based testing when Docker configs are available",
+                "- Run security scans inside containers to match production environment",
+                "- Fallback to local execution only when Docker is unavailable",
+                
+                # Message parsing instructions (unchanged)
                 "You will receive messages in this format:",
                 "{",
                 "  'instruction': 'Review the proposed code changes for operational risks, performance issues, and deployment readiness.',",
@@ -35,103 +48,119 @@ class SRELeadAgent(Agent):
                 "  'modified_files': {'file.py': 'content...', 'file2.js': 'content...'}", 
                 "}",
                 
-                # Processing instructions
-                "When you receive a message, follow these steps:",
-                "1. Identify the project_path and modified_files from the message",
-                "2. Detect the programming languages used in the modified files",
-                "3. You must call your validate_changes(...) function using the values from the message.",
-                "4. Format the response according to the expected structure",
+                # Enhanced processing instructions
+                "When you receive a message, follow the Docker-integrated workflow:",
+                "1. Detect project architecture and programming languages",
+                "2. Generate dependency manifests using DependencyVerifierAgent",
+                "3. Generate Docker configurations using DockerConfigAgent", 
+                "4. Run container-based syntax and test validation using SandboxExecutorAgent",
+                "5. Execute container-aware dependency security scanning",
+                "6. Verify version control readiness",
+                "7. Format comprehensive response with all validation results",
                 
-                # Operational focus areas
-                "Focus on these operational validation areas:",
-                "- Syntax validation and test execution (sandbox checks)",
-                "- Dependency vulnerability scanning", 
-                "- Version control readiness",
-                "- Runtime stability and performance risks",
-                
-                # Resource optimization
-                "Be smart about resource usage:",
-                "- Only run checks appropriate for the detected languages",
-                "- Skip tools that would fail based on missing dependencies",
-                "- Prioritize critical operational checks over minor issues",
-                
-                # Response formatting
-                "Return results in this format:",
+                # Enhanced response formatting
+                "Return results in this enhanced format:",
                 "{",
                 "  'passed': boolean,  # Overall operational readiness",
                 "  'issues': [string],  # List of operational issues found",
                 "  'check_results': {  # Results per operational check",
-                "    'sandbox': {'passed': boolean, 'issues': [string]},",
-                "    'dependencies': {'passed': boolean, 'issues': [string]},", 
+                "    'manifest_generation': {'passed': boolean, 'files_created': [string], 'issues': [string]},",
+                "    'docker_configuration': {'passed': boolean, 'files_created': [string], 'issues': [string]},",
+                "    'container_testing': {'passed': boolean, 'issues': [string]},",
+                "    'container_security': {'passed': boolean, 'issues': [string]},", 
                 "    'version_control': {'passed': boolean, 'issues': [string]}",
                 "  },",
                 "  'summary': {  # High-level operational summary",
                 "    'total_issues': int,",
                 "    'deployment_ready': boolean,",
+                "    'docker_ready': boolean,",
                 "    'operational_score': string",
+                "  },",
+                "  'docker_pipeline': {  # Docker-specific results",
+                "    'manifests_generated': [string],",
+                "    'docker_configs_created': [string],",
+                "    'container_tests_run': boolean,",
+                "    'container_security_scanned': boolean",
                 "  }",
                 "}",
-                
-                # Detailed process instructions
-                "For each validation request:",
-                "1. Run sandbox checks for syntax and test execution",
-                "2. Check dependencies for security vulnerabilities", 
-                "3. Verify version control status and readiness",
-                "4. Compile all results and return a structured response",
-                "Always return a dictionary as a response, even if validation fails or inputs are incomplete.",
-                "If a tool fails, still include it in 'check_results' with 'passed': False and an error message.",
-                "If any operational issues are found, provide clear feedback for correction."
             ],
             **kwargs
         )
-        # Initialize session state if needed
-        if self.team_session_state is None:
-            self.team_session_state = {}
+        
+        self.project_path = Path(project_path)
+        self.team_session_state = session_state
+        
+        # Initialize enhanced Docker-aware agents
+        self.docker_agent = DockerConfigAgent(project_path=self.project_path)
+        self.dependency_agent = DependencyVerifierAgent(
+            project_path=self.project_path, 
+            session_state=session_state
+        )
+        self.sandbox_agent = SandboxExecutorAgent(project_path=self.project_path)
     
     def validate_changes(self, project_path: Path, modified_files: Dict[str, str]) -> Dict[str, Any]:
         """
-        Validate code changes for operational excellence - SYNCHRONOUS
+        Enhanced Docker-integrated validation workflow
         
         Args:
             project_path: Path to the project directory
             modified_files: Dictionary of modified files (path -> content)
             
         Returns:
-            Dictionary with validation results
+            Dictionary with comprehensive validation results including Docker pipeline status
         """
-        # This function will coordinate the SRE team activities
         try:
-            # 1. Sandbox execution check (syntax + tests)
-            sandbox_results = self._run_sandbox_checks(project_path, modified_files)
+            # Phase 1: Generate dependency manifests
+            manifest_results = self._run_manifest_generation(project_path, modified_files)
             
-            # 2. Dependency vulnerability check
-            dependency_results = self._run_dependency_checks(project_path)
+            # Phase 2: Generate Docker configurations  
+            docker_config_results = self._run_docker_configuration(project_path, modified_files)
             
-            # 3. Version control readiness check
+            # Phase 3: Container-based testing
+            container_test_results = self._run_container_testing(project_path, modified_files)
+            
+            # Phase 4: Container-aware security scanning
+            container_security_results = self._run_container_security_scanning(project_path)
+            
+            # Phase 5: Version control readiness
             version_control_results = self._run_version_control_checks(project_path)
             
-            # 4. Determine overall pass/fail
+            # Determine overall pass/fail with Docker-specific considerations
             all_passed = (
-                sandbox_results.get("passed", False) and
-                dependency_results.get("passed", False) and
+                manifest_results.get("passed", False) and
+                docker_config_results.get("passed", False) and
+                container_test_results.get("passed", False) and
+                container_security_results.get("passed", False) and
                 version_control_results.get("passed", False)
             )
             
-            # 5. Collect issues
+            # Collect all issues
             issues = []
-            issues.extend(sandbox_results.get("issues", []))
-            issues.extend(dependency_results.get("issues", []))
+            issues.extend(manifest_results.get("issues", []))
+            issues.extend(docker_config_results.get("issues", []))
+            issues.extend(container_test_results.get("issues", []))
+            issues.extend(container_security_results.get("issues", []))
             issues.extend(version_control_results.get("issues", []))
             
-            # 6. Build check results
+            # Build comprehensive check results
             check_results = {
-                "sandbox": {
-                    "passed": sandbox_results.get("passed", False),
-                    "issues": sandbox_results.get("issues", [])
+                "manifest_generation": {
+                    "passed": manifest_results.get("passed", False),
+                    "files_created": manifest_results.get("files_created", []),
+                    "issues": manifest_results.get("issues", [])
                 },
-                "dependencies": {
-                    "passed": dependency_results.get("passed", False), 
-                    "issues": dependency_results.get("issues", [])
+                "docker_configuration": {
+                    "passed": docker_config_results.get("passed", False),
+                    "files_created": docker_config_results.get("files_created", []),
+                    "issues": docker_config_results.get("issues", [])
+                },
+                "container_testing": {
+                    "passed": container_test_results.get("passed", False),
+                    "issues": container_test_results.get("issues", [])
+                },
+                "container_security": {
+                    "passed": container_security_results.get("passed", False), 
+                    "issues": container_security_results.get("issues", [])
                 },
                 "version_control": {
                     "passed": version_control_results.get("passed", False),
@@ -139,121 +168,280 @@ class SRELeadAgent(Agent):
                 }
             }
             
-            # 7. Build summary
+            # Determine Docker readiness
+            docker_ready = (
+                manifest_results.get("passed", False) and
+                docker_config_results.get("passed", False)
+            )
+            
+            # Build enhanced summary
             summary = {
                 "total_issues": len(issues),
                 "deployment_ready": all_passed,
+                "docker_ready": docker_ready,
                 "checks_run": len(check_results),
                 "operational_score": f"{sum(1 for r in check_results.values() if r['passed'])}/{len(check_results)}"
             }
             
-            # Store results in the team session state
+            # Build Docker pipeline status
+            docker_pipeline = {
+                "manifests_generated": manifest_results.get("files_created", []),
+                "docker_configs_created": docker_config_results.get("files_created", []),
+                "container_tests_run": container_test_results.get("container_based", False),
+                "container_security_scanned": container_security_results.get("container_based", False)
+            }
+            
+            # Store comprehensive results in session state
             if self.team_session_state is not None:
                 self.team_session_state["validation_results"] = {
                     "passed": all_passed,
                     "issues": issues,
                     "check_results": check_results,
-                    "summary": summary
+                    "summary": summary,
+                    "docker_pipeline": docker_pipeline
                 }
             
             return {
                 "passed": all_passed,
                 "issues": issues,
                 "check_results": check_results,
-                "summary": summary
+                "summary": summary,
+                "docker_pipeline": docker_pipeline
             }
             
         except Exception as e:
             import traceback
             error_info = {
                 "passed": False,
-                "error": f"SRE team error: {str(e)}",
+                "error": f"Enhanced SRE pipeline error: {str(e)}",
                 "error_details": traceback.format_exc(),
                 "issues": [f"SRE validation error: {str(e)}"],
                 "check_results": {},
-                "summary": {"total_issues": 1, "deployment_ready": False}
+                "summary": {"total_issues": 1, "deployment_ready": False, "docker_ready": False},
+                "docker_pipeline": {
+                    "manifests_generated": [],
+                    "docker_configs_created": [],
+                    "container_tests_run": False,
+                    "container_security_scanned": False
+                }
             }
             
-            # Store error in the team session state
             if self.team_session_state is not None:
                 self.team_session_state["validation_results"] = error_info
                 
             return error_info
-    
-    def _run_sandbox_checks(self, project_path: Path, modified_files: Dict[str, str]) -> Dict[str, Any]:
-        """Run sandbox execution checks using sandbox_executor - DIRECT CALL"""
+
+    def _run_manifest_generation(self, project_path: Path, modified_files: Dict[str, str]) -> Dict[str, Any]:
+        """Phase 1: Generate dependency manifests based on architectural intelligence"""
         try:
-            # Detect primary language from modified files (use existing method)
-            language = self._detect_primary_language(modified_files)
+            print("🔄 Phase 1: Generating dependency manifests...")
             
-            # Direct call to sandbox_executor (no async, no LLM)
-            success, message = sandbox_executor.execute(project_path, language)
+            # Detect architectural context from modified files
+            architectural_context = self._analyze_architectural_context(project_path, modified_files)
             
-            return {
-                "passed": success,
-                "issues": [] if success else [f"Sandbox: {message}"],
-            }
+            # Generate manifests using dependency agent
+            manifest_result = self.dependency_agent.generate_requirements_manifest(
+                project_path, architectural_context
+            )
+            
+            files_created = manifest_result.get("manifests_created", [])
+            
+            if files_created:
+                print(f"   ✅ Generated {len(files_created)} manifest file(s): {', '.join(files_created)}")
+                return {
+                    "passed": True,
+                    "files_created": files_created,
+                    "issues": []
+                }
+            else:
+                return {
+                    "passed": True,  # Not having manifests isn't necessarily a failure
+                    "files_created": [],
+                    "issues": ["No manifest files were generated"]
+                }
+                
         except Exception as e:
+            print(f"   ❌ Manifest generation failed: {e}")
             return {
                 "passed": False,
-                "issues": [f"Sandbox error: {str(e)}"],
+                "files_created": [],
+                "issues": [f"Manifest generation error: {str(e)}"]
             }
 
-    def _run_dependency_checks(self, project_path: Path) -> Dict[str, Any]:
-        """Run dependency checks using dependency_verifier - DIRECT CALL"""
+    def _run_docker_configuration(self, project_path: Path, modified_files: Dict[str, str]) -> Dict[str, Any]:
+        """Phase 2: Generate Docker configurations"""
         try:
-            # Direct call to dependency_verifier (no async, no LLM)
-            issues_found = dependency_verifier.check_dependencies(project_path)
+            print("🔄 Phase 2: Generating Docker configurations...")
             
-            return {
-                "passed": len(issues_found) == 0,
-                "issues": [f"Dependency: {issue}" for issue in issues_found],
-            }
+            # Generate Docker configs using docker agent
+            docker_result = asyncio.run(self.docker_agent.run())
+            
+            files_created = docker_result.get("files_created", [])
+            
+            if docker_result.get("passed", False):
+                print(f"   ✅ Generated {len(files_created)} Docker config file(s): {', '.join(files_created)}")
+                return {
+                    "passed": True,
+                    "files_created": files_created,
+                    "issues": []
+                }
+            else:
+                return {
+                    "passed": False,
+                    "files_created": files_created,
+                    "issues": docker_result.get("issues", ["Docker configuration generation failed"])
+                }
+                
         except Exception as e:
+            print(f"   ❌ Docker configuration failed: {e}")
             return {
                 "passed": False,
-                "issues": [f"Dependency error: {str(e)}"],
+                "files_created": [],
+                "issues": [f"Docker configuration error: {str(e)}"]
+            }
+
+    def _run_container_testing(self, project_path: Path, modified_files: Dict[str, str]) -> Dict[str, Any]:
+        """Phase 3: Run container-based testing"""
+        try:
+            print("🔄 Phase 3: Running container-based testing...")
+            
+            # Detect primary language
+            language = self._detect_primary_language(modified_files)
+            
+            # Run container-based tests using enhanced sandbox agent
+            test_result = asyncio.run(self.sandbox_agent.run())
+            
+            if test_result.get("passed", False):
+                print("   ✅ Container-based tests passed")
+                return {
+                    "passed": True,
+                    "container_based": True,
+                    "issues": []
+                }
+            else:
+                issues = test_result.get("issues", ["Container testing failed"])
+                print(f"   ❌ Container tests failed: {', '.join(issues)}")
+                return {
+                    "passed": False,
+                    "container_based": True,
+                    "issues": [f"Container test: {issue}" for issue in issues]
+                }
+                
+        except Exception as e:
+            print(f"   ❌ Container testing error: {e}")
+            return {
+                "passed": False,
+                "container_based": False,
+                "issues": [f"Container testing error: {str(e)}"]
+            }
+
+    def _run_container_security_scanning(self, project_path: Path) -> Dict[str, Any]:
+        """Phase 4: Run container-aware security scanning"""
+        try:
+            print("🔄 Phase 4: Running container-aware security scanning...")
+            
+            # Run enhanced dependency security scanning
+            security_result = asyncio.run(self.dependency_agent.run())
+            
+            issues_found = security_result.get("issues", [])
+            
+            if security_result.get("passed", False):
+                print("   ✅ Container security scan passed")
+                return {
+                    "passed": True,
+                    "container_based": True,
+                    "issues": []
+                }
+            else:
+                print(f"   ❌ Container security scan found {len(issues_found)} issue(s)")
+                return {
+                    "passed": False,
+                    "container_based": True,
+                    "issues": [f"Security: {issue}" for issue in issues_found]
+                }
+                
+        except Exception as e:
+            print(f"   ❌ Container security scanning error: {e}")
+            return {
+                "passed": False,
+                "container_based": False,
+                "issues": [f"Security scanning error: {str(e)}"]
             }
 
     def _run_version_control_checks(self, project_path: Path) -> Dict[str, Any]:
-        """Run version control checks - SIMPLE CHECK"""
+        """Phase 5: Version control readiness checks"""
         try:
-            # Simple git directory check (no LLM calls)
+            print("🔄 Phase 5: Checking version control readiness...")
+            
+            # Simple git directory check
             git_dir = project_path / ".git"
             
             if not git_dir.exists():
+                print("   ⚪ No git repository detected (not blocking)")
                 return {
                     "passed": True,  # Not a blocker
-                    "issues": [],  # Don't report as issue
+                    "issues": [],
                 }
             
+            print("   ✅ Git repository detected")
             return {
                 "passed": True,
                 "issues": [],
             }
             
         except Exception as e:
+            print(f"   ❌ Version control check error: {e}")
             return {
                 "passed": False,
                 "issues": [f"Version control error: {str(e)}"],
             }
-                   
-    async def _run_code_quality_checks(self, modified_files: Dict[str, str]) -> Dict[str, Any]:
-        """Run code quality checks"""
-        # Use code_quality_sentinel to check code quality
-        # In a real implementation, we'd use code_quality_sentinel.check_code
-        return {
-            "passed": True,
-            "issues": []
-        }
 
-    async def _run_unit_tests(self, project_path: Path, modified_files: Dict[str, str]) -> Dict[str, Any]:
-        """Run unit tests"""
-        # Use unit_test_generator to generate and run tests
-        # In a real implementation, we'd use unit_test_generator.generate_tests
+    def _analyze_architectural_context(self, project_path: Path, modified_files: Dict[str, str]) -> Dict[str, Any]:
+        """Analyze project architecture to guide manifest generation"""
+        
+        # Detect system type based on file structure and content
+        has_frontend = any(
+            file_path.startswith("frontend/") or file_path.endswith((".jsx", ".js", ".ts", ".tsx"))
+            for file_path in modified_files.keys()
+        )
+        
+        has_backend = any(
+            file_path.startswith("backend/") or file_path.endswith(".py")
+            for file_path in modified_files.keys()
+        )
+        
+        # Determine system type
+        if has_frontend and has_backend:
+            system_type = "fullstack_web_app"
+        elif has_frontend:
+            system_type = "frontend_app"
+        elif has_backend:
+            system_type = "backend_app"
+        else:
+            system_type = "unknown"
+        
+        # Build module structure
+        modules = {}
+        if has_backend:
+            modules["backend"] = {
+                "languages": ["python"],
+                "responsibilities": ["API endpoints", "business logic", "data access"]
+            }
+        
+        if has_frontend:
+            modules["frontend"] = {
+                "languages": ["javascript", "typescript"],
+                "responsibilities": ["user interface", "client-side logic"]
+            }
+        
         return {
-            "passed": True,
-            "issues": []
+            "system_type": system_type,
+            "modules": modules,
+            "project_structure": {
+                "has_frontend": has_frontend,
+                "has_backend": has_backend,
+                "files": list(modified_files.keys())
+            }
         }
     
     def _detect_primary_language(self, modified_files: Dict[str, str]) -> str:
@@ -275,6 +463,8 @@ class SRELeadAgent(Agent):
             ".py": "python",
             ".js": "javascript",
             ".ts": "typescript",
+            ".jsx": "javascript",
+            ".tsx": "typescript",
             ".java": "java",
             ".cpp": "c++",
             ".c": "c",
@@ -287,40 +477,128 @@ class SRELeadAgent(Agent):
         
         return language_map.get(most_common_ext, "unknown")
 
-def build_sre_team(session_state=None) -> Team:
+
+def build_sre_team(
+    *,
+    project_path: Path | None = None,
+    session_state: Dict[str, Any] | None = None
+) -> Team:
     """
-    Build the SRE team with a lead agent and specialized members.
+    Build the enhanced SRE team with Docker-integrated pipeline
     
     Args:
-        session_state: Optional shared session state dictionary.
+        project_path: Path to the project directory
+        session_state: Optional shared session state dictionary
         
     Returns:
-        Team: Configured SRE team
+        Team: Configured enhanced SRE team with Docker integration
     """
-    # Create the SRE lead agent
-    sre_lead = SRELeadAgent()
-    
-    # Use shared session if provided, else initialize defaults
+    # 1) Ensure we have a mutable session_state dict
     if session_state is None:
-        session_state = {
-            "validation_results": None,
-        }
+        session_state = {}
+    session_state.setdefault("validation_results", None)
+
+    # 2) Resolve project_path, falling back into session_state if absent
+    if project_path is None:
+        project_path = Path(session_state.get("project_path", "."))
     else:
-        # 2️⃣ Add only the keys this team needs (if they are missing)
-        session_state.setdefault("validation_results", None)
- 
-    
-    # Create the team
-    return Team(
-        name="SRETeam",
-        members=[sre_lead],
-        mode="collaborate",
+        project_path = Path(project_path)
+    session_state["project_path"] = str(project_path)
+
+    # 3) Instantiate enhanced Docker-aware members
+    members = [
+        SRELeadAgent(project_path=project_path, session_state=session_state),
+        DockerConfigAgent(project_path=project_path),
+        DependencyVerifierAgent(project_path=project_path, session_state=session_state),
+        SandboxExecutorAgent(project_path=project_path),
+    ]
+
+    # 4) Create the enhanced AGNO Team
+    team = Team(
+        name="EnhancedSRETeam",
+        members=members,
+        mode="collaborate",  # lead agent orchestrates
         model=llm_middle,
         instructions=[
-            "You are the SRE Team, responsible for operational excellence.",
-            "Follow the lead of the SRELead agent, who will coordinate your activities.",
-            "Ensure that code changes meet operational standards and are safe to deploy.",
-            "Focus on issues that would affect stability, performance, or security in production."
+            "You are the Enhanced SRE Team with Docker-integrated operational pipeline.",
+            "Follow the Docker-aware workflow orchestrated by the SRELead agent:",
+            "1. Generate dependency manifests (requirements.txt, package.json)",
+            "2. Create Docker configurations (Dockerfile, docker-compose.yml)",
+            "3. Run container-based testing for production-like validation",
+            "4. Execute container-aware security scanning",
+            "5. Verify version control and deployment readiness",
+            "",
+            "DOCKER-FIRST APPROACH:",
+            "- Prefer container-based validation over local execution",
+            "- Generate production-like environments for testing",
+            "- Ensure security scanning matches deployment environment",
+            "- Fallback gracefully when Docker is not available",
+            "",
+            "Focus on issues that would affect:",
+            "- Container build and deployment",
+            "- Production environment stability",
+            "- Security vulnerabilities in dependencies",
+            "- Cross-platform compatibility",
+            "- Performance under load"
         ],
         session_state=session_state
     )
+
+    # 5) Enhanced synchronous runner for integration tests
+    def run_sync() -> Dict[str, Any]:
+        """
+        Run the complete Docker-integrated SRE pipeline synchronously
+        Returns comprehensive validation results including Docker pipeline status
+        """
+        print("🚀 Starting Enhanced SRE Team Docker-Integrated Pipeline...")
+        
+        try:
+            # Get project path from session state
+            project_path = Path(session_state.get("project_path", "."))
+            
+            # Mock modified files for testing (in real usage, this comes from modification team)
+            modified_files = {
+                "main.py": "# Sample Python file",
+                "frontend/src/App.jsx": "// Sample React component"
+            }
+            
+            # Run the enhanced SRE lead agent validation
+            sre_lead = members[0]  # SRELeadAgent
+            result = sre_lead.validate_changes(project_path, modified_files)
+            
+            print(f"✅ Enhanced SRE Pipeline completed with {result['summary']['operational_score']} operational score")
+            
+            # Enhanced result with Docker pipeline status
+            return {
+                "passed": result.get("passed", False),
+                "issues": result.get("issues", []),
+                "docker_pipeline": result.get("docker_pipeline", {}),
+                "summary": result.get("summary", {}),
+                "deployment_ready": result.get("summary", {}).get("deployment_ready", False),
+                "docker_ready": result.get("summary", {}).get("docker_ready", False)
+            }
+            
+        except Exception as e:
+            print(f"❌ Enhanced SRE Pipeline failed: {e}")
+            return {
+                "passed": False,
+                "issues": [f"Pipeline error: {str(e)}"],
+                "docker_pipeline": {
+                    "manifests_generated": [],
+                    "docker_configs_created": [],
+                    "container_tests_run": False,
+                    "container_security_scanned": False
+                },
+                "summary": {"deployment_ready": False, "docker_ready": False}
+            }
+
+    team.run_sync = run_sync  # monkey-patch enhanced runner onto the Team instance
+    return team
+
+
+# Backwards compatibility function
+def build_enhanced_sre_team(project_path: Path = None, session_state: Dict[str, Any] = None) -> Team:
+    """
+    Backwards compatibility wrapper for build_sre_team
+    """
+    return build_sre_team(project_path=project_path, session_state=session_state)

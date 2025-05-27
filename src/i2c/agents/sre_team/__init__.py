@@ -1,27 +1,24 @@
-# /agents/sre_team/__init__.py
-# Makes sre_team a package and re-exports agent instances.
+# src/i2c/agents/sre_team/__init__.py
 
-# Existing SRE Agents
-from .code_quality import code_quality_sentinel
+# ────────────────
+# Agent Classes
+# ────────────────
+from .docker import DockerConfigAgent
+from .dependency import DependencyVerifierAgent
+from .sandbox import SandboxExecutorAgent
+from .sre_team import SRELeadAgent
+
+# ────────────────
+# Pre-instantiated Agent Instances
+# (for quick imports in orchestration)
+# ────────────────
 from .dependency import dependency_verifier
-from .multilang_unit_test import unit_test_generator
-from .sandbox import sandbox_executor
 from .version_control import version_controller
+from .sandbox import sandbox_executor
+from .multilang_unit_test import unit_test_generator
+from .code_quality import code_quality_sentinel
 
-# Note: ContextReader, ModificationPlanner, CodeModifier are conceptually
-# part of the core modification workflow, not strictly SRE checks.
-# Consider moving them to a different package like 'agents/modification_team' later
-# if this structure becomes too crowded, but keep them here for now for simplicity.
-
-# Define what gets imported when using 'from agents.sre_team import *'
-# Also useful for introspection and clarity.
-__all__ = [
-    "code_quality_sentinel",
-    "dependency_verifier",
-    "unit_test_generator",
-    "sandbox_executor",
-    "version_controller",
-]
-
-print("📦 SRE Team Package Initialized and Agents Exported.")
-
+# ────────────────
+# Builders (Optional)
+# ────────────────
+from .sre_team import build_sre_team, build_enhanced_sre_team

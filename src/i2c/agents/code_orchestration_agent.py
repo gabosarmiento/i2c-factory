@@ -40,7 +40,30 @@ class CodeOrchestrationAgent(Agent):
         **kwargs,
     ) -> None:
         # ------------------------------------------------------------------
-        # 1. Ensure we have a shared, mutable dict (create it exactly once)
+        # 1. AGNO initialisation (name, model, role, instructions)
+        # ------------------------------------------------------------------
+        super().__init__(  # noqa: D401 – imperative style is fine
+            name="CodeOrchestrator",
+            model=llm_middle,
+            role="Orchestrates the end-to-end code evolution process with reasoning and reflection",
+            instructions=[
+                "You are the lead orchestrator of a code evolution factory.",
+                "Coordinate specialized teams (Knowledge, Modification, Quality, SRE) to safely evolve code.",
+                "For each objective, you must:",
+                "1. Analyze project context",
+                "2. Create a modification plan",
+                "3. Execute modifications",
+                "4. Validate with quality and operational checks",
+                "5. Reflect on failures and adapt",
+                "6. Make a final decision: approve or reject with reasoning",
+                "Always prioritize code quality and safety."
+            ],
+            **kwargs
+        )
+        
+        
+        # ------------------------------------------------------------------
+        # 2.  Ensure we have a shared, mutable dict (create it exactly once)
         # ------------------------------------------------------------------
         if session_state is None:
             session_state = {
@@ -62,32 +85,11 @@ class CodeOrchestrationAgent(Agent):
             }
 
         self.session_state = session_state  # the single pointer
-        # ------------------------------------------------------------------
-        # 2. AGNO initialisation (name, model, role, instructions)
-        # ------------------------------------------------------------------
-        super().__init__(  # noqa: D401 – imperative style is fine
-            name="CodeOrchestrator",
-            model=llm_middle,
-            role="Orchestrates the end-to-end code evolution process with reasoning and reflection",
-            instructions=[
-                "You are the lead orchestrator of a code evolution factory.",
-                "Coordinate specialized teams (Knowledge, Modification, Quality, SRE) to safely evolve code.",
-                "For each objective, you must:",
-                "1. Analyze project context",
-                "2. Create a modification plan",
-                "3. Execute modifications",
-                "4. Validate with quality and operational checks",
-                "5. Reflect on failures and adapt",
-                "6. Make a final decision: approve or reject with reasoning",
-                "Always prioritize code quality and safety."
-            ],
-            **kwargs
-        )
 
         # ⬅️ Add strict JSON output enforcement for agent responses
         self.instructions.extend([
-            "IMPORTANT: Your final response must be **valid JSON** with this format:",
-            "```json",
+            "IMPORTANT: Your final response must be a **valid JSON object** ONLY. Do NOT include markdown formatting like ```json.",
+            "Here is the exact format to follow:",
             '{',
             '  "decision": "approve",',
             '  "reason": "All quality and operational checks passed",',
@@ -96,8 +98,9 @@ class CodeOrchestrationAgent(Agent):
             '  "sre_results": { "uptime_check": "passed" },',
             '  "reasoning_trajectory": [ { "step": "Final Decision", "description": "All gates passed", "success": true } ]',
             '}',
-            "```",
-            "Do NOT output explanations, markdown, or narratives. Only return the JSON object."
+            "❌ Do NOT use ```json or ``` anywhere.",
+            "❌ Do NOT return explanations or markdown.",
+            "✅ Only return the raw JSON object, nothing else.",
         ])
 
         # placeholders; real teams wired in _initialize_teams()
