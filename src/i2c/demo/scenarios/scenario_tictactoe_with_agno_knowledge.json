@@ -1,0 +1,47 @@
+{
+  "name": "Tic Tac Toe AI Game with Knowledge",
+  "description": "Same as the base scenario but injects AGNO knowledge before agentic evolution.",
+  "steps": [
+    {
+      "type": "initial_generation",
+      "name": "Initial Game Setup",
+      "prompt": "Create a Python command-line application where two AI agents take alternating turns to play Tic Tac Toe. Include a Board class to manage state, a Player class for each AI agent, and a Game class to coordinate the flow. Make it modular, readable, and use only standard Python.",
+      "project_name": "tic_tac_toe_agents_with_knowledge"
+    },
+    {
+      "type": "knowledge_folder",
+      "name": "Inject AGNO Docs",
+      "document_path": "/Users/caroco/Gabo-Dev/idea_to_code_factory/src/i2c/docs/knowledge/tictactoe",
+      "recursive": true,
+      "metadata": {
+        "doc_type": "guide",
+        "framework": "AGNO",
+        "version": "1.0"
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Refactor Game Architecture",
+      "objective": {
+        "task": "Improve the structure of the game code by separating concerns clearly. Introduce a basic AI decision strategy that blocks winning moves.",
+        "constraints": [
+          "Maintain CLI-based game loop",
+          "AI must act automatically without human input",
+          "No use of external libraries"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add Lookahead AI and Testing",
+      "objective": {
+        "task": "Upgrade the AI to anticipate opponent moves and add unit tests for all core modules.",
+        "constraints": [
+          "Implement a two-move lookahead strategy",
+          "Add tests using Python's unittest module",
+          "Ensure the board logic is fully tested"
+        ]
+      }
+    }
+  ]
+}

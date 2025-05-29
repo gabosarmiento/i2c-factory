@@ -1,0 +1,156 @@
+{
+  "name": "Advanced Forex Strategy Framework with AI Knowledge",
+  "description": "Create a comprehensive forex strategy framework that combines multiple signal types, adapts to changing market conditions, and leverages AI knowledge bases for enhanced decision making",
+  "steps": [
+    {
+      "type": "initialize",
+      "name": "Initialize Session and Knowledge Base",
+      "description": "Set up session state and prepare knowledge base infrastructure"
+    },
+    {
+      "type": "initial_generation",
+      "name": "Create Core Strategy Framework",
+      "prompt": "Create a forex strategy framework with a modular architecture that allows combining multiple signal generators and filters. The framework should include:\n\n1) A base Strategy class that can be extended\n2) A SignalGenerator interface for creating various technical indicators\n3) A MarketRegimeDetector for identifying trending vs ranging markets\n4) A RiskManager for position sizing and stop-loss calculation\n5) A BacktestEngine for strategy validation\n6) A simple CLI for testing strategies\n7) Integration with Agno framework for AI-powered decision making\n\nImplement one basic strategy using moving average crossover (20 EMA and 50 EMA) on EUR/USD. Include comprehensive logging and error handling.",
+      "project_name": "adaptive_forex_framework"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Trading Knowledge Base",
+      "objective": {
+        "task": "Create a comprehensive knowledge base for forex trading using Agno's knowledge system. Include:\n1) Technical analysis patterns and indicators\n2) Economic indicators and their impact on currency pairs\n3) Risk management best practices\n4) Market psychology and sentiment analysis\n5) Historical market data and pattern recognition",
+        "constraints": [
+          "Must use Agno AgentKnowledge with pgvector database",
+          "Must implement semantic chunking with 1000 token chunks and 200 overlap",
+          "Must use text-embedding-ada-002 for embeddings",
+          "Must set similarity threshold to 0.8 for knowledge retrieval",
+          "Must load documents: technical_analysis_complete_guide.pdf, forex_economic_indicators.pdf, risk_management_strategies.pdf, market_psychology_trading.pdf",
+          "Must scrape web sources: forexfactory.com/calendar, centralbanking.com, tradingview.com/markets/currencies/",
+          "Must process structured data: historical_forex_data.csv, economic_events_calendar.json, central_bank_decisions.json",
+          "Must enable automatic knowledge search with max 10 results per query",
+          "Must implement daily updates for web-scraped content"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add Advanced Signal Generators",
+      "objective": {
+        "task": "Extend the forex framework with advanced signal generators that leverage the knowledge base. Implement:\n1) RSI divergence detector with pattern recognition\n2) Support/Resistance breakout detector using historical data\n3) Bollinger Band squeeze detector with volatility analysis\n4) Volume-weighted trend detector\n5) Fibonacci retracement level calculator\n6) News sentiment analyzer for fundamental analysis\n7) Correlation analyzer between currency pairs\n\nEach signal generator should query the knowledge base for relevant patterns and historical context.",
+        "constraints": [
+          "Must maintain consistent architectural boundaries",
+          "Must include unit tests for each new signal generator",
+          "Must be configurable via external parameters",
+          "Must include documentation on each indicator's logic",
+          "Must integrate with Agno knowledge retrieval system with search_knowledge=True",
+          "Must handle real-time data feeds",
+          "Must enable Agno ReasoningTools for multi-step analysis",
+          "Must use AgentKnowledge for historical pattern matching queries",
+          "Must enable agentic memory with SqliteMemoryDb for user preferences",
+          "Must query knowledge base for indicator effectiveness analysis and market condition classification"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Implement AI-Powered Market Analysis Agent",
+      "objective": {
+        "task": "Create an intelligent market analysis agent using Agno framework that can:\n1) Analyze current market conditions using multiple data sources\n2) Provide reasoning for trade recommendations\n3) Adapt strategies based on market regime changes\n4) Generate detailed market reports with citations from knowledge base\n5) Monitor news and economic events for impact analysis\n6) Maintain conversation history with traders for personalized advice",
+        "constraints": [
+          "Must use Agno Agent with gpt-4o model and reasoning enabled",
+          "Must implement SqliteStorage for session history persistence",
+          "Must enable agentic memory with enable_agentic_memory=True",
+          "Must cite sources from knowledge base using add_references=True",
+          "Must handle multiple currency pairs simultaneously",
+          "Must provide confidence scores for predictions",
+          "Must include tools: market_data_fetcher, technical_analysis_calculator, news_sentiment_analyzer, economic_calendar_checker",
+          "Must use long-term user preferences memory with user_id tracking",
+          "Must enable knowledge base search with search_knowledge=True",
+          "Must implement ReasoningTools for explainable decision making"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution", 
+      "name": "Implement Adaptive Strategy Logic",
+      "objective": {
+        "task": "Create an adaptive strategy system that dynamically selects and combines signals based on AI analysis. The system should:\n1) Use MarketRegimeDetector enhanced with ML classification\n2) Employ Agno Team coordination for multi-agent strategy selection\n3) Dynamically weight signals based on current market conditions\n4) Implement reinforcement learning for strategy optimization\n5) Create a strategy recommendation engine with explainable AI\n6) Track performance metrics across different market regimes\n7) Implement automated parameter optimization",
+        "constraints": [
+          "Must preserve modularity of the framework",
+          "Must handle regime transitions smoothly",
+          "Must log all adaptation decisions with reasoning",
+          "Must remain computationally efficient",
+          "Must provide clear explanations for strategy changes",
+          "Must include backtesting validation for new adaptations",
+          "Must use Agno Team with coordinate mode for multi-agent collaboration",
+          "Must implement TechnicalAnalyst agent focused on technical_analysis_patterns knowledge",
+          "Must implement FundamentalAnalyst agent focused on economic_indicators_impact knowledge", 
+          "Must implement RiskManager agent focused on risk_management_strategies knowledge",
+          "Must implement StrategyCoordinator agent with comprehensive_trading_knowledge access",
+          "Must enable team shared context with enable_agentic_context=True",
+          "Must allow member interaction with share_member_interactions=True"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Real-Time Trading Dashboard",
+      "objective": {
+        "task": "Create an interactive trading dashboard that integrates with the AI agents. Features:\n1) Real-time market data visualization\n2) AI agent recommendations with reasoning display\n3) Interactive strategy parameter adjustment\n4) Performance analytics and reporting\n5) Risk monitoring and alerts\n6) Chat interface with trading assistant agent\n7) Knowledge base search functionality",
+        "constraints": [
+          "Must be web-based with real-time updates using WebSocket connections",
+          "Must integrate with Agno agents using FastAPI pre-built routes",
+          "Must provide mobile-responsive React frontend",
+          "Must include proper authentication and security measures",
+          "Must handle high-frequency data updates efficiently",
+          "Must use FastAPI backend with Agno integration",
+          "Must implement PostgreSQL database with vector extensions for pgvector",
+          "Must include Docker containerization for deployment",
+          "Must provide chat interface using Agno Agent with streaming responses",
+          "Must implement knowledge base search functionality with AgentKnowledge queries"
+        ]
+      }
+    },
+    {
+      "type": "evaluation_and_optimization",
+      "name": "Comprehensive Testing and Optimization",
+      "objective": {
+        "task": "Implement comprehensive testing, evaluation, and optimization systems:\n1) Backtesting engine with historical data validation\n2) A/B testing framework for strategy comparison\n3) Performance benchmarking against market indices\n4) Agent behavior evaluation and fine-tuning\n5) Knowledge base effectiveness measurement\n6) Risk-adjusted return optimization\n7) Stress testing under various market conditions",
+        "evaluation_metrics": [
+          "Sharpe ratio",
+          "Maximum drawdown",
+          "Win rate percentage", 
+          "Average trade duration",
+          "Knowledge retrieval accuracy",
+          "Agent response time",
+          "Strategy adaptation speed",
+          "Must use Agno AccuracyEval with LLM-as-judge approach for agent evaluation",
+          "Must implement reasoning quality assessment using ReasoningTools analysis",
+          "Must measure knowledge retrieval effectiveness with similarity score tracking",
+          "Must analyze multi-agent coordination using Team performance metrics",
+          "Must include A/B testing framework comparing different Agno model configurations"
+        ]
+      }
+    },
+    {
+      "type": "deployment_and_monitoring",
+      "name": "Production Deployment and Monitoring",
+      "objective": {
+        "task": "Deploy the complete system to production with comprehensive monitoring:\n1) Set up production infrastructure with proper scaling\n2) Implement comprehensive logging and monitoring\n3) Create alerting systems for system health and performance\n4) Set up automated knowledge base updates\n5) Implement user feedback collection and analysis\n6) Create documentation and user guides\n7) Establish maintenance and update procedures",
+        "deployment_requirements": [
+          "Cloud deployment with auto-scaling",
+          "Database backup and recovery procedures", 
+          "Security measures and compliance checks",
+          "Performance monitoring dashboards",
+          "User analytics and behavior tracking",
+          "Continuous integration and deployment pipeline",
+          "Must enable Agno monitoring with real-time session tracking",
+          "Must implement custom metrics for agent performance and knowledge base health",
+          "Must set up real-time performance alerts for agent response times",
+          "Must monitor knowledge base search effectiveness and update frequencies",
+          "Must track user analytics and agent interaction patterns",
+          "Must implement automated Agno agent health checks and restart procedures"
+        ]
+      }
+    }
+  ]
+}

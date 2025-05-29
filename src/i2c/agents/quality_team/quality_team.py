@@ -43,7 +43,17 @@ class QualityLeadAgent(Agent):
         'all': ['flake8', 'black', 'mypy', 'pytest', 'bandit', 'eslint', 'tsc', 'govet', 'checkstyle']
     }
     
-    def __init__(self, **kwargs):
+    def __init__(self, knowledge_base=None, **kwargs):
+        """
+        Initialize the Quality Lead Agent.
+        
+        Args:
+            knowledge_base: Optional knowledge base for context retrieval
+            **kwargs: Additional arguments for Agent initialization
+        """
+        # RAG Integration: Store knowledge base for context retrieval
+        self.knowledge_base = knowledge_base
+        
         super().__init__(
             name="QualityLead",
             model=llm_middle, 
@@ -115,6 +125,56 @@ class QualityLeadAgent(Agent):
         if self.team_session_state is None:
             self.team_session_state = {}
 
+    # RAG Integration: Add method to retrieve relevant context
+    def _retrieve_context(self, task_description, quality_gates=None):
+        """
+        Retrieve relevant context from knowledge base for the quality task.
+        
+        Args:
+            task_description: Description of the validation task
+            quality_gates: List of quality gates to check
+            
+        Returns:
+            String containing relevant context or empty string if no context found
+        """
+        if not self.knowledge_base:
+            return ""
+            
+        try:
+            # Build a query from the task description and quality gates
+            query = task_description
+            if quality_gates:
+                query += f" quality gates: {' '.join(quality_gates)}"
+                
+            # Log the query being used
+            canvas.info(f"[QualityLeadAgent] Retrieving context for: {query[:100]}...")
+            
+            # Retrieve top-k most relevant chunks
+            context_chunks = self.knowledge_base.search(
+                query=query, 
+                limit=3,  # top-k=3
+                max_tokens=800  # Limit context size
+            )
+            
+            # Format the retrieved context
+            if not context_chunks:
+                canvas.info("[QualityLeadAgent] No relevant context found")
+                return ""
+                
+            # Extract content from chunks and join with separators
+            context_text = "\n\n".join([
+                f"SOURCE: {chunk.get('source', 'unknown')}\n{chunk.get('content', '')}" 
+                for chunk in context_chunks
+            ])
+            
+            # Log what was retrieved for transparency
+            canvas.info(f"[QualityLeadAgent] Retrieved {len(context_chunks)} context chunks ({len(context_text)} chars)")
+            
+            return context_text
+        except Exception as e:
+            canvas.warning(f"[QualityLeadAgent] Error retrieving context: {e}")
+            return ""  # Graceful fallback
+
     async def _decide_quality_gate_presets_with_llm(
         self, project_path: Path, modified_files: Dict[str, str]
     ) -> List[str]:
@@ -130,6 +190,20 @@ class QualityLeadAgent(Agent):
             "Files:\n" +
             "\n".join(modified_files.keys())
         )
+
+        # RAG Integration: Retrieve relevant context about quality gates
+        context = self._retrieve_context("selecting appropriate quality gates for files", 
+                                        list(self.ENTERPRISE_QUALITY_GATES.keys()))
+        
+        # RAG Integration: Add context to the message if available
+        if context:
+            message = (
+                "Context for quality gate selection:\n"
+                f"{context}\n\n"
+                f"{message}"
+            )
+            # Log the enhanced prompt for transparency
+            canvas.info("[QualityLeadAgent] Enhanced quality gate selection with context")
 
         response = await self.model.aask(message)
         try:
@@ -165,29 +239,33 @@ class QualityLeadAgent(Agent):
         resolved_gates = self._resolve_quality_gates(quality_gates)
         canvas.info(f"[QualityLeadAgent] Running quality gates: {resolved_gates}")
 
+        # RAG Integration: Retrieve relevant context for validation task
+        task_description = f"Validating code changes with quality gates: {', '.join(resolved_gates)}"
+        context = self._retrieve_context(task_description, resolved_gates)
+        
         # This function will coordinate the Quality team activities
         try:
             # 1. Static analysis check
             static_analysis_results = await self._run_static_analysis(
-                project_path, modified_files, resolved_gates
+                project_path, modified_files, resolved_gates, context
             )
             
             # 2. Enterprise quality gates check (if any gates specified)
             if resolved_gates:
                 enterprise_results = await self._run_enterprise_checks(
-                    project_path, modified_files, resolved_gates
+                    project_path, modified_files, resolved_gates, context
                 )
             else:
                 enterprise_results = {"passed": True, "issues": []}
             
             # 3. Code review check
             review_results = await self._run_code_review(
-                project_path, modified_files
+                project_path, modified_files, context
             )
             
             # 4. Integration check
             integration_results = await self._run_integration_checks(
-                project_path, modified_files
+                project_path, modified_files, context
             )
             
             # 5. Guardrail check - include enterprise results
@@ -195,7 +273,8 @@ class QualityLeadAgent(Agent):
                 static_analysis_results, 
                 review_results, 
                 integration_results,
-                enterprise_results
+                enterprise_results,
+                context
             )
             
             # 6. Determine overall pass/fail
@@ -322,10 +401,12 @@ class QualityLeadAgent(Agent):
         seen = set()
         return [x for x in resolved if not (x in seen or seen.add(x))]
     
+    # RAG Integration: Add context parameter to static analysis
     async def _run_static_analysis(
-        self, project_path: Path, modified_files: Dict[str, str], quality_gates: List[str]
+        self, project_path: Path, modified_files: Dict[str, str], 
+        quality_gates: List[str], context: str = ""
     ) -> Dict[str, Any]:
-        """Run static analysis checks"""
+        """Run static analysis checks with enhanced context"""
         try:
             # Use static_analysis_agent to analyze code quality
             analysis_summary = static_analysis_agent.get_analysis_summary(project_path)
@@ -344,10 +425,12 @@ class QualityLeadAgent(Agent):
                 "issues": [f"Static analysis error: {str(e)}"]
             }
     
+    # RAG Integration: Add context parameter to enterprise checks
     async def _run_enterprise_checks(
-        self, project_path: Path, modified_files: Dict[str, str], quality_gates: List[str]
+        self, project_path: Path, modified_files: Dict[str, str], 
+        quality_gates: List[str], context: str = ""
     ) -> Dict[str, Any]:
-        """Run enterprise quality gate checks"""
+        """Run enterprise quality gate checks with enhanced context"""
 
         try:
             # Use enterprise_static_analyzer to run quality gates
@@ -377,8 +460,11 @@ class QualityLeadAgent(Agent):
                 "detailed_results": {}
             }
     
-    async def _run_code_review(self, project_path: Path, modified_files: Dict[str, str]) -> Dict[str, Any]:
-        """Run code review"""
+    # RAG Integration: Add context parameter to code review
+    async def _run_code_review(
+        self, project_path: Path, modified_files: Dict[str, str], context: str = ""
+    ) -> Dict[str, Any]:
+        """Run code review with enhanced context"""
         try:
             # Determine the dominant language in modified files
             language_counts = {}
@@ -390,9 +476,16 @@ class QualityLeadAgent(Agent):
             # Find the most common language
             dominant_language = max(language_counts.items(), key=lambda x: x[1])[0] if language_counts else "python"
             
+            # RAG Integration: Enhance the review objective with context
+            review_objective = "Ensure code quality"
+            if context:
+                # Add the retrieved context to the review objective
+                review_objective = f"Ensure code quality based on the following context:\n{context}\n\nReview objective: Ensure code quality"
+                canvas.info(f"[QualityLeadAgent] Enhanced code review with {len(context)} chars of context")
+            
             # Use reviewer_agent to review code
             structured_goal = {
-                "objective": "Ensure code quality", 
+                "objective": review_objective, 
                 "language": dominant_language.capitalize()  # Provide actual language
             }
             review_feedback = reviewer_agent.review_code(structured_goal, modified_files)
@@ -418,8 +511,11 @@ class QualityLeadAgent(Agent):
                 "issues": [f"Code review error: {str(e)}"]
             }
     
-    async def _run_integration_checks(self, project_path: Path, modified_files: Dict[str, str]) -> Dict[str, Any]:
-        """Run integration checks"""
+    # RAG Integration: Add context parameter to integration checks
+    async def _run_integration_checks(
+        self, project_path: Path, modified_files: Dict[str, str], context: str = ""
+    ) -> Dict[str, Any]:
+        """Run integration checks with enhanced context"""
         try:
             # Use integration_checker_agent to check integration
             integration_issues = integration_checker_agent.check_integrations(project_path)
@@ -435,14 +531,16 @@ class QualityLeadAgent(Agent):
                 "issues": [f"Integration check error: {str(e)}"]
             }
     
+    # RAG Integration: Add context parameter to guardrail checks
     async def _run_guardrail_checks(
         self, 
         static_analysis_results: Dict[str, Any],
         review_results: Dict[str, Any],
         integration_results: Dict[str, Any],
-        enterprise_results: Dict[str, Any] = None
+        enterprise_results: Dict[str, Any] = None,
+        context: str = ""
     ) -> Dict[str, Any]:
-        """Run guardrail checks"""
+        """Run guardrail checks with enhanced context"""
         try:
             # Use guardrail_agent to apply guardrails
             # Additional input for dependency_summary and syntax_check_result
@@ -450,15 +548,54 @@ class QualityLeadAgent(Agent):
             syntax_check_result = (enterprise_results.get("passed", True), "")  # Simplified
             
             # Get review feedback from review results
-            review_feedback = review_results.get("feedback")
+            review_feedback = review_results.get("feedback", "")
             
-            # Run guardrail evaluation
-            decision, reasons = guardrail_agent.evaluate_results(
-                static_analysis_results.get("summary"),
-                dependency_summary,
-                syntax_check_result,
-                review_feedback
-            )
+            # RAG Integration: Enhance review feedback with context if available
+            if context and review_feedback:
+                # Prepend the context to the review feedback
+                review_feedback = f"Context for guardrail evaluation:\n{context}\n\nReview feedback:\n{review_feedback}"
+                canvas.info(f"[QualityLeadAgent] Enhanced guardrail check with context")
+            
+            # Default values in case of failure
+            decision = "BLOCK"
+            reasons = []
+            
+            # Only call guardrail agent if we have valid inputs
+            if static_analysis_results and static_analysis_results.get("summary") is not None:
+                try:
+                    # Call with manual unpacking
+                    result = guardrail_agent.evaluate_results(
+                        static_analysis_results.get("summary"),
+                        dependency_summary,
+                        syntax_check_result,
+                        review_feedback
+                    )
+                    
+                    
+                    # Handle different return formats safely
+                    if isinstance(result, tuple):
+                        if len(result) >= 2:
+                            decision = result[0]
+                            reasons = result[1]
+                        elif len(result) == 1:
+                            decision = result[0]
+                            reasons = ["No specific reasons provided"]
+                    elif isinstance(result, str):
+                        decision = result
+                        reasons = ["No specific reasons provided"]
+                    elif isinstance(result, dict):
+                        decision = result.get("decision", "BLOCK")
+                        reasons = result.get("reasons", [])
+                    else:
+                        canvas.warning(f"[QualityLeadAgent] Unexpected guardrail result format: {type(result)}")
+                except IndexError:
+                    canvas.warning("[QualityLeadAgent] Index error in guardrail evaluation")
+                    reasons = ["Guardrail evaluation encountered an index error"]
+                except Exception as eval_error:
+                    canvas.warning(f"[QualityLeadAgent] Error in guardrail evaluation: {eval_error}")
+                    reasons = [f"Guardrail evaluation error: {str(eval_error)}"]
+            else:
+                reasons = ["Missing static analysis results for guardrail evaluation"]
             
             # Add reasons from enterprise checks if they failed
             if enterprise_results and not enterprise_results.get("passed", True):
@@ -479,18 +616,19 @@ class QualityLeadAgent(Agent):
                 "reasons": [f"Guardrail check error: {str(e)}"]
             }
 
-def build_quality_team(session_state=None) -> Team:
+def build_quality_team(session_state=None, knowledge_base=None) -> Team:
     """
     Build the quality team with a lead agent and specialized members.
     
     Args:
         session_state: Optional shared session state dictionary.
+        knowledge_base: Optional knowledge base for context retrieval.
         
     Returns:
         Team: Configured quality team
     """
-    # Create the Quality lead agent
-    quality_lead = QualityLeadAgent()
+    # Create the Quality lead agent with knowledge base
+    quality_lead = QualityLeadAgent(knowledge_base=knowledge_base)
     
     # Use shared session if provided, else initialize defaults
     if session_state is None:

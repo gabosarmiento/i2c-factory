@@ -16,3 +16,4 @@ demo/.env
 demo_project/
 demo/output/
 demo/data/lancedb/
+docs/

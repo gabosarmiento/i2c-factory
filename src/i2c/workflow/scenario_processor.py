@@ -509,7 +509,7 @@ class ScenarioProcessor:
                 action_detail=self.current_structured_goal,
                 current_project_path=self.current_project_path,
                 current_structured_goal=self.current_structured_goal,
-                architectural_context=self.session_state.get("architectural_context", {})  # NEW
+                architectural_context=(self.session_state or {}).get("architectural_context", {})  # NEW
             )
             
             # Handle detailed result
