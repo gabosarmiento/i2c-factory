@@ -154,7 +154,8 @@ class SampleClass:
         if row_count > 0:
             # Try to query the table
             logger.info("Querying first row...")
-            df = table.to_pandas(limit=1)
+            df = table.to_pandas()
+            df = df.head(1)
             if not df.empty:
                 logger.info(f"Columns: {list(df.columns)}")
                 logger.info(f"Content snippet: {df['content'].iloc[0][:50]}...")

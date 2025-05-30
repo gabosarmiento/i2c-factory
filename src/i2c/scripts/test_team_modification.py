@@ -32,7 +32,7 @@ def subtract(a, b):
     
     # Import the adapter
     try:
-        from i2c.workflow.modification.code_modifier_adapter import apply_modification
+        from i2c.agents.modification_team.code_modification_manager_agno import apply_modification
         logger.info("✅ Successfully imported adapter")
     except ImportError as e:
         logger.error(f"❌ Failed to import adapter: {e}")

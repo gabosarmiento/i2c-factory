@@ -18,7 +18,7 @@ from typing import Dict, List, Tuple
 
 from agno.agent import Agent
 from i2c.cli.controller import canvas
-from builtins import llm_highest, llm_deepseek
+from builtins import llm_highest, llm_deepseek, llm_middle_alt
 
 from i2c.agents.sre_team import sandbox_executor
 from i2c.agents.reflective.context_aware_operator import (
@@ -53,8 +53,8 @@ class IssueResolutionOperator(ContextAwareOperator):
 
         # Dedicated reasoning LLM
         self.reasoning_agent = Agent(
-            model=llm_highest,
-            reasoning=True,
+            model=llm_middle_alt,
+            reasoning=False,
             name="IssueResolutionAgent",
             description="Diagnoses and fixes code issues",
             instructions=[
@@ -118,7 +118,7 @@ class IssueResolutionOperator(ContextAwareOperator):
         self.cost_tracker.start_phase(
             phase_id=phase_id,
             phase_description="Analyse test failure and identify root cause",
-            model_id=getattr(llm_highest, "id", "Unknown"),
+            model_id=getattr(llm_middle_alt, "id", "Unknown"),
         )
 
         try:
@@ -154,7 +154,7 @@ class IssueResolutionOperator(ContextAwareOperator):
             self.cost_tracker.start_phase(
                 phase_id=phase_id,
                 phase_description="Generate fix for the identified issue",
-                model_id=getattr(llm_highest, "id", "Unknown"),
+                model_id=getattr(llm_middle_alt, "id", "Unknown"),
             )
 
             fix_prompt = self._prepare_fix_prompt(

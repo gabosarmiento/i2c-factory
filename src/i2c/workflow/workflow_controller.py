@@ -166,6 +166,13 @@ class WorkflowController:
         
         # Create and run workflow
         workflow = GenerationWorkflow(session_id=f"{self.session_id}-gen")
+        workflow.session_state.update({
+            "action_type": "generate",
+            "structured_goal": structured_goal,
+            "project_path": str(project_path),
+            "language": structured_goal.get("language")
+        })
+        
         success = self.run_workflow_with_recovery(
             workflow, 
             max_attempts=1,

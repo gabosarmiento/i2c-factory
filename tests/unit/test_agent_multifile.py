@@ -2,7 +2,7 @@ import json
 import pytest
 from pathlib import Path
 from agno.agent import Agent  # Adjust import if needed
-from i2c.workflow.modification.code_modifier_adapter import apply_modification
+from i2c.agents.modification_team.code_modification_manager_agno import apply_modification
 from i2c.agents.modification_team.domain.modification_payload import ModPayload
 from i2c.agents.modification_team.code_modification_manager import (
     ModifyCodeInteractor,

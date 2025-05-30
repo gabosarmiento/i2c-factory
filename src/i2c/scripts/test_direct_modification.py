@@ -59,7 +59,7 @@ def read_root():
     }
     
     # Apply modification
-    from i2c.workflow.modification.code_modifier_adapter import apply_modification
+    from i2c.agents.modification_team.code_modification_manager_agno import apply_modification
     
     result = apply_modification(
         modification_step=step,

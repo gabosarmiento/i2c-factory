@@ -287,7 +287,7 @@ def query_context(
             return None
             
         # Execute search
-        df = tbl.search(query_vector).select([n for n in tbl.schema.names if n != "vector"]).limit(limit).to_df()
+        df = tbl.search(query_vector).select([n for n in tbl.schema.names if n != "vector"]).limit(limit).to_pandas()
         return df
     except Exception as e:
         canvas.error(f"query_context error: {e}")
@@ -340,7 +340,8 @@ def query_context_filtered(
                 q = q.where(" AND ".join(conds))
         
         # Execute query
-        df = q.select([n for n in tbl.schema.names if n != "vector"]).limit(limit).to_df()
+        df = q.select([n for n in tbl.schema.names if n != "vector"]).limit(limit).to_pandas()
+
         return df
     except Exception as e:
         canvas.error(f"query_context_filtered error: {e}")

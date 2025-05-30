@@ -1,7 +1,7 @@
 from i2c.bootstrap import initialize_environment
 initialize_environment()
 from pathlib import Path
-from i2c.workflow.modification.code_modifier_adapter import apply_modification
+from i2c.agents.modification_team.code_modification_manager_agno import apply_modification
 
 # Test modification
 test_step = {

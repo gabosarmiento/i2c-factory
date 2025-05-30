@@ -15,7 +15,7 @@ from builtins import llm_highest  # Use high-capacity model for code modificatio
 # Display a deprecation warning
 warnings.warn(
     "CodeModifierAgent is deprecated. Use ModificationManager instead. " 
-    "See i2c.workflow.modification.code_modifier_adapter for compatibility functions.",
+    "See i2c.agents.modification_team.code_modification_manager_agno for compatibility functions.",
     DeprecationWarning,
     stacklevel=2
 )
@@ -306,7 +306,7 @@ Return ONLY the complete fixed source code with no explanations or markdown form
 
     def modify_code(self, modification_step: Dict, project_path: Path, retrieved_context: Optional[str] = None) -> Union[str, Dict, None]:
         """
-        DEPRECATED: Use i2c.workflow.modification.code_modifier_adapter.apply_modification instead.
+        DEPRECATED: Use i2c.agents.modification_team.code_modification_manager_agno.apply_modification instead.
         
         Apply planned modifications to code files with validation.
         

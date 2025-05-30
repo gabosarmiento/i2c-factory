@@ -442,25 +442,23 @@ class TestDockerConfigIntegration:
     @pytest.mark.skipif(not DOCKER_AGENTS_AVAILABLE, reason="SRE components not available")
     def test_docker_config_with_sre_workflow(self, temp_project_dir, mock_sre_session_state):
         """Test Docker configuration as part of the complete SRE workflow"""
+
         try:
             from i2c.agents.sre_team.sre_team import build_sre_team
-            
-            # Build SRE team with Docker integration
-            # Note: This might fail if sre_team.py expects different agent signatures
-            # We'll catch the specific error and verify it's the expected initialization issue
-            with pytest.raises(TypeError, match="unexpected keyword argument 'project_path'"):
-                sre_team = build_sre_team(
-                    project_path=temp_project_dir, 
-                    session_state=mock_sre_session_state
-                )
-            
-            # This test verifies that the integration issue is as expected
-            # In a real implementation, the SRE team would need to be updated
-            # to use the original DockerConfigAgent signature without project_path
-            
+
+            # Build the SRE team using the updated signature
+            sre_team = build_sre_team(
+                project_path=temp_project_dir, 
+                session_state=mock_sre_session_state
+            )
+
+            # Optional: Run the SRE pipeline or validate output
+            assert sre_team is not None
+            assert hasattr(sre_team, "run")  # or whatever main method it exposes
+
         except ImportError:
-            # Skip if SRE team not available in test environment
             pytest.skip("SRE team components not available")
+
 
     @patch('subprocess.run')
     def test_docker_availability_check(self, mock_subprocess, temp_project_dir):

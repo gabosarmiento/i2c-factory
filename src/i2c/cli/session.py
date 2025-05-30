@@ -121,22 +121,26 @@ def run_session():
                 canvas.step("Clarifying new idea...")
                 response_content = None
                 try:
+                    from i2c.utils.json_extraction import extract_json_with_fallback
+                    
                     response = input_processor_agent.run(raw_idea) # Direct call
                     response_content = response.content if hasattr(response, 'content') else str(response)
 
-                    processed_goal = json.loads(response_content)
+                    fallback_goal = {
+                        "objective": "create application",
+                        "language": "python"
+                    }
+                    
+                    processed_goal = extract_json_with_fallback(response_content, fallback_goal)
+                    
                     if not isinstance(processed_goal, dict) or "objective" not in processed_goal or "language" not in processed_goal:
-                         canvas.error("LLM response for clarification was invalid JSON structure.")
-                         canvas.error(f"Parsed Value: {processed_goal}")
-                         continue
+                        canvas.error("LLM response for clarification was invalid JSON structure.")
+                        canvas.error(f"Parsed Value: {processed_goal}")
+                        continue
+                        
                     current_structured_goal = processed_goal
                     canvas.success(f"Objective: {current_structured_goal['objective']}")
                     canvas.success(f"Language: {current_structured_goal['language']}")
-
-                except json.JSONDecodeError as json_err:
-                     canvas.error(f"Failed to parse clarification response from LLM: {json_err}")
-                     canvas.error(f"LLM Raw Response: {response_content[:500]}")
-                     continue
                 except Exception as e:
                     canvas.error(f"Error clarifying idea: {e}")
                     continue

@@ -1,0 +1,26 @@
+{
+  "name": "Test CLI Reflection Tool",
+  "description": "Trigger knowledge ingestion from PDF",
+  "steps": [
+    {
+      "type": "knowledge",
+      "name": "Load Cheat Sheet",
+      "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+      "doc_type": "Cheat Sheet",
+      "framework": "AGNO",
+      "version": "latest",
+      "global": true
+    },
+    {
+      "type": "initial_generation",
+      "name": "Build CLI Tool",
+      "prompt": "Based on the cheat sheet, build a CLI tool to test reflection.",
+      "project_name": "test_cli_tool",
+      "input": {
+        "instruction": "IGNORED"
+      },
+      "output_type": "code",
+      "agent": "CodeBuilderAgent"
+    }
+  ]
+}

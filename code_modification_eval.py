@@ -3,10 +3,10 @@
 from i2c.bootstrap import initialize_environment
 initialize_environment()
 from typing import Optional
-
+import json
 from agno.agent import Agent
 from agno.eval.accuracy import AccuracyEval, AccuracyResult
-from agno.models.openai import OpenAIChat
+
 from agno.team import Team
 
 from i2c.agents.modification_team.code_modification_manager_agno import (

@@ -69,7 +69,8 @@ def run_simple_test():
         logger.info(f"✅ Table now has {count} rows")
         
         # Get one row
-        df = table.to_pandas(limit=1)
+        df = table.to_pandas()
+        df = df.head(1)
         logger.info(f"✅ Data retrieved. Columns: {list(df.columns)}")
         logger.info(f"✅ Content from table: {df['content'].iloc[0]}")
         

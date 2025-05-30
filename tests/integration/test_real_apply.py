@@ -16,7 +16,7 @@ from builtins import llm_deepseek
 os.environ['DEFAULT_PROJECT_ROOT'] = str(PROJECT_ROOT / 'test_output')
 
 # 4) System under test
-from i2c.workflow.modification.code_modifier_adapter import apply_modification
+from i2c.agents.modification_team.code_modification_manager_agno import apply_modification
 
 
 @pytest.fixture
@@ -49,20 +49,35 @@ def fib(n): return fib(n-1) + fib(n-2) if n > 1 else n  # O(2^n)
 ''')
     return file
 
-
 def test_live_pipeline_on_realistic_file(realistic_test_file):
     print("\n🚀 Running apply_modification() on realistic hard file")
-
     project_root = realistic_test_file.parent
-    step = {"user_prompt": "Refactor this code to be safer and more maintainable."}
+    step = {
+        "user_prompt": "Refactor this code to be safer and more maintainable.",
+        "file_path": str(realistic_test_file)
+    }
 
     result = apply_modification(step, project_root)
 
     if isinstance(result, dict):
-        body = result.get("raw_reply", "")
-        patch = body.split("## Patch", 1)[1].split("\n##", 1)[0].strip()
+        print("[DEBUG] raw_reply:", result.get("raw_reply", ""))
     else:
-        patch = result.unified_diff
+        print("[DEBUG] unified_diff:", getattr(result, 'unified_diff', ''))
+
+    # Defensive PATCH extraction logic
+    patch = ""
+    if isinstance(result, dict):
+        body = result.get("raw_reply", "")
+        if "## Patch" in body:
+            patch_section = body.split("## Patch", 1)[1]
+            if "\n##" in patch_section:
+                patch = patch_section.split("\n##", 1)[0].strip()
+            else:
+                patch = patch_section.strip()
+        else:
+            print("[DEBUG] No '## Patch' section found in raw_reply. Full reply was:\n", body)
+    else:
+        patch = getattr(result, 'unified_diff', "")
 
     print("\n🔎 PATCH RESULT:\n", patch)
 

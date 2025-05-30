@@ -32,26 +32,24 @@ def test_full_agentic_flow(valid_objective, mock_orchestration_team):
     result = execute_agentic_evolution_sync(valid_objective, project_path)
 
     assert isinstance(result, dict)
-    assert result.get("decision") == "approve"
-    assert "modifications" in result
-    assert "reasoning_trajectory" in result
+    assert result.get("result", {}).get("decision") == "approve"
+    assert "modifications" in result.get("result", {})
+    assert "reasoning_trajectory" in result.get("result", {})
 
 def test_agentic_flow_with_missing_content(valid_objective, mock_orchestration_team):
     project_path = Path("tests/assets/agentic_integration")
-
     mock_orchestration_team.return_value = MagicMock(content=None)
-
-    with pytest.raises(ValueError, match="Result content is missing or invalid."):
-        execute_agentic_evolution_sync(valid_objective, project_path)
+    result = execute_agentic_evolution_sync(valid_objective, project_path)
+    assert result.get("status") == "error"
+    assert "Failed to parse" in result.get("result", {}).get("reason", "")
 
 def test_agentic_flow_with_invalid_json(valid_objective, mock_orchestration_team):
     project_path = Path("tests/assets/agentic_integration")
-
     mock_orchestration_team.return_value = MagicMock(content="not a valid json string")
-
-    with pytest.raises(ValueError, match="Failed to parse result content as JSON"):
-        execute_agentic_evolution_sync(valid_objective, project_path)
-
+    result = execute_agentic_evolution_sync(valid_objective, project_path)
+    assert result.get("status") == "error"
+    assert "Failed to parse" in result.get("result", {}).get("reason", "")
+    
 def test_agentic_flow_with_reject_decision(valid_objective, mock_orchestration_team):
     project_path = Path("tests/assets/agentic_integration")
 
@@ -62,5 +60,6 @@ def test_agentic_flow_with_reject_decision(valid_objective, mock_orchestration_t
 
         result = execute_agentic_evolution_sync(valid_objective, project_path)
 
-        assert result.get("decision") == "reject"
-        assert result.get("reason") == "Failed security checks"
+        assert result.get("result", {}).get("decision") == "reject"
+        assert result.get("result", {}).get("reason") == "Failed security checks"
+

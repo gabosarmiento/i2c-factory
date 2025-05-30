@@ -1,4 +1,4 @@
-# /workflow/scenario_processor.py
+# /src/i2c/workflow/scenario_processor.py
 """
 I2C Factory Scenario Processor
 
@@ -17,6 +17,8 @@ from pathlib import Path
 import logging
 from typing import Dict, List, Optional, Any, Union
 import traceback
+from i2c.utils.json_extraction import extract_json_with_fallback
+
 # Import CLI canvas for user interaction
 from i2c.cli.controller import canvas
 from i2c.cli.budget_display import show_budget_status, show_operation_cost, show_budget_summary
@@ -37,7 +39,7 @@ from i2c.workflow.session_handlers import (
 from i2c.agents.core_agents import input_processor_agent
 from i2c.agents.budget_manager import BudgetManagerAgent
 from i2c.agents.modification_team.context_reader.context_reader_agent import ContextReaderAgent
-
+from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent
 # Setup logging
 logger = logging.getLogger(__name__)
 
@@ -447,7 +449,12 @@ class ScenarioProcessor:
             canvas.info(f"JSON to parse: {json_str[:100]}...")
 
             # Parse the extracted JSON
-            proc = extract_json(json_str)
+            proc = extract_json_with_fallback(json_str, fallback={
+                "objective": "CLI tool for reflection (fallback)",
+                "language": "python",
+                "system_type": "cli_tool",
+                "architecture_pattern": "Single-Process"
+            })
             if not (isinstance(proc, dict) and "objective" in proc and "language" in proc):
                 raise ValueError("Invalid JSON from LLM")
             
@@ -989,115 +996,97 @@ class ScenarioProcessor:
             )
         else:
             canvas.warning("Refinement cancelled due to budget rejection.")
-            
+    
+    def _handle_knowledge_ingestion(self, document_path, metadata, *, is_folder=False):
+        """
+        Ingests knowledge from a given path (file or folder), using the project name as the knowledge space.
+        Raises an error if project name is not defined, to avoid fallback to 'global'.
+        """
+        if not self.project_name:
+            raise ValueError(
+                "No 'project_name' defined. Explicit project name is required to define a knowledge space. "
+                "Avoid using deprecated fallback to 'global'."
+            )
+
+        from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent
+
+        knowledge_space = self.project_name
+        ingestor = EnhancedKnowledgeIngestorAgent(
+            knowledge_space=knowledge_space,
+            metadata=metadata,
+            use_cache=True,
+            recursive=is_folder
+        )
+        stats = ingestor.execute(document_path)
+        print(f"[Knowledge Ingestion] Completed with stats: {stats}")
+
     def _process_knowledge_step(self, step: Dict[str, Any]) -> None:
-        """Process a knowledge step - add documentation to knowledge base with smart caching"""
-        if not self.current_project_path:
-            canvas.warning("No active project. Cannot add knowledge.")
-            return
-            
+        """Process a knowledge step - add documentation to knowledge base"""
         doc_path = step.get("doc_path", "")
         if not doc_path:
             canvas.warning("Knowledge step missing doc_path. Skipping...")
             return
-            
+
         doc_path = Path(doc_path)
         if not doc_path.is_absolute():
             doc_path = Path(os.getcwd()) / doc_path
-        
+
         if not doc_path.exists():
             canvas.warning(f"Document path does not exist: {doc_path}")
             return
-            
-        # Extract metadata
+
         doc_type = step.get("doc_type", "API Documentation")
-        framework = step.get("framework", "")
-        version = step.get("version", "")
-        
+        metadata = {
+            "framework": step.get("framework", ""),
+            "version": step.get("version", ""),
+            "project_path": str(self.current_project_path) if self.current_project_path else "global",
+            "global": step.get("global", False)
+        }
+
         canvas.step(f"Adding documentation to knowledge base: {doc_path.name}")
-        
-        # Use enhanced ingestor with smart caching
+
         try:
-            from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent
-            
-            ingestor = EnhancedKnowledgeIngestorAgent(
-                budget_manager=self.budget_manager,
-                knowledge_space=self.current_project_path.name,
-            )
-            
-            success, results = ingestor.execute(
-                document_path=doc_path,
-                document_type=doc_type,
-                metadata={
-                    "framework": framework,
-                    "version": version,
-                    "project_path": str(self.current_project_path)
-                },
-                force_refresh=False  # Use smart caching
-            )
-            
+            success, results = self._handle_knowledge_ingestion(doc_path, doc_type, metadata, is_folder=False)
             if success:
                 canvas.success(f"✅ Added {doc_path.name}: {results['successful_files']} files, "
                             f"skipped {results['skipped_files']} (cached)")
             else:
                 canvas.error(f"Failed to add {doc_path.name} to knowledge base.")
-                
         except Exception as e:
-            canvas.error(f"Error in knowledge step: {e}")
+            canvas.error(f"Error during ingestion: {e}")
 
     def _process_knowledge_folder_step(self, step: Dict[str, Any]) -> None:
         """Process a knowledge folder step with smart caching"""
-        if not self.current_project_path:
-            canvas.warning("No active project. Cannot add knowledge.")
-            return
-            
-        folder_path = step.get("folder_path", "")
+        folder_path = step.get("folder_path", "") or step.get("document_path", "")
         if not folder_path:
             canvas.warning("Knowledge folder step missing folder_path. Skipping...")
             return
-            
+
         folder_path = Path(folder_path)
         if not folder_path.exists() or not folder_path.is_dir():
             canvas.warning(f"Folder path does not exist or is not a directory: {folder_path}")
             return
-            
-        # Extract metadata
+
         doc_type = step.get("doc_type", "API Documentation")
-        framework = step.get("framework", "")
-        version = step.get("version", "")
-        
+        metadata = {
+            "framework": step.get("framework", ""),
+            "version": step.get("version", ""),
+            "project_path": str(self.current_project_path) if self.current_project_path else "global",
+            "global": step.get("global", False)
+        }
+
         canvas.step(f"Adding documentation folder to knowledge base: {folder_path.name}")
-        
-        # Use enhanced ingestor with smart caching
+
         try:
-            from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent
-            
-            ingestor = EnhancedKnowledgeIngestorAgent(
-                budget_manager=self.budget_manager,
-                knowledge_space=self.current_project_path.name,
-            )
-            
-            success, results = ingestor.execute(
-                document_path=folder_path,
-                document_type=doc_type,
-                metadata={
-                    "framework": framework,
-                    "version": version,
-                    "project_path": str(self.current_project_path)
-                },
-                force_refresh=False,  # Use smart caching
-                recursive=True
-            )
-            
+            success, results = self._handle_knowledge_ingestion(folder_path, doc_type, metadata, is_folder=True)
             if success:
                 canvas.success(f"✅ Added {folder_path.name}: {results['successful_files']} files, "
                             f"skipped {results['skipped_files']} (cached)")
             else:
                 canvas.error(f"Failed to add documentation from {folder_path.name}")
-                
         except Exception as e:
-            canvas.error(f"Error in knowledge folder step: {e}")
-                
+            canvas.error(f"Error during ingestion: {e}")
+        
     def _process_pause_step(self, step: Dict[str, Any]) -> None:
         """
         Process a pause step - pause for user interaction

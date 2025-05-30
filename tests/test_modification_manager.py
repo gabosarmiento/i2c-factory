@@ -12,7 +12,7 @@ from i2c.bootstrap import initialize_environment
 initialize_environment()
 from i2c.agents.modification_team.modification_manager import ModificationManager
 from i2c.agents.modification_team.patch import Patch
-from i2c.workflow.modification.code_modifier_adapter import apply_modification
+from i2c.agents.modification_team.code_modification_manager_agno import apply_modification
 
 class MockRunResponse:
     """Mock object that mimics Agent.run() response."""

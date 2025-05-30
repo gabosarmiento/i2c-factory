@@ -1,3 +1,4 @@
+# /src/i2c/agents/modification_team/code_modification_manager_agno.py
 import json
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
@@ -17,6 +18,81 @@ from .code_modification_manager_agno_legacy import (
     apply_modification as _apply_legacy
 )
 
+# === LEAN KNOWLEDGE INTEGRATION ===
+def _should_use_knowledge(modification_step: Dict[str, Any]) -> bool:
+    """Smart gating - only use knowledge when it actually helps"""
+    task = modification_step.get("what", "").lower()
+    
+    # Only use knowledge for complex tasks that benefit from patterns
+    knowledge_worthy = [
+        "create", "implement", "build", "design", "architecture", 
+        "pattern", "best practice", "optimize", "refactor"
+    ]
+    
+    return any(keyword in task for keyword in knowledge_worthy) and len(task) > 10
+
+def _get_lean_knowledge_context(session_state: Dict[str, Any], 
+                               modification_step: Dict[str, Any]) -> str:
+    """Get minimal, relevant knowledge context - ONE API call max"""
+    knowledge_base = session_state.get("knowledge_base")
+    if not knowledge_base or not _should_use_knowledge(modification_step):
+        return ""
+    
+    try:
+        task = modification_step.get("what", "")
+        file_ext = Path(modification_step.get("file", "")).suffix.lower()
+        
+        # Build focused query - no verbose descriptions
+        query_parts = [task.split()[:3]]  # First 3 words only
+        if file_ext == ".py":
+            query_parts.append(["python"])
+        elif file_ext in [".js", ".jsx"]:
+            query_parts.append(["javascript"])
+            
+        query = " ".join([" ".join(part) for part in query_parts])
+        
+        # ONE focused retrieval - limit=1 for speed
+        chunks = knowledge_base.retrieve_knowledge(query=query, limit=1)
+        
+        if chunks:
+            content = chunks[0].get("content", "").strip()[:400]  # Keep it short
+            return content
+            
+    except Exception:
+        pass
+    
+    return ""
+
+# === LEAN KNOWLEDGE INTEGRATION END ===
+
+def _inject_knowledge_into_prompt(base_prompt: str, knowledge_context: str) -> str:
+    """
+    Inject knowledge context into the modification prompt.
+    
+    Args:
+        base_prompt: Original prompt
+        knowledge_context: Retrieved knowledge context
+        
+    Returns:
+        Enhanced prompt with knowledge context
+    """
+    if not knowledge_context:
+        return base_prompt
+        
+    enhanced_prompt = f"""{base_prompt}
+
+=== KNOWLEDGE CONTEXT ===
+Use the following relevant knowledge to inform your code modifications:
+
+{knowledge_context}
+
+Apply patterns, best practices, and examples from the knowledge context above.
+Ensure your modifications align with the provided knowledge.
+=== END KNOWLEDGE CONTEXT ==="""
+    
+    return enhanced_prompt
+# === KNOWLEDGE INTEGRATION END ===
+
 def _build_modular_tool_agents(session_state: Dict[str, Any] = None) -> Dict[str, Agent]:
     """
     Define one lightweight agent per retrieval tool. Each tool agent is only responsible for one tool and returns strict JSON.
@@ -30,7 +106,7 @@ def _build_modular_tool_agents(session_state: Dict[str, Any] = None) -> Dict[str
         name="VectorRetrieverAgent",
         model=llm_middle,
         tools=[vector_retrieve_tool],
-        reasoning=True,
+        reasoning=False,  # Disable reasoning to prevent hanging
         instructions="""
 You are a vector retrieval specialist.
 Use ONLY the vector_retrieve tool to answer queries about code, knowledge, or both. Respond strictly in JSON.
@@ -42,7 +118,7 @@ Example:
         name="ProjectContextAgent",
         model=llm_middle,
         tools=[get_project_context_tool],
-        reasoning=True,
+        reasoning=False,  # Disable reasoning to prevent hanging
         instructions="""
 You are a project structure specialist.
 Use ONLY the get_project_context tool. Given a project path and a focus term, return project file info as JSON.
@@ -54,7 +130,7 @@ Example:
         name="GitHubFetcherAgent",
         model=llm_middle,
         tools=[github_fetch_tool],
-        reasoning=True,
+        reasoning=False,  # Disable reasoning to prevent hanging
         instructions="""
 You fetch files from GitHub. Use ONLY the github_fetch tool with repo_path and file_path, return JSON.
 Example:
@@ -77,9 +153,9 @@ def _create_modular_retrieval_team(session_state: Dict[str, Any] = None) -> Team
 
     analyzer = Agent(
         name="AnalyzerAgent",
-        model=llm_deepseek,  # Good at reasoning
+        model=llm_highest,  # Good at reasoning
         tools=retrieval_helpers,
-        reasoning=True,
+        reasoning=False,  # Disable reasoning to prevent hanging
         instructions="""
 You are a senior code analyst with access to three tool specialists: VectorRetrieverAgent, ProjectContextAgent, GitHubFetcherAgent.
 
@@ -97,7 +173,7 @@ Respond strictly in JSON.
         name="ImplementerAgent",
         model=llm_highest,  # Focused on quality output
         tools=retrieval_helpers,
-        reasoning=True,
+        reasoning=False,  # Disable reasoning to prevent hanging
         instructions="""
 You are an advanced implementer with access to tool agents and a code analysis plan.
 
@@ -128,21 +204,15 @@ You are a fast, robust, modular modification team.
     )
 
 def robust_json_parse(content: Union[str, dict, list]) -> dict:
+    from i2c.utils.json_extraction import extract_json_with_fallback
+    
     if isinstance(content, dict):
         return content
     if isinstance(content, list) and content:
         return content[0] if isinstance(content[0], dict) else {"modified": str(content[0])}
     if isinstance(content, str):
-        try:
-            return json.loads(content)
-        except:
-            import re
-            match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content)
-            if match:
-                try:
-                    return json.loads(match.group())
-                except:
-                    pass
+        return extract_json_with_fallback(content, {"modified": str(content)[:1000]})
+    
     return {"modified": str(content)[:1000]}
 
 def apply_modification(
@@ -151,13 +221,22 @@ def apply_modification(
     retrieved_context: str = "",
     session_state: Optional[Dict[str, Any]] = None
 ) -> Any:
+    print("[DEBUG][apply_modification] step:", modification_step)
+    print("[DEBUG][apply_modification] project_root:", project_path)
     shared = session_state or {}
+    
+    # Check for test mode to force legacy path
+    if shared.get("test_mode", False):
+        print("[DEBUG] Test mode - forcing legacy path")
+        return _apply_legacy(modification_step, project_path, retrieved_context, shared)
+    
     use_retrieval = shared.get("use_retrieval_tools", False)
     if use_retrieval:
         return _apply_modular_modification(modification_step, project_path, retrieved_context, shared)
     return _apply_legacy(modification_step, project_path, retrieved_context, shared)
 
 def build_code_modification_team(*, session_state: Dict[str, Any] = None, **kwargs) -> Team:
+    """Build code modification team - lean approach, no preloading overhead"""
     shared = session_state or {}
     use_retrieval = shared.get("use_retrieval_tools", False)
     if use_retrieval:
@@ -171,14 +250,24 @@ def _apply_modular_modification(
     session_state: Dict[str, Any]
 ) -> Any:
     try:
-        context_payload = {
+        # === LEAN: Get minimal knowledge context (max 1 API call) ===
+        knowledge_context = _get_lean_knowledge_context(session_state, step)
+        
+        base_context = {
             "task": step.get("what", ""),
             "file": step.get("file", ""),
             "how": step.get("how", ""),
             "context_hint": retrieved_context[:200] if retrieved_context else ""
         }
+        
+        # Add knowledge only if we got some
+        if knowledge_context:
+            base_context["knowledge_hint"] = knowledge_context  # Renamed to hint - it's minimal
+        
         team = _create_modular_retrieval_team(session_state)
-        response = team.run(json.dumps(context_payload))
+        team_prompt = json.dumps(base_context)
+        
+        response = team.run(team_prompt)
         content = getattr(response, "content", str(response))
         result = robust_json_parse(content)
         file_rel = result.get("file_path", step.get("file", ""))
@@ -249,6 +338,14 @@ def quick_search(query: str, search_type: str = "vector") -> str:
             return call_tool_manually("vector_retrieve", query=query, source="both", limit=3)
     except:
         return "{}"
+
+def get_knowledge_cache_stats() -> dict:
+    """Get simple knowledge usage stats"""
+    return {"message": "Lean knowledge integration - minimal overhead"}
+
+def clear_knowledge_cache():
+    """No-op for lean implementation"""
+    pass
 
 __all__ = [
     "apply_modification",

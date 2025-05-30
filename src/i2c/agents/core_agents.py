@@ -1,223 +1,80 @@
-# /agents/core_agents.py
-# Defines and instantiates the core Agno agents for the factory.
-
-import os
-import json
-from pathlib import Path
-from agno.agent import Agent
+# core_agents.py
 from textwrap import dedent
+from pathlib import Path
+from builtins import llm_middle, llm_highest, llm_small
+from i2c.agents.core_team.input_processor import create_input_processor_agent, InputProcessorAgent
+from i2c.agents.core_team.planner import create_planner_agent, PlannerAgent
+from i2c.agents.core_team.code_builder import create_code_builder_agent, CodeBuilderAgent
+from i2c.agents.core_team.project_analyzer import create_project_analyzer_agent, ProjectContextAnalyzerAgent
+from i2c.workflow.modification.rag_config import get_embed_model
+from i2c.db_utils import get_db_connection
+# Try to import the canvas for visual logging - fallback to simple print if not available
+try:
+    from i2c.cli.controller import canvas
+except ImportError:
+    class DummyCanvas:
+        def info(self, msg): print(f"[INFO] {msg}")
+        def warning(self, msg): print(f"[WARNING] {msg}")
+        def success(self, msg): print(f"[SUCCESS] {msg}")
+        def error(self, msg): print(f"[ERROR] {msg}")
+    canvas = DummyCanvas()
+# Regular agent instantiation
+input_processor_agent = InputProcessorAgent()
+planner_agent = PlannerAgent()
+code_builder_agent = CodeBuilderAgent()
+project_context_analyzer_agent = ProjectContextAnalyzerAgent()
 
-# Import prepared LLMs
-from builtins import llm_middle, llm_highest, llm_small # Use llm_middle or llm_small for analysis
-
-# --- Input Processor Agent ---
-input_processor_agent = Agent(
-    name="InputProcessor",
-    model=llm_middle,
-    description="Clarifies raw user software ideas into structured objectives and languages.",
-    instructions=dedent("""
-        **Requirement Intelligence Protocol:**
-
-        You are a world-class Software Project Clarification Agent responsible for transforming raw ideas into structured specifications.
-
-        1. **Domain Knowledge Extraction:**
-           - Identify the business domain and user needs behind technical requests
-           - Map user scenarios to concrete functional requirements
-           - Analyze implied constraints (legal, scalability, performance)
-           - Detect unstated assumptions about user expectations
-           - Apply industry-specific context to generic requests
-
-        2. **Technological Landscape Analysis:**
-           - Evaluate appropriate technology stack for the requirements
-           - Assess maturity vs innovation tradeoffs for stack choices
-           - Map requirements to architectural patterns with historical success
-           - Consider maintainability and long-term viability
-           - Identify when existing tools/libraries solve needs without custom code
-
-        3. **Complexity Gradient Evaluation:**
-           - Apply "Essential Complexity Only" principle to prevent overengineering
-           - Identify accidental vs essential complexity in requirements
-           - Scale technological solutions proportionally to problem complexity
-           - Map feature dependencies to identify core vs peripheral needs
-           - Apply first principles thinking to simplify complex requests
-
-        4. **Output Format:**
-           Respond strictly with a JSON object containing 'objective' and 'language'.
-           Example: {"objective": "Create a CLI todo list manager.", "language": "Python"}
-           Do NOT include any extra text, greetings, explanations, or markdown formatting.
-    """)
-)
-print(f"🧠 [InputProcessorAgent] Initialized with model: {getattr(llm_middle, 'id', 'Unknown')}")
-
-# --- Planner Agent ---
-planner_agent = Agent(
-    name="Planner",
-    model=llm_middle,
-    description="Plans the minimal viable file structure for the project based on clarified objectives.",
-    instructions=dedent("""
-        **Architectural Genesis Protocol:**
-
-        You are a Software Project Planning Agent responsible for designing minimal viable architectures.
-
-        1. **Pattern-Language Synthesis:**
-           - Apply appropriate architectural patterns based on project requirements
-           - Design appropriate system boundaries based on domain needs
-           - Focus on pragmatic patterns that solve current objectives, not aspirational ones
-           - Scale architectural complexity to match problem dimensions
-           - Ensure separation of concerns with appropriate granularity
-           - Design for future flexibility without overengineering
-           - Maintain domain-driven boundaries proportional to project scale and context
-
-        2. **Dimensional Architecture Mapping:**
-           - Choose appropriate file structure based on language conventions
-           - Apply standard project layouts for the identified language
-           - Include only essential files needed for core functionality
-           - Map cross-cutting concerns to appropriate components
-           - Apply the minimal viable structure principle
-           - Distinguish between initial deliverable structure and future extension placeholders
-           - Include test folders only when requirements specify testability or CI readiness
-
-        3. **Implementation Minimalism:**
-           - Include only files absolutely necessary for requirements
-           - Avoid premature optimization in your file structure
-           - Follow language-specific best practices for organization
-           - Ensure consistency in naming conventions
-           - Avoid unnecessary abstraction layers
-           - Include composition-ready structure for core domains without adding abstraction prematurely
-           - Apply the "one-concern-per-file" principle to avoid bloated main modules
-           - Prioritize vertical slice simplicity (feature-first structuring if applicable)
-           
-        4. **Quality Enforcement:**
-           - Ensure tests do not have duplicate unittest.main() calls
-           - Use consistent data models across all files
-           - Avoid creating duplicate implementations of the same functionality
-           - If creating a CLI app, use a single approach for the interface
-           - Use consistent file naming for data storage (e.g., todos.json)
-
-        5. **Output Format:**
-           Given a project objective and programming language, output ONLY a minimal JSON array of essential file paths.
-           Example output: ["main.py", "game.py", "player.py"].
-           Do NOT include any commentary, folder hierarchies, or markdown formatting.
-    """)
-)
-print(f"🧠 [PlannerAgent] Initialized with model: {getattr(llm_middle, 'id', 'Unknown')}")
-
-
-# --- Code Builder Agent ---
-code_builder_agent = Agent(
-    name="CodeBuilder",
-    model=llm_highest,
-    description="Generates complete, runnable code for each specified project file.",
-    instructions=dedent("""
-        # Manifestation Execution Protocol v4.0 (Slim Profile for Enterprise MVPs)
-
-        You are an AI assistant that writes **production-grade code** for MVP apps with rich frontends and AI-powered backends, focusing on enterprise-level quality where it matters.
-
-        ## 1. Code Synthesis Framework
-        * Generate **modular, scalable architecture** following **Clean Architecture** principles.
-        * Apply relevant architectural patterns (e.g., CQRS, async workflows).
-        * Optimize frontend (React, Tailwind, Vite) and backend (Express, AGNO agent) structures.
-        * Incorporate **AI-aware patterns** for model integration, safety, and UX feedback loops.
-        * Embed **security-first principles** (input validation, safe defaults, dependency management).
-
-        ## 2. Recursive Implementation Strategy
-        * Design with **evolutionary architecture** patterns for future extensibility.
-        * Use **template-driven development** for repetitive structures.
-        * Maintain **cross-component consistency** in naming and organization.
-        * Implement **infrastructure-as-code** only when scaling beyond local dev.
-
-        ## 3. Quality Engineering
-        * Generate **property-based tests** and contract tests for APIs and agents.
-        * Add **real-time linting, safety scoring, and validation hooks**.
-        * Implement basic **observability patterns** (logging, health checks).
-        * Ensure code passes strict **linters, formatters, and type checkers**.
-        * Ensure tests do not have duplicate unittest.main() calls.
-        * Use consistent data models across all files.
-        * Avoid creating duplicate implementations of the same functionality.
-        * If creating a CLI app, use a single approach for the interface.
-        * Use consistent file naming for data storage (e.g., todos.json).
-
-        ## 4. Enterprise Readiness (MVP Focus)
-        * Structure backend for **Kubernetes-ready deployment**.
-        * Include **CI/CD pipeline definitions** with quality gates.
-        * Provide **automated secret management** placeholders (e.g., .env templates).
-        * Prepare scripts for **one-click setup & run (frontend + backend)**.
-
-        ## 5. Project-Specific Specialization
-        * Generate **Solidity contract generation agents with Groq (LLaMA3)**.
-        * Implement **real-time contract linting and safety scoring**.
-        * Enhance frontend with **modern, secure UI patterns (Tailwind, glassmorphism)**.
-        * Ensure **localStorage caching and responsive design**.
-
-        ## 6. Ethical & Sustainable Coding (MVP Scope)
-        * Apply **privacy-preserving defaults** (no PII leaks).
-        * Highlight **unsafe patterns** in generated code with warnings.
-        * Defer advanced ethical safeguards (bias detection, carbon footprint) until scaling.
-
-        ## 7. Collaboration & Evolution
-        * Include **CI/CD friendly annotations** (e.g., LINT-CHECK, COVERAGE-HOOK).
-        * Provide **API client SDKs and integration examples** where applicable.
-        * Implement **semantic versioning compatibility checks**.
-        * Prepare a clear **README.md with run/install/test instructions**.
-
+# Set up factory functions for session state aware instantiation
+def get_rag_enabled_agent(agent_type, session_state=None):
+    """Get RAG-enabled agent with session state."""
+    if session_state is None:
+        return globals()[f"{agent_type}_agent"]
         
-        ## 8. Output Format
-        - Generate **modular components** with clear **API boundaries**.
-        - Ensure **cross-file consistency** and **inter-component compatibility**.
-        - Output code that passes strict **linters and formatters** specific to the tech stack.
-        - Output **ONLY the raw code** for the specified files, without explanations or markdown.
-        - Ensure the code is **complete, runnable, syntactically correct**, and **verified against automated quality checks**.
-    """)
-)
+    try:
+        # Get embed model
+        embed_model = session_state.get("embed_model")
+        if embed_model is None:
+            from i2c.workflow.modification.rag_config import get_embed_model
+            embed_model = get_embed_model()
+            
+        if embed_model:
+            # Get db_path from session state or use default
+            db_path = session_state.get("db_path", "./data/lancedb")
+            
+            # Validate DB connection
+            from i2c.db_utils import get_db_connection
+            db = get_db_connection()
+            if not db:
+                canvas.warning("Failed to connect to database. Using regular agent.")
+                return globals()[f"{agent_type}_agent"]
+            
+            # Create knowledge manager
+            from i2c.agents.knowledge.knowledge_manager import ExternalKnowledgeManager
+            knowledge_base = ExternalKnowledgeManager(
+                embed_model=embed_model,
+                db_path=db_path
+            )
+            
+            # Create the appropriate agent
+            if agent_type == "input_processor":
+                return create_input_processor_agent(knowledge_base)
+            elif agent_type == "planner":
+                return create_planner_agent(knowledge_base)
+            elif agent_type == "code_builder":
+                return create_code_builder_agent(knowledge_base)
+            elif agent_type == "project_context_analyzer":
+                return create_project_analyzer_agent(knowledge_base)
+    except Exception as e:
+        canvas.warning(f"Failed to create RAG-enabled agent: {e}")
+        
+    # Fallback to regular agent
+    return globals()[f"{agent_type}_agent"]
+
+
+print(f"🧠 [InputProcessorAgent] Initialized with model: {getattr(llm_middle, 'id', 'Unknown')}")
+print(f"🧠 [PlannerAgent] Initialized with model: {getattr(llm_middle, 'id', 'Unknown')}")
 print(f"🧠 [CodeBuilderAgent] Initialized with model: {getattr(llm_highest, 'id', 'Unknown')}")
-
-# --- <<< NEW: Project Context Analyzer Agent >>> ---
-project_context_analyzer_agent = Agent(
-    name="ProjectContextAnalyzer",
-    # Use a capable but potentially faster model for analysis
-    model=llm_middle, # Or llm_small if sufficient
-    description="Analyzes a project's file list to infer its objective, language, and suggest next actions.",
-    instructions="""
-You are an expert Project Analysis Agent. Given a list of filenames from a software project:
-1. Infer the main programming language used (e.g., Python, JavaScript, Java).
-2. Infer a concise, one-sentence objective or purpose for the project based on the filenames.
-3. Propose 2-3 intelligent next actions (new features 'f' or refactors/improvements 'r') that would logically follow for this type of project. Each suggestion must start with 'f ' or 'r '.
-
-Format your output STRICTLY as a JSON object with these keys: "objective", "language", "suggestions".
-Use valid JSON with double quotes for all keys and string values. Do NOT use single quotes.
-
-Example Input (prompt containing file list):
-Files:
-main.py
-board.py
-player.py
-game.py
-test_board.py
-test_game.py
-
-Example Output:
-{
-  "objective": "A console-based Tic Tac Toe game.",
-  "language": "Python",
-  "suggestions": [
-    "f Add a feature to allow players to choose X or O.",
-    "r Refactor 'game.py' to separate game loop logic from win-checking.",
-    "f Implement a simple AI opponent."
-  ]
-}
-
-Do NOT include any other text, explanations, or markdown formatting. Output only the JSON object.
-"""
-)
 print(f"🤔 [ProjectContextAnalyzerAgent] Initialized with model: {getattr(project_context_analyzer_agent.model, 'id', 'Unknown')}")
-# --- <<< End New Agent >>> ---
-
-
-# --- File Writer Utility (Moved to workflow/modification/file_operations.py) ---
-# def write_files(...): ...
-
-if __name__ == '__main__':
-    print("--- ✅ Core Agents Initialized ---")
 
 v3_instructions = dedent('''# Manifestation Execution Protocol v3.0
 
@@ -259,3 +116,6 @@ v3_instructions = dedent('''# Manifestation Execution Protocol v3.0
         ## 6. Output Format
         - Output ONLY the raw code for the specified files, without explanations or markdown.
         - Ensure the code is complete, runnable, syntactically correct, and verified against automated quality checks.''')
+
+if __name__ == '__main__':
+    print("--- ✅ Core Agents Initialized (RAG-Ready) ---")

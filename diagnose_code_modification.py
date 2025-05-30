@@ -22,7 +22,7 @@ diagnostics = initialize_diagnostics()
 
 # Import original components with minimal modifications
 from i2c.agents.modification_team.code_modification_manager_agno import build_code_modification_team
-from i2c.workflow.modification.code_modifier_adapter import apply_modification
+from i2c.agents.modification_team.code_modification_manager_agno import apply_modification
 
 # Test function to diagnose a simple modification
 @track_api_call

@@ -22,8 +22,8 @@ def initialize_groq_providers():
     print("[INFO]: Initializing Groq LLM providers…")
 
     llm_highest = Groq(
-        id="meta-llama/llama-4-maverick-17b-128e-instruct",
-        # id="llama-3.3-70b-versatile",
+        # id="meta-llama/llama-4-maverick-17b-128e-instruct",
+        id="llama-3.3-70b-versatile",
         api_key=GROQ_API_KEY,
         temperature=0.5
     )
@@ -36,8 +36,8 @@ def initialize_groq_providers():
     )
 
     llm_middle = Groq(
-        id="meta-llama/llama-4-scout-17b-16e-instruct",
-        # id="llama-3.1-8b-instant",
+        # id="meta-llama/llama-4-scout-17b-16e-instruct",
+        id="llama-3.1-8b-instant",
         api_key=GROQ_API_KEY,
         temperature=0.2
     )

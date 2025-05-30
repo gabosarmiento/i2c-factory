@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Iterator, Dict, Any
 
 # Import existing agents
-from i2c.agents.core_agents import planner_agent, code_builder_agent
+
 from i2c.agents.sre_team import unit_test_generator, code_quality_sentinel
 from i2c.workflow.modification.file_operations import write_files_to_disk
 from i2c.cli.controller import canvas
@@ -83,7 +83,13 @@ class GenerationWorkflow(Workflow):
             # Build the plan prompt with constraints
             plan_prompt = f"Objective: {objective}\nLanguage: {language}{constraints_text}"
             
-            response = planner_agent.run(plan_prompt)
+            # Get RAG-enabled planner with session state
+            from i2c.agents.core_agents import get_rag_enabled_agent
+            planner = get_rag_enabled_agent("planner", self.session_state)
+            
+            # Use the enhanced planner
+            response = planner.run(plan_prompt)
+            
             content = response.content if hasattr(response, 'content') else str(response)
             
             # Process response into file list
@@ -137,7 +143,13 @@ class GenerationWorkflow(Workflow):
                     f"Objective: {objective}\nLanguage: {language}{constraints_text}\n"
                     f"Generate complete, runnable code for the file '{file_path}'."
                 )
-                response = code_builder_agent.run(build_prompt)
+                # Get RAG-enabled code builder with session state
+                from i2c.agents.core_agents import get_rag_enabled_agent
+                builder = get_rag_enabled_agent("code_builder", self.session_state)
+                
+                # Use the enhanced builder
+                response = builder.run(build_prompt)
+                
                 raw = response.content if hasattr(response, 'content') else str(response)
                 
                 # Clean code response

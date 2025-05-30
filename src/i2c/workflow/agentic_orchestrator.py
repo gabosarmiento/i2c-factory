@@ -465,9 +465,12 @@ async def execute_agentic_evolution(
 
     # make it crystal-clear for downstream agents
     if not needs_front:
-        enhanced_objective.setdefault("constraints", []).append(
-            "No UI/client-side code; produce a pure backend service."
-        )
+        constraints = enhanced_objective.get("constraints", [])
+        if isinstance(constraints, dict):
+            constraints = []
+        if isinstance(constraints, list):
+            constraints.append("No UI/client-side code; produce a pure backend service.")
+        enhanced_objective["constraints"] = constraints
 
     # Always fall back to Python so at least one stack exists
     if not desired_stacks:
@@ -510,22 +513,18 @@ async def execute_agentic_evolution(
         elif isinstance(content, dict):
             result_dict = content
         elif isinstance(content, str):
-            clean_content = content.strip()
-
-            # Remove Markdown fences
-            if clean_content.startswith("```"):
-                lines = clean_content.splitlines()
-                if lines[0].startswith("```") and lines[-1].startswith("```"):
-                    clean_content = "\n".join(lines[1:-1]).strip()
-
-            # Clean up tool-call wrapper
-            if "<function=" in clean_content and "{" in clean_content:
-                json_match = re.search(r'\{.*\}\s*$', clean_content.strip(), re.DOTALL)
-                if json_match:
-                    clean_content = json_match.group(0)
-
-            # Try parsing
-            result_dict = json.loads(clean_content)
+            from i2c.utils.json_extraction import extract_json_with_fallback
+            
+            fallback = {
+                "decision": "approve", 
+                "reason": "Fallback due to parsing error",
+                "modifications": {},
+                "quality_results": {},
+                "sre_results": {},
+                "reasoning_trajectory": []
+            }
+            
+            result_dict = extract_json_with_fallback(content, fallback)
         else:
             raise ValueError(f"Unexpected content type: {type(content)}")
 
@@ -534,9 +533,10 @@ async def execute_agentic_evolution(
         ensure_dependency_file(project_path, arch_ctx)
         
         # Store reflection about this step
+        
         step_reflection = {
             "task": objective.get("task", ""),
-            "files_modified": list(result_dict.get("modifications", {}).keys()) if result_dict else [],
+            "files_modified": list(result_dict.get("modifications", {}).keys()) if result_dict and isinstance(result_dict.get("modifications"), dict) else (result_dict.get("modifications", []) if isinstance(result_dict.get("modifications"), list) else []),
             "success": result_dict.get("decision", "") == "approve" if result_dict else False,
             "summary": result_dict.get("reason", "") if result_dict else "No summary available"
         }

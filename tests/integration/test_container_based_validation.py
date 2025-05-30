@@ -165,18 +165,28 @@ export default App;
         shutil.rmtree(temp_dir)
 
     def test_complete_sre_pipeline_integration(self, fullstack_project):
-        """Test the SRE pipeline integration with original components"""
+        """Test the full SRE pipeline execution using build_sre_team"""
         session_state = {
             "validation_results": None,
             "project_path": str(fullstack_project)
         }
-        
-        # Test that build_sre_team raises the expected error due to component mismatch
-        with pytest.raises(TypeError, match="unexpected keyword argument 'project_path'"):
-            sre_team = build_sre_team(
-                project_path=fullstack_project,
-                session_state=session_state
-            )
+
+        sre_team = build_sre_team(
+            project_path=fullstack_project,
+            session_state=session_state
+        )
+
+        assert sre_team is not None
+        assert hasattr(sre_team, "run_sync")
+
+        # Run the pipeline
+        result = sre_team.run_sync()
+
+        assert isinstance(result, dict)
+        assert "summary" in result
+        assert "deployment_ready" in result["summary"]
+        assert "docker_ready" in result["summary"]
+        assert "operational_score" in result["summary"]
 
     def test_manifest_generation_phase(self, fullstack_project):
         """Test Phase 1: Dependency manifest generation with original components"""

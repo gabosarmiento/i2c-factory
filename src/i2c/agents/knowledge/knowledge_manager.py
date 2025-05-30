@@ -14,6 +14,7 @@ import numpy as np
 from i2c.cli.controller import canvas
 from i2c.db_utils import get_db_connection, add_or_update_chunks, TABLE_KNOWLEDGE_BASE, SCHEMA_KNOWLEDGE_BASE,query_context
 from i2c.workflow.modification.rag_retrieval import retrieve_context_for_planner
+from i2c.utils.embedding import get_embedding_from_model
 
 class ExternalKnowledgeManager:
     """Manages external knowledge ingestion and retrieval."""
@@ -34,8 +35,9 @@ class ExternalKnowledgeManager:
                 canvas.warning(f"Empty content for source {source}. Skipping.")
                 return False
 
-            # Generate embedding - handle both numpy arrays and lists
-            embedding = self.embed_model.encode(content)
+            embedding = get_embedding_from_model(self.embed_model, content)
+            
+            # Convert to list format
             if isinstance(embedding, np.ndarray):
                 vector = embedding.tolist()
             else:
@@ -66,17 +68,17 @@ class ExternalKnowledgeManager:
             canvas.error(f"Failed to ingest knowledge from {source}: {e}")
             return False
 
-    def retrieve_knowledge(
-        self, query: str, limit: int = 5
-    ) -> Optional[List[Dict]]:
+    def retrieve_knowledge(self, query: str, limit: int = 5) -> Optional[List[Dict]]:
         """Retrieve relevant knowledge for a query."""
         try:
-            
-            vector = self.embed_model.encode(query).tolist()
+            # Handle different embedding model types
+            vector = None
+            vector = get_embedding_from_model(self.embed_model, query)
+                
             results_df = query_context(
-                self.db_connection,          # db handle
-                TABLE_KNOWLEDGE_BASE,        # table name
-                vector,                      # query vector
+                self.db_connection,
+                TABLE_KNOWLEDGE_BASE,
+                vector,
                 limit=limit,
             )
             if results_df is None or results_df.empty:
@@ -91,7 +93,7 @@ class ExternalKnowledgeManager:
         except Exception as e:
             canvas.error(f"Error retrieving knowledge: {e}")
             return None
-
+        
     def batch_ingest_from_files(self, files: List[Path]) -> int:
         """Ingest multiple files (e.g., markdown docs) into knowledge_base."""
         success_count = 0

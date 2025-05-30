@@ -4,6 +4,7 @@ initialize_environment()
 from pathlib import Path
 import sys
 import logging
+from i2c.utils.embedding import get_embedding_from_model
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
@@ -62,7 +63,8 @@ def diagnose_rag_system():
                 try:
                     # Try to get a single row
                     logger.info("Attempting to query the table...")
-                    df = table.to_pandas(limit=1)
+                    df = table.to_pandas()
+                    df = df.head(1)
                     logger.info(f"Query succeeded. Columns: {list(df.columns) if not df.empty else 'No data'}")
                 except Exception as e:
                     logger.error(f"❌ Failed to query table: {e}")
@@ -98,7 +100,7 @@ def diagnose_rag_system():
         # Test embedding generation
         test_text = "This is a test embedding"
         try:
-            vector = embed_model.encode(test_text)
+            vector = get_embedding_from_model(embed_model, test_text)
             logger.info(f"✅ Successfully generated embedding with shape: {vector.shape}")
         except Exception as e:
             logger.error(f"❌ Failed to generate embedding: {e}")

@@ -51,7 +51,8 @@ if db and TABLE_CODE_CONTEXT in db.table_names():
     if row_count > 0:
         # Try to query the table
         print("Querying first row...")
-        df = table.to_pandas(limit=1)
+        df = table.to_pandas()
+        df = df.head(1)
         if not df.empty:
             print(f"Columns: {list(df.columns)}")
             print(f"Content snippet: {df['content'].iloc[0][:50]}...")
