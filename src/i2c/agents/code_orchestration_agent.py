@@ -9,6 +9,7 @@ from agno.team import Team
 from agno.agent import Message
 from i2c.cli.controller import canvas
 from pydantic import BaseModel, Field
+from i2c.agents.knowledge.application_scorer import KnowledgeApplicationScorer
 
 
 class OrchestrationResult(BaseModel):
@@ -93,6 +94,9 @@ class CodeOrchestrationAgent(Agent):
             if "knowledge_cache" not in self.session_state:
                 self.session_state["knowledge_cache"] = {}
 
+        
+        self.knowledge_scorer = KnowledgeApplicationScorer()
+        
         # ⬅️ Add strict JSON output enforcement for agent responses
         self.instructions.extend([
             "IMPORTANT: Your final response must be a **valid JSON object** ONLY. Do NOT include markdown formatting like ```json.",
@@ -890,6 +894,12 @@ class CodeOrchestrationAgent(Agent):
                 self._add_reasoning_step("Code Modification", 
                                     f"Successfully modified {len(modified_files)} files",
                                     success=True)
+                # ADD THIS SCORING LINE HERE:
+                await self._update_knowledge_effectiveness(
+                    str(result.get("modified_files", {})), 
+                    {"step": "modifications"}, 
+                    "code_generation"
+                )
             else:
                 error = result.get("error", "Unknown error")
                 self._add_reasoning_step("Code Modification", 
@@ -1062,6 +1072,12 @@ class CodeOrchestrationAgent(Agent):
                     "knowledge_applied": bool(self.knowledge_base)  # Flag indicating if knowledge was applied
                 }
 
+                # Add knowledge effectiveness summary
+                knowledge_effectiveness = self.session_state.get('knowledge_effectiveness', []) if self.session_state else []
+                if knowledge_effectiveness:
+                    avg_score = sum(item['score'] for item in knowledge_effectiveness) / len(knowledge_effectiveness)
+                    final_result['knowledge_application_score'] = avg_score
+                    final_result['knowledge_feedback'] = knowledge_effectiveness[-1].get('feedback', [])
                 # Ensure clean JSON without function refs
                 return self._sanitize_response(final_result)
 
@@ -1525,7 +1541,11 @@ class CodeOrchestrationAgent(Agent):
             self._add_reasoning_step("Modification Planning", 
                                 f"Generated architecturally-validated plan with {len(validated_steps)} steps", 
                                 success=True)
-            
+            await self._update_knowledge_effectiveness(
+                str(plan.get("steps", [])), 
+                {"step": "planning"}, 
+                "multi_agent"
+            )
             return plan
             
         except Exception as e:
@@ -1881,6 +1901,47 @@ class CodeOrchestrationAgent(Agent):
                 cleaned[key] = str(value)
                 
         return cleaned
+
+    async def _update_knowledge_effectiveness(self, agent_output: str, knowledge_used: Dict[str, Any], step_type: str = "general"):
+        """Track which knowledge leads to better outcomes"""
+        
+        if not self.knowledge_base or not agent_output:
+            return
+        
+        try:
+            # Create expected patterns based on step type
+            expected_patterns = self.knowledge_scorer.create_agno_pattern_expectations(step_type)
+            
+            # Score the application
+            application_score = self.knowledge_scorer.score_pattern_application(
+                agent_output, expected_patterns
+            )
+            
+            # Add reasoning step about knowledge application
+            self._add_reasoning_step(
+                f"Knowledge Application Analysis",
+                f"Pattern application score: {application_score['overall_score']:.2f}. "
+                f"Missing patterns: {', '.join(application_score['missing_patterns']) if application_score['missing_patterns'] else 'None'}",
+                success=application_score['overall_score'] > 0.7
+            )
+            
+            # Store results for continuous improvement
+            if hasattr(self, 'session_state') and self.session_state:
+                if 'knowledge_effectiveness' not in self.session_state:
+                    self.session_state['knowledge_effectiveness'] = []
+                
+                self.session_state['knowledge_effectiveness'].append({
+                    "step_type": step_type,
+                    "score": application_score['overall_score'],
+                    "patterns_applied": list(application_score['pattern_scores'].keys()),
+                    "feedback": application_score['feedback']
+                })
+            
+            return application_score
+            
+        except Exception as e:
+            canvas.warning(f"Error updating knowledge effectiveness: {e}")
+            return None
     
     def _clean_dict(self, d: Dict[str, Any]) -> Dict[str, Any]:
         """Clean a dictionary recursively"""

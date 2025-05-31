@@ -18,6 +18,7 @@ def create_stronger_agno_test_scenario():
     scenario_dir.mkdir(parents=True, exist_ok=True)
     
     scenario_data = {
+        "project_name": "enhanced_agno_test",
         "name": "Enhanced AGNO Knowledge Application Test",
         "steps": [
             {
@@ -27,6 +28,7 @@ def create_stronger_agno_test_scenario():
                 "doc_type": "AGNO Framework cheat sheet",
                 "framework": "AGNO",
                 "version": "latest",
+                "project_name": "enhanced_agno_test",
                 "global": True
             },
             {
@@ -36,6 +38,7 @@ def create_stronger_agno_test_scenario():
                 "doc_type": "AGNO Framework Guide",
                 "framework": "AGNO",
                 "version": "latest",
+                "project_name": "enhanced_agno_test",
                 "global": True
             },
             {

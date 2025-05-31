@@ -493,14 +493,25 @@ async def execute_agentic_evolution(
     result = await team.arun(message=message)
 
     # Handle intermediate events if paused
-    intermediate_events = {"run_paused", "waiting", "intermediate"}
-    while getattr(result, "event", None) in intermediate_events:
-        canvas.info(f"Waiting on agentic evolution, current state: {result.event}")
-        await asyncio.sleep(1)
-        if hasattr(team, "resume_run"):
-            result = await team.resume_run(result.run_id)
-        else:
-            result = await team.get_next_result(result.run_id)
+    # intermediate_events = {"run_paused", "waiting", "intermediate"}
+    # max_wait = 30  # seconds
+    # waited = 0
+    # while getattr(result, "event", None) in intermediate_events:
+    #     canvas.info(f"Waiting on agentic evolution, current state: {result.event}")
+    #     await asyncio.sleep(1)
+    #     waited += 1
+    #     if waited >= max_wait:
+    #         canvas.error("Timed out waiting for sandbox container to start.Is Docker running?")
+    #         raise RuntimeError("SandboxExecutorAgent start timeout")
+    #     if hasattr(team, "resume_run"):
+    #         result = await team.resume_run(result.run_id)
+    #     else:
+    #         result = await team.get_next_result(result.run_id)
+    
+    # Skip sandbox waiting entirely - proceed with what we have
+    if getattr(result, "event", None) in {"waiting", "run_paused", "intermediate"}:
+        canvas.warning(f"Skipping sandbox wait (state: {result.event}) - proceeding with available content")
+        # Just continue to the content parsing - don't wait, don't loop
 
     # Once final, parse the content safely
     content = getattr(result, "content", None)
@@ -543,7 +554,7 @@ async def execute_agentic_evolution(
         session_state["reflection_memory"].append(step_reflection)
 
         # Cap reflection memory to prevent unbounded growth
-        MAX_REFLECTIONS = 10
+        MAX_REFLECTIONS = 5
         if len(session_state["reflection_memory"]) > MAX_REFLECTIONS:
             session_state["reflection_memory"] = session_state["reflection_memory"][-MAX_REFLECTIONS:]
 

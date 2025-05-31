@@ -123,7 +123,9 @@ def run_session():
                 try:
                     from i2c.utils.json_extraction import extract_json_with_fallback
                     
-                    response = input_processor_agent.run(raw_idea) # Direct call
+                    from i2c.agents.core_agents import get_rag_enabled_agent
+                    temp_agent = get_rag_enabled_agent("input_processor")
+                    response = temp_agent.run(raw_idea)
                     response_content = response.content if hasattr(response, 'content') else str(response)
 
                     fallback_goal = {

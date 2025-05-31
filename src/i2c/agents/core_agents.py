@@ -18,64 +18,153 @@ except ImportError:
         def success(self, msg): print(f"[SUCCESS] {msg}")
         def error(self, msg): print(f"[ERROR] {msg}")
     canvas = DummyCanvas()
-# Regular agent instantiation
-input_processor_agent = InputProcessorAgent()
-planner_agent = PlannerAgent()
-code_builder_agent = CodeBuilderAgent()
-project_context_analyzer_agent = ProjectContextAnalyzerAgent()
+# Knowledge-enhanced agent instantiation
+input_processor_agent = None  # Will be created dynamically
+planner_agent = None
+code_builder_agent = None
+project_context_analyzer_agent = None
 
 # Set up factory functions for session state aware instantiation
 def get_rag_enabled_agent(agent_type, session_state=None):
-    """Get RAG-enabled agent with session state."""
-    if session_state is None:
-        return globals()[f"{agent_type}_agent"]
-        
+    """Get knowledge-enhanced agent with internalized expertise"""
+    
     try:
-        # Get embed model
-        embed_model = session_state.get("embed_model")
-        if embed_model is None:
-            from i2c.workflow.modification.rag_config import get_embed_model
-            embed_model = get_embed_model()
+        # Direct instantiation with error handling
+        if agent_type == "input_processor":
+            agent_class = InputProcessorAgent
+        elif agent_type == "planner":
+            agent_class = PlannerAgent
+        elif agent_type == "code_builder":
+            agent_class = CodeBuilderAgent
+        elif agent_type == "project_context_analyzer":
+            agent_class = ProjectContextAnalyzerAgent
+        else:
+            canvas.error(f"Unknown agent type: {agent_type}")
+            return None
+        
+        if session_state is None:
+            return agent_class()
             
-        if embed_model:
-            # Get db_path from session state or use default
-            db_path = session_state.get("db_path", "./data/lancedb")
+        try:
+            # Get knowledge base from session
+            knowledge_base = session_state.get("knowledge_base")
             
-            # Validate DB connection
-            from i2c.db_utils import get_db_connection
-            db = get_db_connection()
-            if not db:
-                canvas.warning("Failed to connect to database. Using regular agent.")
-                return globals()[f"{agent_type}_agent"]
-            
-            # Create knowledge manager
-            from i2c.agents.knowledge.knowledge_manager import ExternalKnowledgeManager
-            knowledge_base = ExternalKnowledgeManager(
-                embed_model=embed_model,
-                db_path=db_path
+            # Create knowledge-enhanced agent
+            enhanced_agent = create_knowledge_enhanced_agent(
+                agent_class, 
+                knowledge_base, 
+                agent_type
             )
             
-            # Create the appropriate agent
-            if agent_type == "input_processor":
-                return create_input_processor_agent(knowledge_base)
-            elif agent_type == "planner":
-                return create_planner_agent(knowledge_base)
-            elif agent_type == "code_builder":
-                return create_code_builder_agent(knowledge_base)
-            elif agent_type == "project_context_analyzer":
-                return create_project_analyzer_agent(knowledge_base)
+            return enhanced_agent
+            
+        except Exception as e:
+            canvas.warning(f"Failed to create enhanced {agent_type}: {e}")
+            return agent_class()  # Fallback
+            
     except Exception as e:
-        canvas.warning(f"Failed to create RAG-enabled agent: {e}")
+        canvas.error(f"Error creating agent {agent_type}: {e}")
+        return None
+print("🤔 [InputProcessorAgent] Ready for dynamic initialization")
+print("📋 [PlannerAgent] Ready for dynamic initialization") 
+print("🔨 [CodeBuilderAgent] Ready for dynamic initialization")
+print("🤔 [ProjectContextAnalyzerAgent] Ready for dynamic initialization")
+
+def _extract_domain_expertise(knowledge_base, agent_role):
+    """Extract relevant expertise for specific agent role"""
+    
+    role_queries = {
+        "input_processor": ["requirement analysis", "user story clarification", "project scoping"],
+        "planner": ["software architecture", "file structure", "project planning"], 
+        "code_builder": ["code generation", "programming patterns", "implementation"],
+        "project_analyzer": ["code analysis", "project structure", "architecture review"]
+    }
+    
+    queries = role_queries.get(agent_role.lower(), [agent_role])
+    all_expertise = []
+    
+    for query in queries:
+        try:
+            # Get principles and patterns for this domain
+            principles = knowledge_base.retrieve_knowledge(
+                query=f"principles best practices {query}", 
+                limit=3
+            )
+            examples = knowledge_base.retrieve_knowledge(
+                query=f"examples patterns {query}",
+                limit=2
+            )
+            
+            all_expertise.extend(principles)
+            all_expertise.extend(examples)
+            
+        except Exception:
+            continue
+    
+    return all_expertise[:8]  # Limit to top 8 pieces
+
+def _inject_expertise_into_agent(agent, expertise, agent_role):
+    """Inject deep expertise with reasoning chains"""
+    
+    if not expertise:
+        return agent
+    
+    # Process with deep transformer
+    from i2c.agents.knowledge.principle_transformer import DeepPrincipleTransformer
+    deep_transformer = DeepPrincipleTransformer()
+    
+    # Extract contextual patterns from expertise
+    contextual_patterns = deep_transformer.extract_contextual_patterns(expertise)
+    
+    # Create reasoning-based expertise
+    reasoning_context = f"""
+Your expertise as a {agent_role} includes deep contextual understanding:
+
+{deep_transformer.synthesize_deep_expertise(contextual_patterns)}
+
+REASONING APPROACH:
+1. Analyze the context deeply before applying patterns
+2. Consider edge cases and potential conflicts
+3. Choose the optimal approach based on specific requirements
+4. Implement with confidence, knowing when and why to apply each pattern
+
+Think like an expert who naturally reasons through problems using internalized knowledge."""
+    
+    # Modify agent instructions
+    original_instructions = getattr(agent, 'instructions', [])
+    if isinstance(original_instructions, list):
+        enhanced_instructions = [reasoning_context] + original_instructions
+    else:
+        enhanced_instructions = reasoning_context + "\n\n" + str(original_instructions)
+    
+    agent.instructions = enhanced_instructions
+    return agent
+
+def create_knowledge_enhanced_agent(base_agent_class, knowledge_base=None, agent_role=""):
+    """Create agent with internalized knowledge instead of external references"""
+    
+    if knowledge_base is None:
+        # Return regular agent if no knowledge
+        return base_agent_class()
+    
+    try:
+        # Get domain expertise for this agent type
+        domain_knowledge = _extract_domain_expertise(knowledge_base, agent_role)
         
-    # Fallback to regular agent
-    return globals()[f"{agent_type}_agent"]
-
-
-print(f"🧠 [InputProcessorAgent] Initialized with model: {getattr(llm_middle, 'id', 'Unknown')}")
-print(f"🧠 [PlannerAgent] Initialized with model: {getattr(llm_middle, 'id', 'Unknown')}")
-print(f"🧠 [CodeBuilderAgent] Initialized with model: {getattr(llm_highest, 'id', 'Unknown')}")
-print(f"🤔 [ProjectContextAnalyzerAgent] Initialized with model: {getattr(project_context_analyzer_agent.model, 'id', 'Unknown')}")
-
+        # Create the base agent
+        agent = base_agent_class()
+        
+        # Transform instructions to include internalized expertise
+        if domain_knowledge:
+            agent = _inject_expertise_into_agent(agent, domain_knowledge, agent_role)
+            canvas.success(f"✅ Enhanced {agent_role} with internalized expertise")
+        
+        return agent
+        
+    except Exception as e:
+        canvas.warning(f"Failed to enhance {agent_role}: {e}")
+        return base_agent_class()  # Fallback to regular agent
+    
 v3_instructions = dedent('''# Manifestation Execution Protocol v3.0
 
         You are an AI assistant that writes code for specified files based on a project objective.

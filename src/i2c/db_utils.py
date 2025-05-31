@@ -46,7 +46,7 @@ SCHEMA_CODE_CONTEXT = pa.schema([
     pa.field("language", pa.string()),
 ])
 
-# --- Schema for Knowledge Base Table (Unified V2 Schema) ---
+# --- Schema for Knowledge Base Table (Enhanced V3 Schema) ---
 SCHEMA_KNOWLEDGE_BASE = pa.schema([
     pa.field("source", pa.string()),
     pa.field("content", pa.string()),
@@ -61,6 +61,11 @@ SCHEMA_KNOWLEDGE_BASE = pa.schema([
     pa.field("chunk_type", pa.string()),
     pa.field("source_hash", pa.string()),
     pa.field("metadata_json", pa.string()),
+    # NEW ENHANCED FIELDS FOR KNOWLEDGE TRACKING
+    pa.field("knowledge_type", pa.string()),      # principle/antipattern/example/raw
+    pa.field("application_context", pa.string()), # when to apply this knowledge
+    pa.field("confidence_score", pa.float32()),   # how reliable (0.0-1.0)
+    pa.field("usage_frequency", pa.int32()),      # how often this gets used
 ])
 
 # --- Core DB Helpers ---

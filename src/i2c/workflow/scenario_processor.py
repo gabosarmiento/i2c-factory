@@ -15,7 +15,7 @@ import time
 import os
 from pathlib import Path
 import logging
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Tuple
 import traceback
 from i2c.utils.json_extraction import extract_json_with_fallback
 
@@ -59,6 +59,7 @@ class ScenarioProcessor:
         """
         self.scenario_path = Path(scenario_path)
         self.scenario_data = self._load_scenario()
+        
         self.budget_manager = budget_manager or BudgetManagerAgent(session_budget=None)
         
         # Store the budget manager globally for other components to access
@@ -205,6 +206,7 @@ class ScenarioProcessor:
                 if isinstance(data, dict):
                     canvas.info(f"Scenario keys: {list(data.keys())}")
                     
+                    self.project_name = data.get("project_name")
                     # Check if 'steps' is a list in the data
                     steps = data.get('steps', [])
                     canvas.info(f"Steps type: {type(steps)}")
@@ -401,7 +403,7 @@ class ScenarioProcessor:
         if not self.budget_manager.request_approval(
             description="New Idea Clarification",
             prompt=raw_idea,
-            model_id=getattr(input_processor_agent.model, 'id', 'Unknown'),
+            model_id='Dynamic' if input_processor_agent is None else getattr(input_processor_agent.model, 'id', 'Unknown'),
         ):
             canvas.warning("Clarification cancelled due to budget rejection.")
             return
@@ -414,10 +416,12 @@ class ScenarioProcessor:
             # ENHANCED: Add architectural context to the input processing
             enhanced_prompt = self._enhance_prompt_with_architectural_guidance(raw_idea)
             
-            resp = input_processor_agent.run(enhanced_prompt)
+            from i2c.agents.core_agents import get_rag_enabled_agent
+            temp_agent = get_rag_enabled_agent("input_processor")
+            resp = temp_agent.run(enhanced_prompt)
             
             # Update budget manager with metrics from Agno agent
-            self.budget_manager.update_from_agno_metrics(input_processor_agent)
+            self.budget_manager.update_from_agno_metrics(temp_agent)
             
             # Calculate operation cost
             end_tokens, end_cost = self.budget_manager.get_session_consumption()
@@ -505,7 +509,7 @@ class ScenarioProcessor:
         if self.budget_manager.request_approval(
             description="Initial Project Generation",
             prompt=self.current_structured_goal['objective'],
-            model_id=getattr(input_processor_agent.model, 'id', 'Unknown'),
+            model_id=getattr(input_processor_agent.model, 'id', 'Unknown') if input_processor_agent and input_processor_agent.model else 'Dynamic',
         ):
             # Get start cost for operation tracking
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
@@ -870,7 +874,7 @@ class ScenarioProcessor:
         if self.budget_manager.request_approval(
             description=f"Project Modification ({prompt[:20]}...)",
             prompt=prompt,
-            model_id=getattr(input_processor_agent.model, 'id', 'Unknown'),
+            model_id=getattr(input_processor_agent.model, 'id', 'Unknown') if input_processor_agent and input_processor_agent.model else 'Dynamic',
         ):
             # Get start cost for operation tracking
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
@@ -963,7 +967,7 @@ class ScenarioProcessor:
         if self.budget_manager.request_approval(
             description=f"Project Refinement",
             prompt="General project refinement",
-            model_id=getattr(input_processor_agent.model, 'id', 'Unknown'),
+            model_id=getattr(input_processor_agent.model, 'id', 'Unknown') if input_processor_agent and input_processor_agent.model else 'Dynamic',
         ):
             # Get start cost for operation tracking
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
@@ -997,28 +1001,57 @@ class ScenarioProcessor:
         else:
             canvas.warning("Refinement cancelled due to budget rejection.")
     
-    def _handle_knowledge_ingestion(self, document_path, metadata, *, is_folder=False):
+    def _handle_knowledge_ingestion(
+        self,
+        document_path: Path,
+        doc_type: str,
+        metadata: Dict[str, Any],
+        *,
+        is_folder: bool = False
+    ) -> Tuple[bool, Dict[str, Any]]:
         """
-        Ingests knowledge from a given path (file or folder), using the project name as the knowledge space.
-        Raises an error if project name is not defined, to avoid fallback to 'global'.
+        Ingests knowledge from a given path (file or folder) into the specified knowledge space.
+
+        Expects metadata to include:
+        - "project_name": the target knowledge space.
+        - other optional keys (framework, version, global).
+
+        Args:
+            document_path: Path to the file or directory to ingest.
+            doc_type:      A string label for the document type (e.g. "API Doc").
+            metadata:      A dict that MUST contain "project_name".
+            is_folder:     If True, ingests recursively as a directory.
+
+        Returns:
+            A tuple (success: bool, stats: dict) from the ingestor.
         """
-        if not self.project_name:
+        # 1. Extract the target knowledge space from metadata
+        project_name = metadata.get("project_name")
+        if not project_name:
             raise ValueError(
-                "No 'project_name' defined. Explicit project name is required to define a knowledge space. "
-                "Avoid using deprecated fallback to 'global'."
+                "No 'project_name' defined in step metadata; "
+                "explicit project_name is required to define a knowledge space."
             )
 
+        # 2. Import and instantiate the enhanced ingestor
         from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent
 
-        knowledge_space = self.project_name
         ingestor = EnhancedKnowledgeIngestorAgent(
-            knowledge_space=knowledge_space,
+            budget_manager=self.budget_manager,     # required by the agent
+            knowledge_space=project_name            # injects your per-step project name
+        )
+
+        # 3. Execute ingestion
+        success, stats = ingestor.execute(
+            document_path=document_path,
+            document_type=doc_type,
             metadata=metadata,
-            use_cache=True,
             recursive=is_folder
         )
-        stats = ingestor.execute(document_path)
-        print(f"[Knowledge Ingestion] Completed with stats: {stats}")
+
+        # 4. Log or print summary
+        canvas.info(f"[Knowledge Ingestion] Space: '{project_name}' → stats: {stats}")
+        return success, stats
 
     def _process_knowledge_step(self, step: Dict[str, Any]) -> None:
         """Process a knowledge step - add documentation to knowledge base"""
@@ -1037,6 +1070,7 @@ class ScenarioProcessor:
 
         doc_type = step.get("doc_type", "API Documentation")
         metadata = {
+            "project_name": step.get("project_name"), 
             "framework": step.get("framework", ""),
             "version": step.get("version", ""),
             "project_path": str(self.current_project_path) if self.current_project_path else "global",
@@ -1046,7 +1080,7 @@ class ScenarioProcessor:
         canvas.step(f"Adding documentation to knowledge base: {doc_path.name}")
 
         try:
-            success, results = self._handle_knowledge_ingestion(doc_path, doc_type, metadata, is_folder=False)
+            success, results = self._handle_knowledge_ingestion(doc_path, step.get("doc_type", "Docs"), metadata, is_folder=False)
             if success:
                 canvas.success(f"✅ Added {doc_path.name}: {results['successful_files']} files, "
                             f"skipped {results['skipped_files']} (cached)")
@@ -1069,6 +1103,7 @@ class ScenarioProcessor:
 
         doc_type = step.get("doc_type", "API Documentation")
         metadata = {
+            "project_name": step.get("project_name"), 
             "framework": step.get("framework", ""),
             "version": step.get("version", ""),
             "project_path": str(self.current_project_path) if self.current_project_path else "global",
@@ -1078,7 +1113,7 @@ class ScenarioProcessor:
         canvas.step(f"Adding documentation folder to knowledge base: {folder_path.name}")
 
         try:
-            success, results = self._handle_knowledge_ingestion(folder_path, doc_type, metadata, is_folder=True)
+            success, results = self._handle_knowledge_ingestion(folder_path, step.get("doc_type", "Docs"), metadata, is_folder=True)
             if success:
                 canvas.success(f"✅ Added {folder_path.name}: {results['successful_files']} files, "
                             f"skipped {results['skipped_files']} (cached)")

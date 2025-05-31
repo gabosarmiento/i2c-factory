@@ -31,9 +31,9 @@ def _should_use_knowledge(modification_step: Dict[str, Any]) -> bool:
     
     return any(keyword in task for keyword in knowledge_worthy) and len(task) > 10
 
-def _get_lean_knowledge_context(session_state: Dict[str, Any], 
-                               modification_step: Dict[str, Any]) -> str:
-    """Get minimal, relevant knowledge context - ONE API call max"""
+def _get_principle_enhanced_context(session_state: Dict[str, Any], 
+                                  modification_step: Dict[str, Any]) -> str:
+    """Transform knowledge using deep contextual understanding"""
     knowledge_base = session_state.get("knowledge_base")
     if not knowledge_base or not _should_use_knowledge(modification_step):
         return ""
@@ -42,26 +42,95 @@ def _get_lean_knowledge_context(session_state: Dict[str, Any],
         task = modification_step.get("what", "")
         file_ext = Path(modification_step.get("file", "")).suffix.lower()
         
-        # Build focused query - no verbose descriptions
-        query_parts = [task.split()[:3]]  # First 3 words only
+        # Multi-modal knowledge retrieval (like Claude)
+        knowledge_queries = {
+            "core_patterns": f"core patterns best practices {task}",
+            "error_patterns": f"common mistakes avoid {task}",
+            "context_patterns": f"when to use {task}",
+            "optimization": f"optimize performance {task}",
+            "integration": f"integrate {task} with existing code"
+        }
+        
+        # Add language context
         if file_ext == ".py":
-            query_parts.append(["python"])
+            for key in knowledge_queries:
+                knowledge_queries[key] += " python"
         elif file_ext in [".js", ".jsx"]:
-            query_parts.append(["javascript"])
-            
-        query = " ".join([" ".join(part) for part in query_parts])
+            for key in knowledge_queries:
+                knowledge_queries[key] += " javascript"
         
-        # ONE focused retrieval - limit=1 for speed
-        chunks = knowledge_base.retrieve_knowledge(query=query, limit=1)
+        # Retrieve all knowledge types
+        all_knowledge = []
+        for query_type, query in knowledge_queries.items():
+            chunks = knowledge_base.retrieve_knowledge(query=query, limit=2)
+            for chunk in chunks:
+                chunk["query_type"] = query_type  # Tag the knowledge type
+                all_knowledge.append(chunk)
         
-        if chunks:
-            content = chunks[0].get("content", "").strip()[:400]  # Keep it short
-            return content
-            
-    except Exception:
+        # Use deep principle transformer
+        from i2c.agents.knowledge.principle_transformer import DeepPrincipleTransformer
+        deep_transformer = DeepPrincipleTransformer()
+        
+        # Extract contextual patterns
+        contextual_patterns = deep_transformer.extract_contextual_patterns(all_knowledge)
+        
+        # Synthesize into expert-level guidance
+        expert_guidance = deep_transformer.synthesize_deep_expertise(contextual_patterns)
+        
+        if expert_guidance:
+            return f"""
+As an expert in {task}, you have internalized deep knowledge that guides your professional judgment:
+
+{expert_guidance}
+
+Apply this expertise naturally - reason through the context, consider edge cases, and implement the optimal solution."""
+        
+    except Exception as e:
+        print(f"Error in deep knowledge processing: {e}")
+        # Fallback to simple approach
         pass
     
     return ""
+
+def _transform_to_principles(patterns, antipatterns, decisions, task):
+    """Convert raw knowledge chunks into internalized expertise"""
+    
+    principles = []
+    
+    # Extract core principles from patterns
+    for chunk in patterns:
+        content = chunk.get("content", "")
+        # Extract actionable insights
+        if "always" in content.lower() or "must" in content.lower():
+            principles.append(f"CORE PRINCIPLE: {content[:200]}")
+        elif "pattern" in content.lower():
+            principles.append(f"APPLY PATTERN: {content[:200]}")
+    
+    # Extract warnings from anti-patterns  
+    for chunk in antipatterns:
+        content = chunk.get("content", "")
+        if "avoid" in content.lower() or "don't" in content.lower():
+            principles.append(f"AVOID: {content[:150]}")
+    
+    # Extract decision guidance
+    for chunk in decisions:
+        content = chunk.get("content", "")
+        if "when" in content.lower() or "if" in content.lower():
+            principles.append(f"DECIDE: {content[:150]}")
+    
+    if not principles:
+        return ""
+    
+    # Format as internalized expertise
+    expertise = f"""
+As an expert in {task}, your internalized knowledge guides you to:
+
+{chr(10).join(f"• {p}" for p in principles[:5])}
+
+Apply this expertise naturally in your implementation."""
+    
+    return expertise
+
 
 # === LEAN KNOWLEDGE INTEGRATION END ===
 
@@ -251,7 +320,7 @@ def _apply_modular_modification(
 ) -> Any:
     try:
         # === LEAN: Get minimal knowledge context (max 1 API call) ===
-        knowledge_context = _get_lean_knowledge_context(session_state, step)
+        knowledge_context = _get_principle_enhanced_context(session_state, step)
         
         base_context = {
             "task": step.get("what", ""),

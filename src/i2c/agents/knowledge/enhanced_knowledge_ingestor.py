@@ -410,7 +410,165 @@ class EnhancedKnowledgeIngestorAgent(ContextAwareOperator):
             canvas.error(f"Error processing file {file_path}: {e}")
             result_stats["failed_files"] += 1
             result_stats["errors"].append(f"Error processing file: {e}")
-    
+
+    def _extract_principles_from_text(self, text: str) -> List[str]:
+        """Extract actionable principles from text"""
+        principles = []
+        lines = text.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            # Look for principle indicators
+            if any(word in line.lower() for word in ['always', 'must', 'should', 'principle', 'rule']):
+                if len(line) > 10 and len(line) < 200:
+                    principles.append(line)
+        
+        return principles[:5]  # Limit to top 5
+
+    def _extract_antipatterns_from_text(self, text: str) -> List[str]:
+        """Extract anti-patterns and things to avoid"""
+        antipatterns = []
+        lines = text.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            # Look for antipattern indicators
+            if any(word in line.lower() for word in ['avoid', 'never', 'don\'t', 'anti-pattern', 'mistake']):
+                if len(line) > 10 and len(line) < 200:
+                    antipatterns.append(line)
+        
+        return antipatterns[:3]  # Limit to top 3
+
+    def _extract_examples_from_text(self, text: str) -> List[str]:
+        """Extract code examples and usage patterns"""
+        examples = []
+        lines = text.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            # Look for example indicators
+            if any(word in line.lower() for word in ['example', 'usage', '```', 'import', 'from', 'def', 'class']):
+                if len(line) > 5 and len(line) < 300:
+                    examples.append(line)
+        
+        return examples[:3]  # Limit to top 3
+
+    def _create_principle_chunk(self, principles: List[str], file_path: Path, chunk_id: int, 
+                            file_hash: str, metadata: Dict[str, Any], document_type: str) -> Dict[str, Any]:
+        """Create a principle-specific chunk"""
+        if not principles:
+            return {}
+        
+        content = "PRINCIPLES:\n" + "\n".join(f"• {p}" for p in principles)
+        vector = self.embed_model.get_embedding(content)
+        
+        return {
+            "source": str(file_path),
+            "content": content,
+            "vector": vector,
+            "category": document_type,
+            "last_updated": _dt.datetime.now().isoformat(),
+            "knowledge_space": self.knowledge_space,
+            "document_type": "principle",
+            "framework": metadata.get("framework", ""),
+            "version": metadata.get("version", ""),
+            "parent_doc_id": "",
+            "chunk_type": f"principle_{chunk_id}",
+            "source_hash": file_hash,
+            "metadata_json": json.dumps(metadata),
+            # NEW ENHANCED FIELDS
+            "knowledge_type": "principle",
+            "application_context": "core_patterns_to_follow",
+            "confidence_score": 1.0,  # Start with high confidence
+            "usage_frequency": 0,
+        }
+
+    def _create_antipattern_chunk(self, antipatterns: List[str], file_path: Path, chunk_id: int,
+                                file_hash: str, metadata: Dict[str, Any], document_type: str) -> Dict[str, Any]:
+        """Create an antipattern-specific chunk"""
+        if not antipatterns:
+            return {}
+        
+        content = "AVOID THESE:\n" + "\n".join(f"• {a}" for a in antipatterns)
+        vector = self.embed_model.get_embedding(content)
+        
+        return {
+            "source": str(file_path),
+            "content": content,
+            "vector": vector,
+            "category": document_type,
+            "last_updated": _dt.datetime.now().isoformat(),
+            "knowledge_space": self.knowledge_space,
+            "document_type": "antipattern",
+            "framework": metadata.get("framework", ""),
+            "version": metadata.get("version", ""),
+            "parent_doc_id": "",
+            "chunk_type": f"antipattern_{chunk_id}",
+            "source_hash": file_hash,
+            "metadata_json": json.dumps(metadata),
+            # NEW ENHANCED FIELDS
+            "knowledge_type": "antipattern",
+            "application_context": "patterns_to_avoid",
+            "confidence_score": 0.9,
+            "usage_frequency": 0,
+        }
+
+    def _create_example_chunk(self, examples: List[str], file_path: Path, chunk_id: int,
+                            file_hash: str, metadata: Dict[str, Any], document_type: str) -> Dict[str, Any]:
+        """Create an example-specific chunk"""
+        if not examples:
+            return {}
+        
+        content = "EXAMPLES:\n" + "\n".join(f"• {e}" for e in examples)
+        vector = self.embed_model.get_embedding(content)
+        
+        return {
+            "source": str(file_path),
+            "content": content,
+            "vector": vector,
+            "category": document_type,
+            "last_updated": _dt.datetime.now().isoformat(),
+            "knowledge_space": self.knowledge_space,
+            "document_type": "example",
+            "framework": metadata.get("framework", ""),
+            "version": metadata.get("version", ""),
+            "parent_doc_id": "",
+            "chunk_type": f"example_{chunk_id}",
+            "source_hash": file_hash,
+            "metadata_json": json.dumps(metadata),
+            # NEW ENHANCED FIELDS
+            "knowledge_type": "example",
+            "application_context": "implementation_examples",
+            "confidence_score": 0.8,
+            "usage_frequency": 0,
+        }
+
+    def _create_raw_chunk(self, text: str, file_path: Path, chunk_id: int,
+                        file_hash: str, metadata: Dict[str, Any], document_type: str) -> Dict[str, Any]:
+        """Create the original raw text chunk"""
+        vector = self.embed_model.get_embedding(text)
+        
+        return {
+            "source": str(file_path),
+            "content": text,
+            "vector": vector,
+            "category": document_type,
+            "last_updated": _dt.datetime.now().isoformat(),
+            "knowledge_space": self.knowledge_space,
+            "document_type": "raw",
+            "framework": metadata.get("framework", ""),
+            "version": metadata.get("version", ""),
+            "parent_doc_id": "",
+            "chunk_type": f"raw_{chunk_id}",
+            "source_hash": file_hash,
+            "metadata_json": json.dumps(metadata),
+            # NEW ENHANCED FIELDS
+            "knowledge_type": "raw",
+            "application_context": "general_reference",
+            "confidence_score": 0.7,
+            "usage_frequency": 0,
+        }
+ 
     def _extract_and_embed_chunks(
         self, 
         file_path: Path, 
@@ -442,28 +600,22 @@ class EnhancedKnowledgeIngestorAgent(ContextAwareOperator):
             text = getattr(doc, 'content', str(doc))
             if not text.strip():
                 continue
-                
-            vector = self.embed_model.get_embedding(text)
             
-            chunk = {
-                "source": str(file_path),
-                "content": text,
-                "vector": vector,
-                "category": document_type,
-                "last_updated": _dt.datetime.now().isoformat(),
-                "knowledge_space": self.knowledge_space,
-                "document_type": document_type,
-                "framework": metadata.get("framework", ""),
-                "version": metadata.get("version", ""),
-                "parent_doc_id": "",
-                "chunk_type": f"chunk_{i}",
-                "source_hash": file_hash,
-                "metadata_json": json.dumps(metadata),
-            }
-            chunks.append(chunk)
+            # NEW: Extract principles during ingestion
+            principles = self._extract_principles_from_text(text)
+            antipatterns = self._extract_antipatterns_from_text(text) 
+            examples = self._extract_examples_from_text(text)
+            
+            # Create multiple chunk types
+            chunks.extend([
+                self._create_principle_chunk(principles, file_path, i, file_hash, metadata, document_type),
+                self._create_antipattern_chunk(antipatterns, file_path, i, file_hash, metadata, document_type),
+                self._create_example_chunk(examples, file_path, i, file_hash, metadata, document_type),
+                self._create_raw_chunk(text, file_path, i, file_hash, metadata, document_type)
+            ])
         
         return chunks
-    
+
     def _process_pdf(self, file_path: Path):
         """Process PDF files"""
         try:

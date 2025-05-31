@@ -23,7 +23,7 @@ def initialize_groq_providers():
 
     llm_highest = Groq(
         # id="meta-llama/llama-4-maverick-17b-128e-instruct",
-        id="llama-3.3-70b-versatile",
+        id="llama-3.1-8b-instant",
         api_key=GROQ_API_KEY,
         temperature=0.5
     )

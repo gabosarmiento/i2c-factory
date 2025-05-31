@@ -51,7 +51,9 @@ def _safe_json_loads(text: str) -> dict | None:
             from i2c.agents.core_agents import input_processor_agent
             canvas.info("Processing JSON prompt content...")
             
-            response = input_processor_agent.run(prompt_content)
+            from i2c.agents.core_agents import get_rag_enabled_agent
+            temp_agent = get_rag_enabled_agent("input_processor")
+            response = temp_agent.run(prompt_content)
             response_content = response.content if hasattr(response, 'content') else str(response)
             
             try:
@@ -212,7 +214,9 @@ def handle_load_project(path_str: str) -> tuple[Path | None, dict | None]:
                  prompt += "\n... (more files exist)"
 
             # Use direct run - error handling below
-            response = project_context_analyzer_agent.run(prompt)
+            from i2c.agents.core_agents import get_rag_enabled_agent
+            temp_agent = get_rag_enabled_agent("project_context_analyzer")
+            response = temp_agent.run(prompt)
             analysis_json = response.content if hasattr(response, "content") else str(response)
             analysis_data = _safe_json_loads(analysis_json) # Use safe JSON parsing
 
@@ -263,7 +267,9 @@ def handle_new_project_idea(raw_idea: str, budget_manager: BudgetManagerAgent, b
     response_content = None
     processed_goal = None
     try:
-        response = input_processor_agent.run(raw_idea)
+        from i2c.agents.core_agents import get_rag_enabled_agent
+        temp_agent = get_rag_enabled_agent("input_processor")
+        response = temp_agent.run(raw_idea)
         response_content = response.content if hasattr(response, 'content') else str(response)
         processed_goal = _safe_json_loads(response_content) # Use safe JSON parsing
         if not isinstance(processed_goal, dict) or "objective" not in processed_goal or "language" not in processed_goal:
