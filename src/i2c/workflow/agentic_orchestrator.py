@@ -326,7 +326,7 @@ async def execute_agentic_evolution(
     session_state: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
-    Orchestrate an agentic evolution run with architectural intelligence enforcement.
+    Orchestrate an agentic evolution run with knowledge-driven intelligence.
     """
 
     if session_state is None:
@@ -343,6 +343,32 @@ async def execute_agentic_evolution(
     # Add reflection memory if not already present
     if "reflection_memory" not in session_state:
         session_state["reflection_memory"] = []
+    
+    # NEW: Ensure knowledge context is available for all teams
+    if "retrieved_context" not in session_state and "knowledge_base" in session_state:
+        try:
+            knowledge_base = session_state["knowledge_base"]
+            task = objective.get("task", "")
+            
+            if hasattr(knowledge_base, 'retrieve_knowledge'):
+                knowledge_items = knowledge_base.retrieve_knowledge(task, limit=5)
+                if knowledge_items:
+                    context_parts = []
+                    for item in knowledge_items:
+                        context_parts.append(f"Source: {item.get('source', 'Unknown')}")
+                        context_parts.append(item.get('content', ''))
+                        context_parts.append("---")
+                    session_state["retrieved_context"] = "\n".join(context_parts)
+                    canvas.info(f"🧠 Retrieved knowledge context for agentic evolution: {len(knowledge_items)} items")
+
+                    # DEBUG: Check knowledge content
+                    canvas.info(f"🔍 DEBUG: Knowledge context length: {len(session_state['retrieved_context'])} chars")
+                    canvas.info(f"🔍 DEBUG: Contains 'Agent': {'Agent' in session_state['retrieved_context']}")
+                    canvas.info(f"🔍 DEBUG: Contains 'Team': {'Team' in session_state['retrieved_context']}")
+                    canvas.info(f"🔍 DEBUG: Context preview: {session_state['retrieved_context'][:200]}...")
+                    
+        except Exception as e:
+            canvas.warning(f"Failed to retrieve knowledge context: {e}")
 
     # Enhance objective with reflection context if we have previous steps
 
@@ -492,22 +518,6 @@ async def execute_agentic_evolution(
     message = Message(role="user", content=json.dumps(team_input))
     result = await team.arun(message=message)
 
-    # Handle intermediate events if paused
-    # intermediate_events = {"run_paused", "waiting", "intermediate"}
-    # max_wait = 30  # seconds
-    # waited = 0
-    # while getattr(result, "event", None) in intermediate_events:
-    #     canvas.info(f"Waiting on agentic evolution, current state: {result.event}")
-    #     await asyncio.sleep(1)
-    #     waited += 1
-    #     if waited >= max_wait:
-    #         canvas.error("Timed out waiting for sandbox container to start.Is Docker running?")
-    #         raise RuntimeError("SandboxExecutorAgent start timeout")
-    #     if hasattr(team, "resume_run"):
-    #         result = await team.resume_run(result.run_id)
-    #     else:
-    #         result = await team.get_next_result(result.run_id)
-    
     # Skip sandbox waiting entirely - proceed with what we have
     if getattr(result, "event", None) in {"waiting", "run_paused", "intermediate"}:
         canvas.warning(f"Skipping sandbox wait (state: {result.event}) - proceeding with available content")

@@ -319,7 +319,7 @@ def _apply_modular_modification(
     session_state: Dict[str, Any]
 ) -> Any:
     try:
-        # === LEAN: Get minimal knowledge context (max 1 API call) ===
+        # === Enhanced: Get knowledge context and enhance agents ===
         knowledge_context = _get_principle_enhanced_context(session_state, step)
         
         base_context = {
@@ -329,13 +329,27 @@ def _apply_modular_modification(
             "context_hint": retrieved_context[:200] if retrieved_context else ""
         }
         
-        # Add knowledge only if we got some
+        # Add knowledge context if available
         if knowledge_context:
-            base_context["knowledge_hint"] = knowledge_context  # Renamed to hint - it's minimal
+            base_context["knowledge_hint"] = knowledge_context
         
+        # NEW: Create team with knowledge enhancement
         team = _create_modular_retrieval_team(session_state)
-        team_prompt = json.dumps(base_context)
         
+        # NEW: Enhance team agents with knowledge
+        if hasattr(team, 'members') and session_state.get("retrieved_context"):
+            from i2c.agents.core_team.enhancer import AgentKnowledgeEnhancer
+            enhancer = AgentKnowledgeEnhancer()
+            
+            for member in team.members:
+                if hasattr(member, 'name'):
+                    agent_type = "analyzer" if "analyzer" in member.name.lower() else "implementer"
+                    enhancer.enhance_agent_with_knowledge(
+                        member, session_state["retrieved_context"], agent_type, step.get("what", "")
+                    )
+                    print(f"🧠 Enhanced {member.name} with knowledge patterns")
+        
+        team_prompt = json.dumps(base_context)
         response = team.run(team_prompt)
         content = getattr(response, "content", str(response))
         result = robust_json_parse(content)

@@ -21,7 +21,8 @@ def route_and_execute_with_recovery(
     action_detail: any,
     current_project_path: Path,
     current_structured_goal: dict | None,
-    max_retries: int = 0  # Allow for retries
+    max_retries: int = 0,  # Allow for retries
+    session_state: dict = None  # ADD THIS
 ) -> bool:
     """Enhanced route_and_execute with error recovery"""
     from i2c.cli.controller import canvas
@@ -42,7 +43,8 @@ def route_and_execute_with_recovery(
                 action_type=action_type,
                 action_detail=action_detail,
                 current_project_path=current_project_path,
-                current_structured_goal=current_structured_goal
+                current_structured_goal=current_structured_goal,
+                session_state=session_state
             )
             
             if success:
@@ -99,7 +101,8 @@ def route_and_execute(
     current_project_path: Path,
     current_structured_goal: dict | None,
     architectural_context: Dict[str, Any] = None,
-    budget_manager: Any = None 
+    budget_manager: Any = None, 
+    session_state: Dict[str, Any] = None    
 ) -> bool:
     """
     Routes action to appropriate workflows using WorkflowController.
@@ -153,7 +156,8 @@ def route_and_execute(
                 action_type=action_type,
                 action_detail=action_detail,
                 project_path=current_project_path,
-                structured_goal=current_structured_goal
+                structured_goal=current_structured_goal, 
+                session_state=session_state
             )
             
             # Show completion and generated files

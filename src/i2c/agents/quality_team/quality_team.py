@@ -215,12 +215,54 @@ class QualityLeadAgent(Agent):
             pass
         return []
 
+    async def _run_knowledge_validation(
+        self, modified_files: Dict[str, str], context: str = ""
+    ) -> Dict[str, Any]:
+        """Run knowledge pattern validation"""
+        try:
+            # Check if we have knowledge context
+            if not self.team_session_state or "retrieved_context" not in self.team_session_state:
+                return {"passed": True, "issues": [], "message": "No knowledge context available"}
+            
+            from i2c.agents.knowledge.knowledge_validator import KnowledgeValidator
+            
+            validator = KnowledgeValidator()
+            validation_result = validator.validate_generation_output(
+                generated_files=modified_files,
+                retrieved_context=self.team_session_state["retrieved_context"],
+                task_description="Quality validation of modified files"
+            )
+            
+            # Convert ValidationResult to dict
+            knowledge_issues = []
+            if not validation_result.success:
+                knowledge_issues = validation_result.violations
+            
+            canvas.info(f"🧪 Knowledge validation score: {validation_result.score:.2f}")
+            
+            return {
+                "passed": validation_result.success,
+                "issues": knowledge_issues,
+                "score": validation_result.score,
+                "applied_patterns": validation_result.applied_patterns,
+                "missing_patterns": validation_result.missing_patterns
+            }
+            
+        except Exception as e:
+            canvas.error(f"[QualityLeadAgent] Error in knowledge validation: {e}")
+            return {
+                "passed": False,
+                "issues": [f"Knowledge validation error: {str(e)}"],
+                "score": 0.0,
+                "applied_patterns": [],
+                "missing_patterns": []
+            }
     
     async def validate_changes(
-        self, project_path: Path, modified_files: Dict[str, str], quality_gates: List[str] = None
-    ) -> Dict[str, Any]:
+            self, project_path: Path, modified_files: Dict[str, str], quality_gates: List[str] = None
+        ) -> Dict[str, Any]:
         """
-        Validate code changes for quality.
+        Validate code changes for quality with knowledge pattern validation.
         
         Args:
             project_path: Path to the project directory
@@ -229,7 +271,7 @@ class QualityLeadAgent(Agent):
                            or preset gate groups like 'python', 'all', etc.
             
         Returns:
-            Dictionary with validation results
+            Dictionary with validation results including knowledge compliance
         """
         if quality_gates is None:
             presets = await self._decide_quality_gate_presets_with_llm(project_path, modified_files)
@@ -268,19 +310,25 @@ class QualityLeadAgent(Agent):
                 project_path, modified_files, context
             )
             
-            # 5. Guardrail check - include enterprise results
+            # NEW: 5. Knowledge pattern validation
+            knowledge_validation_results = await self._run_knowledge_validation(
+                modified_files, context
+            )
+            
+            # 6. Guardrail check - include all results
             guardrail_results = await self._run_guardrail_checks(
                 static_analysis_results, 
                 review_results, 
                 integration_results,
                 enterprise_results,
+                knowledge_validation_results,
                 context
             )
             
-            # 6. Determine overall pass/fail
+            # 7. Determine overall pass/fail
             all_passed = guardrail_results.get("decision") == "CONTINUE"
             
-            # 7. Collect issues
+            # 8. Collect issues
             issues = []
             issues.extend(static_analysis_results.get("issues", []))
             issues.extend(review_results.get("issues", []))

@@ -379,7 +379,7 @@ def add_knowledge_chunks(
         # Create a copy to avoid modifying the original
         chunk = c.copy()
         
-        # Set default values for required fields
+        # Set default values for required fields (original)
         chunk.setdefault("knowledge_space", knowledge_space)
         chunk.setdefault("last_updated", datetime.now().isoformat())
         chunk.setdefault("category", chunk.get("category", "general"))
@@ -389,6 +389,12 @@ def add_knowledge_chunks(
         chunk.setdefault("parent_doc_id", chunk.get("parent_doc_id", ""))
         chunk.setdefault("chunk_type", chunk.get("chunk_type", "text"))
         chunk.setdefault("source_hash", chunk.get("source_hash", ""))
+        
+        # Set default values for ENHANCED fields (these were missing!)
+        chunk.setdefault("knowledge_type", chunk.get("knowledge_type", "raw"))
+        chunk.setdefault("application_context", chunk.get("application_context", "general_reference"))
+        chunk.setdefault("confidence_score", chunk.get("confidence_score", 0.7))
+        chunk.setdefault("usage_frequency", chunk.get("usage_frequency", 0))
         
         # Handle metadata
         if "metadata" in chunk and isinstance(chunk["metadata"], dict):
@@ -406,7 +412,6 @@ def add_knowledge_chunks(
     except Exception as e:
         canvas.error(f"Error adding knowledge chunks: {e}")
         return False
-
 # --- Utilities ---
 
 def list_knowledge_spaces(db: lancedb.db.LanceDBConnection) -> List[str]:

@@ -380,13 +380,26 @@ class EnhancedKnowledgeIngestorAgent(ContextAwareOperator):
             if not db:
                 raise RuntimeError("Database connection failed")
 
+            canvas.info(f"🔍 DEBUG: About to add {len(chunks)} chunks to database")
+            canvas.info(f"🔍 DEBUG: First chunk preview: {chunks[0].get('content', '')[:100] if chunks else 'No chunks'}...")
+
             success = add_knowledge_chunks(db, chunks, self.knowledge_space)
-            
+
+            canvas.info(f"🔍 DEBUG: add_knowledge_chunks returned: {success}")
+
+            # Verify chunks were actually added
+            try:
+                from i2c.db_utils import TABLE_KNOWLEDGE_BASE
+                kb_table = db.open_table(TABLE_KNOWLEDGE_BASE)
+                df_after = kb_table.to_pandas()
+                canvas.info(f"🔍 DEBUG: Database rows after ingestion: {len(df_after)}")
+            except Exception as e:
+                canvas.error(f"🔍 DEBUG: Failed to verify ingestion: {e}")
+
             if success:
                 canvas.success(f"Successfully ingested: {file_path.name} ({len(chunks)} chunks)")
                 result_stats["successful_files"] += 1
-                result_stats["chunks_created"] += len(chunks)
-                
+                result_stats["chunks_created"] += len(chunks)                
                 # Update cache
                 stat = file_path.stat()
                 file_hash = self.cache._compute_file_hash(file_path)
@@ -577,9 +590,13 @@ class EnhancedKnowledgeIngestorAgent(ContextAwareOperator):
     ) -> List[Dict[str, Any]]:
         """Extract content and create embedding chunks"""
         
+        canvas.info(f"🔍 DEBUG: Starting chunk extraction for {file_path}")
+        
         # Handle different file types
         if file_path.suffix.lower() == ".pdf":
+            canvas.info(f"🔍 DEBUG: Processing PDF file")
             documents = self._process_pdf(file_path)
+            canvas.info(f"🔍 DEBUG: PDF processing returned {len(documents) if documents else 0} documents")
         elif file_path.suffix.lower() in ['.md', '.markdown']:
             documents = self._process_markdown(file_path)
         elif file_path.suffix.lower() in ['.html', '.htm']:
@@ -590,30 +607,63 @@ class EnhancedKnowledgeIngestorAgent(ContextAwareOperator):
             documents = self._process_text(file_path)
         
         if not documents:
+            canvas.warning(f"🔍 DEBUG: No documents extracted from {file_path}")
             return []
         
         # Create chunks with embeddings
         chunks = []
         file_hash = self.cache._compute_file_hash(file_path)
         
+        canvas.info(f"🔍 DEBUG: Creating chunks for {len(documents)} documents")
+        
         for i, doc in enumerate(documents):
+            # Add safety limit to prevent infinite loops
+            if i > 100:
+                canvas.warning(f"🔍 DEBUG: Hit document limit, stopping at {i}")
+                break
+                
             text = getattr(doc, 'content', str(doc))
             if not text.strip():
+                canvas.info(f"🔍 DEBUG: Skipping empty document {i}")
                 continue
             
-            # NEW: Extract principles during ingestion
-            principles = self._extract_principles_from_text(text)
-            antipatterns = self._extract_antipatterns_from_text(text) 
-            examples = self._extract_examples_from_text(text)
+            canvas.info(f"🔍 DEBUG: Processing document {i+1}/{min(len(documents), 100)}")
             
-            # Create multiple chunk types
-            chunks.extend([
-                self._create_principle_chunk(principles, file_path, i, file_hash, metadata, document_type),
-                self._create_antipattern_chunk(antipatterns, file_path, i, file_hash, metadata, document_type),
-                self._create_example_chunk(examples, file_path, i, file_hash, metadata, document_type),
-                self._create_raw_chunk(text, file_path, i, file_hash, metadata, document_type)
-            ])
+            try:
+                # Create embedding for this chunk
+                canvas.info(f"🔍 DEBUG: Creating embedding for document {i}")
+                vector = self.embed_model.get_embedding(text)
+                canvas.info(f"🔍 DEBUG: Embedding created successfully for document {i}")
+                
+                # Create single chunk (simplified - no multiple types)
+                chunk = {
+                    "source": str(file_path),
+                    "content": text,
+                    "vector": vector,
+                    "category": document_type,
+                    "last_updated": _dt.datetime.now().isoformat(),
+                    "knowledge_space": self.knowledge_space,
+                    "document_type": "raw",
+                    "framework": metadata.get("framework", ""),
+                    "version": metadata.get("version", ""),
+                    "parent_doc_id": "",
+                    "chunk_type": f"raw_{i}",
+                    "source_hash": file_hash,
+                    "metadata_json": json.dumps(metadata),
+                    "knowledge_type": "raw",
+                    "application_context": "general_reference",
+                    "confidence_score": 0.7,
+                    "usage_frequency": 0,
+                }
+                
+                chunks.append(chunk)
+                canvas.info(f"🔍 DEBUG: Added chunk {i} to collection")
+                
+            except Exception as e:
+                canvas.error(f"🔍 DEBUG: Error creating chunk {i}: {e}")
+                continue
         
+        canvas.info(f"🔍 DEBUG: Finished creating {len(chunks)} chunks")
         return chunks
 
     def _process_pdf(self, file_path: Path):

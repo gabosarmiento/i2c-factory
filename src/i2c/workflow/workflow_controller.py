@@ -145,7 +145,7 @@ class WorkflowController:
             
         return success
             
-    def run_generation_cycle(self, structured_goal: dict, project_path: Path) -> bool:
+    def run_generation_cycle(self, structured_goal: dict, project_path: Path, session_state: dict = None) -> bool:
         """
         Run the generation cycle workflow with recovery.
         
@@ -172,6 +172,17 @@ class WorkflowController:
             "project_path": str(project_path),
             "language": structured_goal.get("language")
         })
+
+        # Merge in the passed session_state (contains knowledge_base)
+        if session_state:
+            workflow.session_state.update(session_state)
+            canvas.info(f"🔍 DEBUG: Merged session_state into GenerationWorkflow: {'knowledge_base' in session_state}")
+            
+            # Verify knowledge_base is now in workflow session_state
+            if 'knowledge_base' in workflow.session_state:
+                canvas.success("✅ DEBUG: Knowledge base successfully passed to GenerationWorkflow")
+            else:
+                canvas.error("❌ DEBUG: Knowledge base missing after merge")
         
         success = self.run_workflow_with_recovery(
             workflow, 
@@ -300,7 +311,8 @@ class WorkflowController:
         return success
     
     def run_complete_workflow(self, action_type: str, action_detail: Any, 
-                             project_path: Path, structured_goal: dict) -> bool:
+                            project_path: Path, structured_goal: dict, 
+                            session_state: dict = None) -> bool:
         """
         Run the complete workflow sequence (main cycle, SRE, quality).
         
@@ -324,9 +336,13 @@ class WorkflowController:
         # 1. Run main cycle (generation or modification)
         if action_type == "generate":
             canvas.info(f"🏭 [WorkflowController] Starting Generation Cycle...")
+            # Pass session_state to generation cycle
+            if session_state:
+                canvas.info(f"🔍 DEBUG: Passing session_state to generation cycle: {'knowledge_base' in session_state}")
             main_cycle_success = self.run_generation_cycle(
                 structured_goal=action_detail,
-                project_path=project_path
+                project_path=project_path,
+                session_state=session_state  # ADD THIS
             )
         elif action_type == "modify":
             canvas.info(f"🏭 [WorkflowController] Starting Modification Cycle...")

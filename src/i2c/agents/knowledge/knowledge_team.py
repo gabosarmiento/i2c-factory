@@ -6,6 +6,7 @@ import asyncio
 from builtins import llm_highest, llm_middle
 from agno.team import Team
 from agno.agent import Agent
+import traceback
 
 # Import existing knowledge components
 from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIngestorAgent
@@ -226,23 +227,40 @@ class KnowledgeLeadAgent(Agent):
         """Retrieve relevant documentation for the task"""
         documentation = {"references": [], "api_docs": {}}
         
+        # DEBUG: Check what knowledge manager we're using
+        canvas.info(f"🔍 DEBUG: Knowledge manager available: {self.knowledge_manager is not None}")
+        
         # Use the ExternalKnowledgeManager if available
         if self.knowledge_manager:
             try:
+                canvas.info(f"🔍 DEBUG: Querying knowledge manager for: {task}")
+                
                 # Retrieve knowledge for the task
                 knowledge_items = self.knowledge_manager.retrieve_knowledge(
                     query=task,
                     limit=5
                 )
                 
+                canvas.info(f"🔍 DEBUG: Knowledge manager returned {len(knowledge_items)} items")
+                
                 if knowledge_items:
+                    for i, item in enumerate(knowledge_items[:2]):
+                        if isinstance(item, dict):
+                            content_preview = item.get('content', str(item))[:100]
+                        else:
+                            content_preview = str(item)[:100]
+                        canvas.info(f"🔍 DEBUG: Item {i}: {content_preview}...")
+                    
                     documentation["references"] = knowledge_items
             except Exception as e:
                 canvas.warning(f"Error retrieving documentation: {e}")
+                canvas.error(f"🔍 DEBUG: Full error: {traceback.format_exc()}")
                 documentation["error"] = str(e)
+        else:
+            canvas.error("🔍 DEBUG: No knowledge manager available!")
         
         return documentation
-    
+
     async def _identify_best_practices(self, task: str, languages: Dict[str, int]) -> List[Dict[str, str]]:
         """Identify best practices for the task and languages"""
         best_practices = []

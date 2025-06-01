@@ -29,7 +29,8 @@ def create_simple_scenario():
                 "framework": "AGNO",
                 "version": "latest",
                 "project_name": "agno_task_system",
-                "global": True
+                "global": True,
+                "force_refresh": False
             },
             {
                 "type": "knowledge",
@@ -39,7 +40,8 @@ def create_simple_scenario():
                 "framework": "AGNO",
                 "version": "latest",
                 "project_name": "agno_task_system",
-                "global": True
+                "global": True,
+                "force_refresh": False
             },
             {
                 "type": "initial_generation",

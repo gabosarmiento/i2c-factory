@@ -236,7 +236,7 @@ class ScenarioProcessor:
             raise
     
     def ensure_database_tables(self) -> bool:
-        """Ensure all required database tables exist before processing"""
+        """Ensure all required database tables exist without destroying data"""
         try:
             from i2c.db_utils import (
                 get_db_connection, 
@@ -253,12 +253,23 @@ class ScenarioProcessor:
                 canvas.error("Failed to connect to database")
                 return False
             
-            # Create code_context table directly
+            # Check if knowledge_base has data and preserve it
+            preserve_knowledge = False
+            try:
+                if TABLE_KNOWLEDGE_BASE in db.table_names():
+                    kb_table = db.open_table(TABLE_KNOWLEDGE_BASE)
+                    row_count = len(kb_table.to_pandas())
+                    if row_count > 0:
+                        canvas.success(f"✅ Preserving existing knowledge_base with {row_count} rows")
+                        preserve_knowledge = True
+            except Exception as e:
+                canvas.warning(f"Error checking knowledge_base: {e}")
+            
+            # Handle code_context table (always recreate)
             try:
                 if TABLE_CODE_CONTEXT in db.table_names():
                     canvas.info(f"Dropping existing {TABLE_CODE_CONTEXT} table")
                     db.drop_table(TABLE_CODE_CONTEXT)
-                    
                 canvas.info(f"Creating {TABLE_CODE_CONTEXT} table")
                 code_tbl = db.create_table(TABLE_CODE_CONTEXT, schema=SCHEMA_CODE_CONTEXT)
                 canvas.success(f"Created {TABLE_CODE_CONTEXT} table")
@@ -266,30 +277,22 @@ class ScenarioProcessor:
                 canvas.error(f"Failed to create {TABLE_CODE_CONTEXT} table: {e}")
                 return False
             
-            # Create knowledge_base table directly
+            # Handle knowledge_base table (preserve if has data)
             try:
-                if TABLE_KNOWLEDGE_BASE in db.table_names():
-                    canvas.info(f"Dropping existing {TABLE_KNOWLEDGE_BASE} table")
-                    db.drop_table(TABLE_KNOWLEDGE_BASE)
-                    
-                canvas.info(f"Creating {TABLE_KNOWLEDGE_BASE} table")
-                kb_tbl = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE)
-                canvas.success(f"Created {TABLE_KNOWLEDGE_BASE} table")
+                if preserve_knowledge:
+                    canvas.info(f"Keeping existing {TABLE_KNOWLEDGE_BASE} table with data")
+                else:
+                    if TABLE_KNOWLEDGE_BASE in db.table_names():
+                        canvas.info(f"Dropping existing {TABLE_KNOWLEDGE_BASE} table")
+                        db.drop_table(TABLE_KNOWLEDGE_BASE)
+                    canvas.info(f"Creating {TABLE_KNOWLEDGE_BASE} table")
+                    kb_tbl = db.create_table(TABLE_KNOWLEDGE_BASE, schema=SCHEMA_KNOWLEDGE_BASE)
+                    canvas.success(f"Created {TABLE_KNOWLEDGE_BASE} table")
             except Exception as e:
-                canvas.error(f"Failed to create {TABLE_KNOWLEDGE_BASE} table: {e}")
+                canvas.error(f"Failed to handle {TABLE_KNOWLEDGE_BASE} table: {e}")
                 return False
-            canvas.success("Database tables created successfully")
-        
             
-            if hasattr(self, 'reader_agent') and self.reader_agent is not None:
-                from i2c.agents.modification_team.context_reader.context_reader_agent import ContextReaderAgent
-                try:
-                    canvas.info("Reinitializing context reader agent...")
-                    self.reader_agent = ContextReaderAgent(project_path=self.current_project_path)
-                    canvas.success("Context reader agent reinitialized")
-                except Exception as e:
-                    canvas.error(f"Error reinitializing context reader agent: {e}")
-            
+            canvas.success("Database tables handled successfully")
             return True
         except Exception as e:
             canvas.error(f"Error ensuring database tables: {e}")
@@ -322,9 +325,7 @@ class ScenarioProcessor:
             canvas.info("Checking knowledge base connectivity...")
             self.debug_knowledge_base()
             
-            canvas.info("Ensuring database tables exist...")
-            if not self.ensure_database_tables():
-                canvas.warning("Database table setup failed, some operations may not work correctly")
+            canvas.info("Database tables already exist - skipping recreation to preserve knowledge")
             
             # Process each step in the scenario
             for i, step in enumerate(self.scenario_data):
@@ -466,6 +467,28 @@ class ScenarioProcessor:
             proc = self._enhance_objective_with_architectural_rules(proc, raw_idea)
             
             self.current_structured_goal = proc
+            # DEBUG: Test knowledge retrieval immediately
+            try:
+                from i2c.db_utils import get_db_connection
+                db = get_db_connection()
+                if db and "knowledge_base" in db.table_names():
+                    kb_table = db.open_table("knowledge_base")
+                    df = kb_table.to_pandas()
+                    canvas.info(f"🔍 DEBUG: Knowledge base has {len(df)} total rows")
+                    
+                    # Test actual retrieval
+                    if hasattr(self, 'session_state') and self.session_state and 'knowledge_base' in self.session_state:
+                        kb = self.session_state['knowledge_base']
+                        test_chunks = kb.retrieve_knowledge("AGNO Agent Team", limit=3)
+                        canvas.info(f"🔍 DEBUG: Retrieved {len(test_chunks)} AGNO chunks from session KB")
+                        for i, chunk in enumerate(test_chunks[:1]):
+                            canvas.info(f"📄 DEBUG Chunk {i}: {chunk.get('content', '')[:200]}...")
+                    else:
+                        canvas.error("🔍 DEBUG: No knowledge_base in session_state!")
+                else:
+                    canvas.error("🔍 DEBUG: No knowledge_base table found in DB!")
+            except Exception as e:
+                canvas.error(f"🔍 DEBUG: Knowledge retrieval test failed: {e}")
             canvas.success(f"Objective: {proc['objective']}")
             canvas.success(f"Language:  {proc['language']}")
             canvas.success(f"System Type: {proc.get('system_type', 'auto-detected')}")
@@ -492,12 +515,123 @@ class ScenarioProcessor:
         # ENHANCED: Initialize architectural context early
         self._initialize_architectural_context()
         
-        # Ensure database tables exist before context indexing
-        self.ensure_database_tables()
+        # Tables already exist from scenario start - don't recreate
+        canvas.info("🔍 DEBUG: Skipping table recreation to preserve knowledge data")       
         
         # Reinitialize context reader agent
         from i2c.agents.modification_team.context_reader.context_reader_agent import ContextReaderAgent
         self.reader_agent = ContextReaderAgent(project_path=self.current_project_path)
+        # DEBUG: Create knowledge base instance for session state
+        try:
+            from i2c.workflow.modification.rag_config import get_embed_model
+            from i2c.db_utils import get_db_connection
+            
+            db = get_db_connection()
+            embed_model = get_embed_model()
+            
+            if db and embed_model:
+                # Create a knowledge base object that agents can use
+                class SessionKnowledgeBase:
+                    def __init__(self, db, embed_model, knowledge_space="agno_task_system"):
+                        self.db = db
+                        self.embed_model = embed_model
+                        self.knowledge_space = knowledge_space
+                    
+                    def retrieve_knowledge(self, query, limit=5):
+                        from i2c.db_utils import query_context, TABLE_KNOWLEDGE_BASE
+                        
+                        try:
+                            # Convert text query to vector using embed model
+                            query_vector = self.embed_model.get_embedding(query)
+                            canvas.info(f"🔍 DEBUG: Created vector for query '{query}': {len(query_vector)} dimensions")
+                            
+                            # Query the knowledge base table
+                            df = query_context(
+                                db=self.db,
+                                table_name=TABLE_KNOWLEDGE_BASE,
+                                query_vector=query_vector,
+                                limit=limit
+                            )
+                            
+                            if df is not None and not df.empty:
+                                # Convert DataFrame to list of dicts (matching expected format)
+                                results = []
+                                for _, row in df.iterrows():
+                                    results.append({
+                                        'source': row['source'],
+                                        'content': row['content'],
+                                        'category': row.get('category', ''),
+                                        'knowledge_space': row.get('knowledge_space', ''),
+                                        'framework': row.get('framework', '')
+                                    })
+                                canvas.info(f"🔍 DEBUG: Retrieved {len(results)} knowledge items")
+                                return results
+                            else:
+                                canvas.warning(f"🔍 DEBUG: No results for query '{query}'")
+                                return []
+                                
+                        except Exception as e:
+                            canvas.error(f"🔍 DEBUG: Knowledge retrieval failed: {e}")
+                            return []
+                
+                # Initialize session state if not exists
+                if not hasattr(self, 'session_state') or self.session_state is None:
+                    self.session_state = {}
+                
+                # Add knowledge base to session state
+                self.session_state["knowledge_base"] = SessionKnowledgeBase(db, embed_model)
+                canvas.success("🧠 DEBUG: Knowledge base added to session state")
+                
+                # Test retrieval immediately
+                kb = self.session_state["knowledge_base"]
+                test_chunks = kb.retrieve_knowledge("AGNO Agent Team", limit=3)
+                canvas.info(f"🔍 DEBUG: Test retrieval got {len(test_chunks)} chunks")
+                # Test retrieval immediately
+                kb = self.session_state["knowledge_base"]
+                test_chunks = kb.retrieve_knowledge("AGNO Agent Team", limit=3)
+                canvas.info(f"🔍 DEBUG: Test retrieval got {len(test_chunks)} chunks")
+
+                # ADD THIS DEBUG BLOCK HERE:
+                try:
+                    # Direct database inspection
+                    if db and "knowledge_base" in db.table_names():
+                        kb_table = db.open_table("knowledge_base")
+                        df = kb_table.to_pandas()
+                        
+                        canvas.info(f"🔍 DEBUG: Total rows in knowledge_base: {len(df)}")
+                        canvas.info(f"🔍 DEBUG: Knowledge spaces: {df['knowledge_space'].unique().tolist()}")
+                        canvas.info(f"🔍 DEBUG: Sample content preview:")
+                        
+                        for i, row in df.head(3).iterrows():
+                            canvas.info(f"  Row {i}: space='{row['knowledge_space']}', content='{row['content'][:100]}...'")
+                        
+                        # Test raw query without filters
+                        test_vector = embed_model.get_embedding("AGNO")
+                        raw_results = kb_table.search(test_vector).limit(3).to_pandas()
+                        canvas.info(f"🔍 DEBUG: Raw vector search found {len(raw_results)} results")
+                        
+                except Exception as e:
+                    canvas.error(f"🔍 DEBUG: Database inspection failed: {e}")
+
+
+                # ADD THIS: Store retrieved context for agent enhancement
+                if test_chunks:
+                    retrieved_context_parts = []
+                    for chunk in test_chunks:
+                        retrieved_context_parts.append(f"Source: {chunk.get('source', 'Unknown')}")
+                        retrieved_context_parts.append(chunk.get('content', ''))
+                        retrieved_context_parts.append("---")
+                    
+                    self.session_state["retrieved_context"] = "\n".join(retrieved_context_parts)
+                    canvas.success(f"🧠 DEBUG: Added retrieved_context to session_state: {len(self.session_state['retrieved_context'])} chars")
+                else:
+                    canvas.warning("🔍 DEBUG: No test chunks found for retrieved_context")
+                
+            else:
+                canvas.error("🔍 DEBUG: Failed to create knowledge base - missing db or embed_model")
+                
+        except Exception as e:
+            canvas.error(f"🔍 DEBUG: Error creating knowledge base: {e}")
 
         # Now the agent should see the freshly created tables
         status = self.reader_agent.index_project_context()
@@ -514,13 +648,15 @@ class ScenarioProcessor:
             # Get start cost for operation tracking
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
             
-            # ENHANCED: Pass architectural context to generation
+            # ENHANCED: Pass session state with knowledge base to generation
+            canvas.info(f"🔍 DEBUG: Passing session_state with knowledge_base: {'knowledge_base' in (self.session_state or {})}")
             result = route_and_execute(
                 action_type='generate',
                 action_detail=self.current_structured_goal,
                 current_project_path=self.current_project_path,
                 current_structured_goal=self.current_structured_goal,
-                architectural_context=(self.session_state or {}).get("architectural_context", {})  # NEW
+                architectural_context=(self.session_state or {}).get("architectural_context", {}),
+                session_state=self.session_state  # PASS THE FULL SESSION STATE
             )
             
             # Handle detailed result
@@ -1007,7 +1143,8 @@ class ScenarioProcessor:
         doc_type: str,
         metadata: Dict[str, Any],
         *,
-        is_folder: bool = False
+        is_folder: bool = False,
+        force_refresh: bool = False  # ADD THIS
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Ingests knowledge from a given path (file or folder) into the specified knowledge space.
@@ -1046,7 +1183,8 @@ class ScenarioProcessor:
             document_path=document_path,
             document_type=doc_type,
             metadata=metadata,
-            recursive=is_folder
+            recursive=is_folder,
+            force_refresh=force_refresh
         )
 
         # 4. Log or print summary
@@ -1080,10 +1218,28 @@ class ScenarioProcessor:
         canvas.step(f"Adding documentation to knowledge base: {doc_path.name}")
 
         try:
-            success, results = self._handle_knowledge_ingestion(doc_path, step.get("doc_type", "Docs"), metadata, is_folder=False)
+            # Get force_refresh from step
+            force_refresh = step.get("force_refresh", False)
+            canvas.info(f"🔍 DEBUG: force_refresh = {force_refresh}")
+
+            success, results = self._handle_knowledge_ingestion(
+                doc_path, 
+                step.get("doc_type", "Docs"), 
+                metadata, 
+                is_folder=False,
+                force_refresh=force_refresh  # ADD THIS
+            )
             if success:
                 canvas.success(f"✅ Added {doc_path.name}: {results['successful_files']} files, "
                             f"skipped {results['skipped_files']} (cached)")
+                # DEBUG: Test knowledge retrieval immediately
+                if hasattr(self, 'session_state') and self.session_state and 'knowledge_base' in self.session_state:
+                    kb = self.session_state['knowledge_base']
+                    test_chunks = kb.retrieve_knowledge("AGNO Agent Team", limit=3)
+                    canvas.info(f"🔍 DEBUG: Retrieved {len(test_chunks)} AGNO chunks")
+                    for i, chunk in enumerate(test_chunks[:2]):
+                        canvas.info(f"📄 DEBUG Chunk {i}: {chunk.get('source', 'Unknown')}: {chunk.get('content', '')[:100]}...")
+                                    
             else:
                 canvas.error(f"Failed to add {doc_path.name} to knowledge base.")
         except Exception as e:
@@ -1113,7 +1269,17 @@ class ScenarioProcessor:
         canvas.step(f"Adding documentation folder to knowledge base: {folder_path.name}")
 
         try:
-            success, results = self._handle_knowledge_ingestion(folder_path, step.get("doc_type", "Docs"), metadata, is_folder=True)
+            # Get force_refresh from step
+            force_refresh = step.get("force_refresh", False)
+            canvas.info(f"🔍 DEBUG: force_refresh = {force_refresh}")
+
+            success, results = self._handle_knowledge_ingestion(
+                folder_path, 
+                step.get("doc_type", "Docs"), 
+                metadata, 
+                is_folder=True,
+                force_refresh=force_refresh  # ADD THIS
+            )
             if success:
                 canvas.success(f"✅ Added {folder_path.name}: {results['successful_files']} files, "
                             f"skipped {results['skipped_files']} (cached)")

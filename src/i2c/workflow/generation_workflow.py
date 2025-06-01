@@ -18,7 +18,7 @@ class GenerationWorkflow(Workflow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.session_state.setdefault("generation_memory", [])
-        
+
     def run(self, structured_goal: dict, project_path: Path) -> Iterator[RunResponse]:
         """Execute the generation workflow, yielding responses at each step."""
         canvas.start_process(f"Generation Cycle for: {project_path.name}")
@@ -32,28 +32,125 @@ class GenerationWorkflow(Workflow):
         # Start workflow
         yield RunResponse(content=f"🚀 Starting Generation Workflow for: {project_path.name}")
         
+        # Step 0: Knowledge Analysis with KnowledgeTeam (FIXED - NO ASYNC)
+        canvas.step("Analyzing context with KnowledgeTeam...")
+        try:
+            from i2c.agents.knowledge.knowledge_team import build_knowledge_team
+            import asyncio
+
+            knowledge_team = build_knowledge_team(self.session_state)
+            knowledge_lead = knowledge_team.members[0]
+
+            # CRITICAL DEBUG: Check if KnowledgeTeam can access the database
+            canvas.info(f"🔍 CRITICAL: Testing KnowledgeTeam database connection...")
+
+            # Check if knowledge_lead has the required components
+            canvas.info(f"🔍 CRITICAL: knowledge_lead.knowledge_manager exists: {knowledge_lead.knowledge_manager is not None}")
+            canvas.info(f"🔍 CRITICAL: knowledge_lead.embed_model exists: {knowledge_lead.embed_model is not None}")
+
+            # Test direct database access
+            try:
+                from i2c.db_utils import get_db_connection
+                db = get_db_connection()
+                if db and "knowledge_base" in db.table_names():
+                    kb_table = db.open_table("knowledge_base")
+                    row_count = len(kb_table.to_pandas())
+                    canvas.info(f"🔍 CRITICAL: Direct DB access shows {row_count} rows in knowledge_base")
+                else:
+                    canvas.error(f"🔍 CRITICAL: Direct DB access failed - no knowledge_base table")
+            except Exception as e:
+                canvas.error(f"🔍 CRITICAL: Direct DB access error: {e}")
+
+            # Test if KnowledgeTeam can retrieve anything
+            # Test if KnowledgeTeam can retrieve anything
+            if knowledge_lead.knowledge_manager:
+                try:
+                    test_retrieval = knowledge_lead.knowledge_manager.retrieve_knowledge("test", limit=1)
+                    canvas.info(f"🔍 CRITICAL: KnowledgeTeam test retrieval returned {len(test_retrieval)} items")
+                    
+                    # Test AGNO-specific retrieval
+                    agno_retrieval = knowledge_lead.knowledge_manager.retrieve_knowledge("AGNO", limit=3)
+                    canvas.info(f"🔍 CRITICAL: AGNO retrieval returned {len(agno_retrieval)} items")
+                    
+                    if agno_retrieval:
+                        for i, item in enumerate(agno_retrieval[:2]):
+                            canvas.info(f"🔍 CRITICAL: AGNO item {i}: {str(item)[:200]}...")
+                    
+                except Exception as e:
+                    canvas.error(f"🔍 CRITICAL: KnowledgeTeam retrieval failed: {e}")
+            else:
+                canvas.error(f"🔍 CRITICAL: KnowledgeTeam has no knowledge_manager!")
+                
+
+            current_project_path = Path(self.session_state.get("project_path", "."))
+            task = structured_goal.get("objective", "")
+            
+            canvas.info(f"🔍 DEBUG: Using KnowledgeTeam to analyze task: {task}")
+            
+            # CALL IT SYNCHRONOUSLY
+            project_context = asyncio.run(knowledge_lead.analyze_project_context(
+                project_path=current_project_path,
+                task=task
+            ))
+            
+            canvas.info(f"🔍 DEBUG: KnowledgeTeam analysis complete")
+
+            # DEBUG: Log what the KnowledgeTeam actually found
+            canvas.info(f"🔍 DEBUG: Project context keys: {list(project_context.keys())}")
+
+            if "documentation" in project_context:
+                docs = project_context["documentation"]
+                canvas.info(f"🔍 DEBUG: Documentation keys: {list(docs.keys())}")
+                
+                if "references" in docs:
+                    refs = docs["references"]
+                    canvas.info(f"🔍 DEBUG: Found {len(refs)} references")
+                    for i, ref in enumerate(refs[:2]):
+                        canvas.info(f"🔍 DEBUG: Ref {i}: {str(ref)[:200]}...")
+
+            if "best_practices" in project_context:
+                bp = project_context["best_practices"]
+                canvas.info(f"🔍 DEBUG: Found {len(bp)} best practices")
+                for i, practice in enumerate(bp[:2]):
+                    canvas.info(f"🔍 DEBUG: Practice {i}: {str(practice)[:200]}...")
+
+            # Store the context
+            self.session_state["knowledge_context"] = project_context
+
+            yield RunResponse(content=f"🧠 Knowledge analysis completed")
+            
+        except Exception as e:
+            canvas.error(f"KnowledgeTeam error: {e}")
+            yield RunResponse(content=f"⚠️ Knowledge analysis failed: {e}")
+        
         # Step 1: Plan Files
-        yield from self.planning_phase(structured_goal)
-        
+        for item in self.planning_phase(structured_goal):
+            yield item
+
         # Step 2: Code Generation
-        yield from self.code_generation_phase()
-        
+        for item in self.code_generation_phase():
+            yield item
+
         # Step 3: Unit Tests
-        yield from self.unit_test_phase()
-        
+        for item in self.unit_test_phase():
+            yield item
+
         # Step 4: Quality Checks
         quality_result = self.quality_check_phase()
         yield quality_result
-        
+
         # Step 5: Write Files to Disk
-        yield from self.file_writing_phase(project_path)
-        
+        for item in self.file_writing_phase(project_path):
+            yield item
+
         # Step 6: Index files for RAG
-        yield from self.index_files_phase(project_path)
+        for item in self.index_files_phase(project_path):
+            yield item
+
         # Final status
         success = bool(self.session_state.get("code_map"))
         canvas.end_process(f"Generation cycle for {project_path.name} {'completed successfully' if success else 'failed'}")
-        
+
         yield RunResponse(
             content=f"✅ Generation Workflow {'completed successfully' if success else 'failed'}",
             extra_data={
@@ -62,7 +159,55 @@ class GenerationWorkflow(Workflow):
                 "code_map": self.session_state.get("code_map")
             }
         )
-    
+
+
+    async def knowledge_analysis_phase(self, structured_goal: dict, project_path: Path) -> Iterator[RunResponse]:
+        """Use KnowledgeTeam to analyze context before generation."""
+        canvas.step("Analyzing project context with KnowledgeTeam...")
+        
+        try:
+            # Import and build the KnowledgeTeam
+            from i2c.agents.knowledge.knowledge_team import build_knowledge_team
+            
+            knowledge_team = build_knowledge_team(self.session_state)
+            knowledge_lead = knowledge_team.members[0]  # Get the KnowledgeLeadAgent
+            
+            # Use the KnowledgeTeam to analyze the task context
+            task = structured_goal.get("objective", "")
+            project_context = await knowledge_lead.analyze_project_context(
+                project_path=project_path,
+                task=task
+            )
+            
+            # Store the rich context in session state
+            self.session_state["knowledge_context"] = project_context
+            self.session_state["knowledge_team"] = knowledge_team
+            
+            # Extract and store retrieved context for the enhancer system
+            if "documentation" in project_context:
+                docs = project_context["documentation"].get("references", [])
+                if docs:
+                    context_parts = []
+                    for doc in docs:
+                        context_parts.append(f"Source: {doc.get('source', 'Unknown')}")
+                        context_parts.append(doc.get('content', ''))
+                        context_parts.append("---")
+                    
+                    self.session_state["retrieved_context"] = "\n".join(context_parts)
+                    canvas.success(f"🧠 KnowledgeTeam provided context: {len(docs)} knowledge items")
+            
+            yield RunResponse(
+                content=f"🧠 Knowledge analysis completed: Found {len(project_context.get('documentation', {}).get('references', []))} knowledge items",
+                extra_data={"project_context": project_context}
+            )
+            
+        except Exception as e:
+            canvas.error(f"Error in knowledge analysis: {e}")
+            yield RunResponse(
+                content=f"⚠️ Knowledge analysis failed: {e}",
+                extra_data={"error": str(e)}
+            )
+        
     # In generation_workflow.py
     def planning_phase(self, structured_goal: dict) -> Iterator[RunResponse]:
         """Plan files based on structured goal."""
@@ -84,8 +229,21 @@ class GenerationWorkflow(Workflow):
             plan_prompt = f"Objective: {objective}\nLanguage: {language}{constraints_text}"
             
             # Get RAG-enabled planner with session state
+            
             from i2c.agents.core_agents import get_rag_enabled_agent
             planner = get_rag_enabled_agent("planner", self.session_state)
+
+            # DEBUG: Check if planner has knowledge context
+            if self.session_state and "retrieved_context" in self.session_state:
+                canvas.info(f"🧠 DEBUG: Planner has knowledge context: {len(self.session_state['retrieved_context'])} chars")
+                canvas.info(f"🔍 DEBUG: Context preview: {self.session_state['retrieved_context'][:150]}...")
+            else:
+                canvas.warning("⚠️ DEBUG: Planner missing knowledge context")
+
+            if hasattr(planner, '_enhanced_with_knowledge'):
+                canvas.info(f"✅ DEBUG: Planner enhanced with knowledge")
+            else:
+                canvas.warning("⚠️ DEBUG: Planner not enhanced with knowledge")
             
             # Use the enhanced planner
             response = planner.run(plan_prompt)
@@ -93,16 +251,37 @@ class GenerationWorkflow(Workflow):
             content = response.content if hasattr(response, 'content') else str(response)
             
             # Process response into file list
-            import json
-            content_processed = content.strip()
-            if "```" in content_processed:
-                content_processed = content_processed.split("```")[1].strip()
-                if content_processed.startswith("json"):
-                    content_processed = content_processed[4:].strip()
-            
-            file_plan = json.loads(content_processed)
-            if not isinstance(file_plan, list):
-                raise ValueError("Planner did not return a list.")
+            # Process response into file list using robust JSON extraction
+            from i2c.utils.json_extraction import extract_json_with_fallback
+
+            # DEBUG: Log what the planner actually returned
+            canvas.info(f"🔍 DEBUG: Planner raw response: {content[:200]}...")
+
+            # Fallback file plan in case JSON extraction fails
+            fallback_plan = ["backend/main.py", "backend/app.py", "frontend/src/App.jsx"]
+
+            try:
+                # Use the robust JSON extractor
+                file_plan_data = extract_json_with_fallback(content, fallback={"files": fallback_plan})
+                
+                # Handle different response formats
+                if isinstance(file_plan_data, dict):
+                    file_plan = file_plan_data.get("files", file_plan_data.get("file_plan", fallback_plan))
+                elif isinstance(file_plan_data, list):
+                    file_plan = file_plan_data
+                else:
+                    file_plan = fallback_plan
+                    
+                if not isinstance(file_plan, list):
+                    canvas.warning("Planner response was not a list, using fallback")
+                    file_plan = fallback_plan
+                    
+                canvas.info(f"🔍 DEBUG: Extracted file plan: {file_plan}")
+                
+            except Exception as e:
+                canvas.error(f"JSON extraction failed: {e}")
+                file_plan = fallback_plan
+                canvas.warning("Using fallback file plan due to extraction error")
                 
             # Store in session state
             self.session_state["file_plan"] = file_plan
@@ -123,6 +302,28 @@ class GenerationWorkflow(Workflow):
     def code_generation_phase(self) -> Iterator[RunResponse]:
         """Generate code for planned files."""
         canvas.step("Generating code files...")
+
+        # DEBUG: Check if AGNO knowledge is still available for code generation
+        if "knowledge_context" in self.session_state:
+            kc = self.session_state["knowledge_context"]
+            if "documentation" in kc:
+                refs = kc["documentation"].get("references", [])
+                canvas.info(f"🔍 DEBUG: Code generation has {len(refs)} knowledge references")
+                
+                # Check if any reference contains AGNO content
+                agno_found = False
+                for ref in refs:
+                    if isinstance(ref, dict) and "content" in ref:
+                        if "agno" in ref["content"].lower():
+                            agno_found = True
+                            break
+                canvas.info(f"🔍 DEBUG: AGNO content found in knowledge: {agno_found}")
+            else:
+                canvas.warning("🔍 DEBUG: No documentation in knowledge_context")
+        else:
+            canvas.warning("🔍 DEBUG: No knowledge_context in session_state")
+
+        file_plan = self.session_state.get("file_plan", [])
         
         file_plan = self.session_state.get("file_plan", [])
         objective = self.session_state.get("objective")
@@ -141,18 +342,43 @@ class GenerationWorkflow(Workflow):
             for file_path in file_plan:
                 build_prompt = (
                     f"Objective: {objective}\nLanguage: {language}{constraints_text}\n"
-                    f"Generate complete, runnable code for the file '{file_path}'."
+                    f"Generate complete, runnable code for the file '{file_path}'.\n\n"
+                    f"IMPORTANT: Use any specific frameworks, patterns, or imports mentioned in your instructions above. "
+                    f"Do not generate generic code if specific patterns are provided."
                 )
+                
                 # Get RAG-enabled code builder with session state
                 from i2c.agents.core_agents import get_rag_enabled_agent
                 builder = get_rag_enabled_agent("code_builder", self.session_state)
-                
+
+                # DEBUG: Check if builder has knowledge context
+                if hasattr(builder, '_enhanced_with_knowledge'):
+                    canvas.info(f"✅ DEBUG: Builder enhanced with {len(builder._knowledge_patterns)} patterns")
+                    canvas.info(f"🔍 DEBUG: First pattern: {list(builder._knowledge_patterns.keys())[0] if builder._knowledge_patterns else 'None'}")
+                else:
+                    canvas.warning("⚠️ DEBUG: Builder not enhanced with knowledge")
+
+                if hasattr(builder, 'instructions') and isinstance(builder.instructions, list):
+                    canvas.info(f"📋 DEBUG: Builder has {len(builder.instructions)} instructions")
+                    canvas.info(f"🔍 DEBUG: First instruction: {builder.instructions[0][:100] if builder.instructions else 'None'}...")
+                    
+                    # ADD DETAILED DEBUG
+                    canvas.info(f"📋 DEBUG: Builder instructions preview:")
+                    for i, instruction in enumerate(builder.instructions[:3]):
+                        canvas.info(f"  {i+1}: {instruction[:100]}...")
+                    
+                    # Check if knowledge is actually in the instructions
+                    instructions_text = " ".join(builder.instructions).lower()
+                    knowledge_indicators = ['agno', 'agent', 'team', 'framework', 'import', 'pattern']
+                    found_indicators = [word for word in knowledge_indicators if word in instructions_text]
+                    canvas.info(f"🔍 DEBUG: Knowledge indicators in instructions: {found_indicators}")
+
                 # Use the enhanced builder
                 response = builder.run(build_prompt)
-                
+
                 raw = response.content if hasattr(response, 'content') else str(response)
-                
-                # Clean code response
+
+                # Clean code response and remove any "Applied patterns" documentation
                 if raw.strip().startswith("```"):
                     lines = raw.splitlines()
                     if lines and lines[0].strip().startswith("```"):
@@ -162,6 +388,11 @@ class GenerationWorkflow(Workflow):
                     code = "\n".join(lines)
                 else:
                     code = raw
+
+                # Remove any "Applied patterns" or similar documentation sections
+                import re
+                code = re.sub(r'\n*Applied patterns:.*$', '', code, flags=re.DOTALL | re.MULTILINE)
+                code = re.sub(r'\n*# Applied patterns:.*$', '', code, flags=re.DOTALL | re.MULTILINE)
                     
                 generated_code[file_path] = code.strip()
                 canvas.success(f"Generated: {file_path}")
@@ -242,7 +473,7 @@ class GenerationWorkflow(Workflow):
             )
     
     def file_writing_phase(self, project_path: Path) -> Iterator[RunResponse]:
-        """Write files to disk."""
+        """Write files to disk and validate knowledge application."""
         canvas.step("Writing files to disk...")
         
         code_map = self.session_state.get("code_map", {})
@@ -266,14 +497,70 @@ class GenerationWorkflow(Workflow):
                 content=f"📝 Wrote {len(code_map)} files to disk",
                 extra_data={"files_written": len(code_map)}
             )
+            
+            # NEW: Validate knowledge application after writing files
+            if self.session_state.get("retrieved_context") and code_map:
+                canvas.step("Validating knowledge application...")
+                
+                try:
+                    from i2c.agents.knowledge.knowledge_validator import KnowledgeValidator
+                    
+                    validator = KnowledgeValidator()
+                    validation_result = validator.validate_generation_output(
+                        generated_files=code_map,
+                        retrieved_context=self.session_state["retrieved_context"],
+                        task_description=self.session_state.get("objective", "")
+                    )
+                    
+                    # Store validation results
+                    self.session_state["knowledge_validation"] = {
+                        "success": validation_result.success,
+                        "score": validation_result.score,
+                        "violations": validation_result.violations,
+                        "applied_patterns": validation_result.applied_patterns
+                    }
+                    
+                    # Report validation results
+                    if validation_result.success:
+                        canvas.success(f"✅ Knowledge validation passed (score: {validation_result.score:.2f})")
+                        yield RunResponse(
+                            content=f"✅ Knowledge validation: {validation_result.score:.2f}/1.0",
+                            extra_data={
+                                "validation_success": True,
+                                "validation_score": validation_result.score,
+                                "applied_patterns": validation_result.applied_patterns
+                            }
+                        )
+                    else:
+                        canvas.warning(f"⚠️ Knowledge validation issues (score: {validation_result.score:.2f})")
+                        canvas.warning(f"Violations: {', '.join(validation_result.violations[:3])}")
+                        
+                        yield RunResponse(
+                            content=f"⚠️ Knowledge validation: {validation_result.score:.2f}/1.0 - some patterns not applied",
+                            extra_data={
+                                "validation_success": False,
+                                "validation_score": validation_result.score,
+                                "violations": validation_result.violations[:5],  # Limit for readability
+                                "missing_patterns": validation_result.missing_patterns
+                            }
+                        )
+                    
+                except Exception as validation_error:
+                    canvas.warning(f"Knowledge validation failed: {validation_error}")
+                    self.session_state["knowledge_validation_error"] = str(validation_error)
+                    
+                    yield RunResponse(
+                        content="⚠️ Knowledge validation could not be completed",
+                        extra_data={"validation_error": str(validation_error)}
+                    )
+            
         except Exception as e:
             self.session_state["file_write_error"] = str(e)
             canvas.error(f"Error during file writing step: {e}")
             yield RunResponse(
                 content=f"❌ File writing failed: {e}",
                 extra_data={"error": str(e)}
-            )
-            
+            )  
     def index_files_phase(self, project_path: Path) -> Iterator[RunResponse]:
         """Index generated files for RAG retrieval."""
         canvas.step("Indexing code for RAG context...")

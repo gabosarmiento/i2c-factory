@@ -757,8 +757,8 @@ class CodeOrchestrationAgent(Agent):
             }
 
     async def _run_quality_checks(self, modification_result: Dict[str, Any], quality_gates: List[str]) -> Dict[str, Any]:
-        """Run quality checks using the quality team with proper message formatting"""
-        self._add_reasoning_step("Quality Validation", "Running quality checks through Quality Team")
+        """Run quality checks using the quality team with knowledge validation"""
+        self._add_reasoning_step("Quality Validation", "Running quality checks with knowledge validation")
         
         try:
             project_path = Path(self.session_state.get("project_path", ""))
@@ -767,60 +767,41 @@ class CodeOrchestrationAgent(Agent):
             if not self.quality_team:
                 raise ValueError("Quality team not initialized.")
 
-            # RAG Integration: Retrieve quality-specific knowledge
-            quality_context = ""
-            if hasattr(self, 'context_builder') and self.context_builder.knowledge_base:
-                # Build focused quality check query
-                quality_query = "code quality validation"
-                if quality_gates:
-                    quality_query += f" for {', '.join(quality_gates)}"
+            # NEW: Ensure quality team has access to knowledge context
+            if self.session_state and "retrieved_context" in self.session_state:
+                # Pass knowledge context to quality team session state
+                if hasattr(self.quality_team, 'session_state'):
+                    self.quality_team.session_state["retrieved_context"] = self.session_state["retrieved_context"]
                 
-                # Get file-type specific quality knowledge
-                file_extensions = set()
-                for file_path in modified_files.keys():
-                    ext = Path(file_path).suffix.lower()
-                    if ext:
-                        file_extensions.add(ext)
-                
-                sub_queries = [f"{ext} code quality standards" for ext in file_extensions]
-                
-                # Add quality gate specific queries
-                for gate in quality_gates[:3]:  # Limit to first 3 gates
-                    sub_queries.append(f"{gate} best practices")
-                
-                # Retrieve knowledge
-                quality_context = self.context_builder.retrieve_team_specific_context(
-                    team_name="Quality",
-                    team_goal=quality_query
-                )
-                
-                if quality_context:
-                    canvas.info(f"[RAG:Quality] Retrieved context for quality checks: ~{len(quality_context)//4} tokens")
+                # Also enhance quality team members with knowledge
+                if hasattr(self.quality_team, 'members'):
+                    from i2c.agents.core_team.enhancer import AgentKnowledgeEnhancer
+                    enhancer = AgentKnowledgeEnhancer()
                     
-                    # Add to session state for quality team
-                    if self.session_state is not None:
-                        self.session_state["quality_context"] = quality_context
-            
-            # Build content data first
+                    for member in self.quality_team.members:
+                        if hasattr(member, 'name') and 'quality' in member.name.lower():
+                            enhancer.enhance_agent_with_knowledge(
+                                member, 
+                                self.session_state["retrieved_context"], 
+                                "quality_validator",
+                                f"Validate code against retrieved patterns"
+                            )
+                            canvas.info(f"🧠 Enhanced {member.name} with knowledge patterns")
+
+            # Build content data
             content_data = {
-                "instruction": "Review the code changes for quality issues, style violations, and potential bugs. Return a structured validation report.",
+                "instruction": "Review code changes for quality AND knowledge pattern compliance. Validate against retrieved patterns.",
                 "project_path": str(project_path),
                 "modified_files": modified_files,
-                "quality_gates": quality_gates
+                "quality_gates": quality_gates,
+                "include_knowledge_validation": True
             }
 
-            # Add quality context if available
-            if quality_context:
-                content_data["quality_context"] = quality_context
-
-            # Create message with JSON string
-            message_payload = Message(
-                role="user", 
-                content=content_data  # Pass dict directly, not JSON string
-            )
-            canvas.info(f"[CodeOrchestrator] Message to Quality Team:\n{json.dumps(message_payload, indent=2)[:500]}...")
+            # Create message
+            message_payload = Message(role="user", content=content_data)
+            canvas.info(f"[CodeOrchestrator] Sending enhanced quality validation request")
             
-            # Send message with proper format
+            # Send message
             result = await self.quality_team.arun(message=message_payload)
             
             # Process response safely

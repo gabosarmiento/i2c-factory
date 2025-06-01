@@ -18,6 +18,8 @@ except ImportError:
         def success(self, msg): print(f"[SUCCESS] {msg}")
         def error(self, msg): print(f"[ERROR] {msg}")
     canvas = DummyCanvas()
+    
+_expertise_cache = {}
 # Knowledge-enhanced agent instantiation
 input_processor_agent = None  # Will be created dynamically
 planner_agent = None
@@ -43,11 +45,13 @@ def get_rag_enabled_agent(agent_type, session_state=None):
             return None
         
         if session_state is None:
+            canvas.warning(f"🔍 DEBUG: No session_state for {agent_type}")
             return agent_class()
             
         try:
             # Get knowledge base from session
             knowledge_base = session_state.get("knowledge_base")
+            canvas.info(f"🔍 DEBUG: Knowledge base exists in session: {knowledge_base is not None}")
             
             # Create knowledge-enhanced agent
             enhanced_agent = create_knowledge_enhanced_agent(
@@ -55,7 +59,16 @@ def get_rag_enabled_agent(agent_type, session_state=None):
                 knowledge_base, 
                 agent_type
             )
-            
+            canvas.info(f"🔍 DEBUG: Enhanced agent created: {type(enhanced_agent).__name__}")
+            # NEW: further enhance if retrieved_context exists
+            if "retrieved_context" in session_state:
+                from i2c.agents.core_team.enhancer import quick_enhance_agent
+                enhanced_agent = quick_enhance_agent(
+                    enhanced_agent, 
+                    session_state["retrieved_context"], 
+                    agent_type
+                )
+                        
             return enhanced_agent
             
         except Exception as e:
@@ -65,13 +78,52 @@ def get_rag_enabled_agent(agent_type, session_state=None):
     except Exception as e:
         canvas.error(f"Error creating agent {agent_type}: {e}")
         return None
-print("🤔 [InputProcessorAgent] Ready for dynamic initialization")
-print("📋 [PlannerAgent] Ready for dynamic initialization") 
-print("🔨 [CodeBuilderAgent] Ready for dynamic initialization")
-print("🤔 [ProjectContextAnalyzerAgent] Ready for dynamic initialization")
 
 def _extract_domain_expertise(knowledge_base, agent_role):
     """Extract relevant expertise for specific agent role"""
+    
+    # Check cache first
+    cache_key = f"{agent_role}_{id(knowledge_base)}"
+    if cache_key in _expertise_cache:
+        canvas.info(f"🔍 DEBUG: Using cached expertise for {agent_role}")
+        return _expertise_cache[cache_key]
+    
+    if not knowledge_base:
+        canvas.info(f"🔍 DEBUG: No knowledge base for {agent_role}")
+        _expertise_cache[cache_key] = []
+        return []
+    
+    # TEST: Try to find what's actually in the knowledge base
+    canvas.info(f"🔍 DEBUG: Testing what's available in knowledge base for {agent_role}")
+    
+    # Try very broad queries to see what content exists
+    broad_queries = ["framework", "library", "pattern", "example", "usage", "import", "class", "agent", "team"]
+    found_content = []
+    
+    for broad_query in broad_queries:
+        try:
+            results = knowledge_base.retrieve_knowledge(query=broad_query, limit=3)
+            if results:
+                canvas.info(f"🔍 DEBUG: Found {len(results)} results for '{broad_query}'")
+                # Log what we actually found to understand the content
+                for i, result in enumerate(results[:1]):
+                    content_preview = result.get('content', '')[:200]
+                    source = result.get('source', 'Unknown')
+                    canvas.info(f"🔍 DEBUG: Sample from '{source}': {content_preview}...")
+                found_content.extend(results)
+                break  # Use the first successful broad query
+        except Exception as e:
+            canvas.error(f"🔍 DEBUG: Broad query '{broad_query}' failed: {e}")
+            continue
+    
+    if found_content:
+        result = found_content[:8]
+        _expertise_cache[cache_key] = result
+        canvas.success(f"🔍 DEBUG: Using {len(result)} items from broad search for {agent_role}")
+        return result
+    
+    # Fallback: Try original specific queries
+    canvas.info(f"🔍 DEBUG: No broad results found, trying specific queries for {agent_role}")
     
     role_queries = {
         "input_processor": ["requirement analysis", "user story clarification", "project scoping"],
@@ -101,7 +153,13 @@ def _extract_domain_expertise(knowledge_base, agent_role):
         except Exception:
             continue
     
-    return all_expertise[:8]  # Limit to top 8 pieces
+    result = all_expertise[:8]  # Limit to top 8 pieces
+    
+    # Cache the result
+    _expertise_cache[cache_key] = result
+    canvas.info(f"🔍 DEBUG: Final result - cached {len(result)} expertise items for {agent_role}")
+    
+    return result
 
 def _inject_expertise_into_agent(agent, expertise, agent_role):
     """Inject deep expertise with reasoning chains"""
@@ -148,21 +206,29 @@ def create_knowledge_enhanced_agent(base_agent_class, knowledge_base=None, agent
         return base_agent_class()
     
     try:
+        canvas.info(f"🔍 DEBUG: Creating knowledge-enhanced {agent_role}")
+        
         # Get domain expertise for this agent type
         domain_knowledge = _extract_domain_expertise(knowledge_base, agent_role)
+        canvas.info(f"🔍 DEBUG: Got {len(domain_knowledge)} domain knowledge items")
         
         # Create the base agent
         agent = base_agent_class()
+        canvas.info(f"🔍 DEBUG: Created base agent: {type(agent).__name__}")
         
         # Transform instructions to include internalized expertise
         if domain_knowledge:
             agent = _inject_expertise_into_agent(agent, domain_knowledge, agent_role)
             canvas.success(f"✅ Enhanced {agent_role} with internalized expertise")
+        else:
+            canvas.warning(f"⚠️ DEBUG: No domain knowledge found for {agent_role}")
         
         return agent
         
     except Exception as e:
         canvas.warning(f"Failed to enhance {agent_role}: {e}")
+        import traceback
+        canvas.error(f"🔍 DEBUG: Enhancement error traceback: {traceback.format_exc()}")
         return base_agent_class()  # Fallback to regular agent
     
 v3_instructions = dedent('''# Manifestation Execution Protocol v3.0
