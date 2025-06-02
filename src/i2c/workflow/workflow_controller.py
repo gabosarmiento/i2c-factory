@@ -252,14 +252,15 @@ class WorkflowController:
         canvas.info("🔍 [WorkflowController] Running SRE Workflow via SelfHealingController...")
         
         try:
+            import asyncio
             # Create controller and run workflow
             healing_controller = SelfHealingController(
                 session_id=f"{self.session_id}-sre"
             )
-            success, results = healing_controller.run_with_recovery(
+            success, results = asyncio.run(healing_controller.run_with_recovery(
                 project_path=project_path,
                 language=language
-            )
+            ))
             
             # Extract analysis summary for later use
             if "analysis_summary" in results:

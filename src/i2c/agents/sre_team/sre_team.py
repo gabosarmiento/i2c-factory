@@ -22,7 +22,7 @@ class SRELeadAgent(Agent):
     def __init__(self, *, project_path: Path, session_state: dict[str,Any], **kwargs):
         super().__init__(
             name="SRELead",
-            model=llm_highest,  
+            model=llm_middle,  
             role="Leads the SRE team to ensure operational excellence with Docker-integrated pipeline",
             instructions=[
                 "You are the lead of the enhanced SRE Team with Docker-integrated operational pipeline.",

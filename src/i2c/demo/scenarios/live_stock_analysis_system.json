@@ -1,0 +1,125 @@
+{
+  "project_name": "live_stock_analysis_system",
+  "name": "Live Stock Market Multi-Agent Analysis System",
+  "description": "Testable with free APIs: Agents analyze real stock data, news, and market sentiment. Includes complete setup instructions for all required API keys.",
+  "setup_instructions": {
+    "required_apis": [
+      {
+        "name": "Alpha Vantage", 
+        "purpose": "Stock prices and technical indicators",
+        "signup": "https://www.alphavantage.co/support/#api-key",
+        "free_tier": "25 requests/day",
+        "key_format": "ALPHA_VANTAGE_API_KEY=your_key_here"
+      },
+      {
+        "name": "NewsAPI",
+        "purpose": "Financial news and market sentiment", 
+        "signup": "https://newsapi.org/register",
+        "free_tier": "1000 requests/day",
+        "key_format": "NEWS_API_KEY=your_key_here"
+      }
+    ],
+    "setup_commands": [
+      "# 1. Get your free API keys from the URLs above",
+      "# 2. Add to your .env file:",
+      "echo 'ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key' >> .env",
+      "echo 'NEWS_API_KEY=your_news_api_key' >> .env",
+      "# 3. Run the scenario:",
+      "python main.py --scenario src/i2c/demo/scenarios/live_stock_analysis_system.json"
+    ],
+    "test_stocks": ["AAPL", "MSFT", "GOOGL", "TSLA"],
+    "expected_demo_duration": "5-10 minutes"
+  },
+  "steps": [
+    {
+      "type": "knowledge",
+      "name": "Load AGNO Framework Guide",
+      "doc_path": "src/i2c/docs/agno_guide.pdf",
+      "doc_type": "AGNO Framework Guide", 
+      "framework": "AGNO",
+      "version": "latest",
+      "project_name": "live_stock_analysis_system",
+      "global": true,
+      "force_refresh": true
+    },
+    {
+      "type": "knowledge",
+      "name": "Load AGNO Cheat Sheet",
+      "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+      "doc_type": "AGNO Framework Cheat Sheet",
+      "framework": "AGNO", 
+      "version": "latest",
+      "project_name": "live_stock_analysis_system",
+      "global": true,
+      "force_refresh": true
+    },
+    {
+      "type": "initial_generation",
+      "name": "Create Live Stock Analysis Agents",
+      "prompt": "Create a live stock market analysis system using AGNO framework with complete API integration:\n\n1) StockDataAgent - Fetches real-time stock prices from Alpha Vantage API\n2) NewsAnalysisAgent - Gets financial news from NewsAPI and analyzes sentiment\n3) TechnicalAnalysisAgent - Calculates RSI, MACD, moving averages from real data\n4) FundamentalAnalysisAgent - Analyzes company financials and earnings\n5) MarketSentimentAgent - Combines news sentiment with technical analysis\n6) StockAnalysisTeam - Coordinates all agents for comprehensive stock analysis\n7) AnalysisDashboard - Web interface showing real-time agent insights\n\nMust include:\n- Complete API integration with error handling\n- Real stock data for AAPL, MSFT, GOOGL, TSLA\n- Live news sentiment analysis\n- Agent coordination for investment recommendations\n- Environment variable management for API keys\n- Comprehensive setup documentation",
+      "project_name": "live_stock_analysis_system",
+      "language": "Python",
+      "system_type": "live_analysis_system"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add Real-Time Market Monitoring",
+      "objective": {
+        "task": "Implement live market monitoring and agent alerts:\n1) Create MarketMonitoringAgent for tracking price movements\n2) Add AlertSystemAgent for price breakouts and news events\n3) Implement TrendAnalysisAgent for identifying market trends\n4) Create ComparisonAgent for relative stock performance\n5) Add ReportingAgent for generating daily market summaries\n6) Enhance StockAnalysisTeam with real-time coordination",
+        "constraints": [
+          "Must use real Alpha Vantage API calls with rate limiting",
+          "Must handle API failures gracefully",
+          "Agents must coordinate analysis across multiple stocks",
+          "Include real-time price alerts and notifications",
+          "Must demonstrate multi-agent market analysis",
+          "Include proper logging of all agent decisions"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Integrate Live News and Earnings",
+      "objective": {
+        "task": "Add comprehensive news analysis and earnings tracking:\n1) Create EarningsAnalysisAgent for tracking quarterly results\n2) Add SectorAnalysisAgent for industry comparisons\n3) Implement NewsImpactAgent for correlating news with price movements\n4) Create AnalystRatingsAgent for tracking professional recommendations\n5) Add RiskAssessmentAgent for volatility and risk analysis\n6) Build comprehensive fundamental analysis capabilities",
+        "constraints": [
+          "Must integrate real news from NewsAPI",
+          "Must track actual earnings announcements",
+          "Agents must correlate news sentiment with stock performance",
+          "Include sector-wide analysis and comparisons",
+          "Must demonstrate intelligent news impact assessment",
+          "Include proper rate limiting and error handling"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Investment Recommendation Engine",
+      "objective": {
+        "task": "Create intelligent investment recommendations:\n1) Create PortfolioAnalysisAgent for portfolio optimization\n2) Add RiskToleranceAgent for personalized recommendations\n3) Implement BacktestingAgent for strategy validation\n4) Create PerformanceTrackingAgent for recommendation accuracy\n5) Add InvestmentAdvisorAgent for comprehensive advice\n6) Build complete investment recommendation system",
+        "constraints": [
+          "Must use real market data for all recommendations",
+          "Must track recommendation performance over time",
+          "Agents must coordinate for comprehensive analysis",
+          "Include risk-adjusted return calculations",
+          "Must demonstrate multi-agent investment intelligence",
+          "Include proper disclaimer and educational content"
+        ]
+      }
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Create Live Analysis Dashboard",
+      "objective": {
+        "task": "Build comprehensive web dashboard for live stock analysis:\n1) Create ReactJS dashboard with real-time stock charts\n2) Add AgentInsightsPanel showing live agent analysis\n3) Implement NewsImpactViewer with sentiment correlation\n4) Create PerformanceTracker for recommendation accuracy\n5) Add StockComparisonTool for side-by-side analysis\n6) Include AgentChatInterface for querying the analysis team",
+        "constraints": [
+          "Must display real-time stock data and agent insights",
+          "Include live news feed with sentiment analysis",
+          "Must show actual agent decision-making processes",
+          "Include interactive charts and analysis tools",
+          "Must demonstrate live multi-agent coordination",
+          "Include proper responsive design and user experience"
+        ]
+      }
+    }
+  ]
+}

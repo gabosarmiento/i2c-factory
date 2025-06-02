@@ -11,6 +11,7 @@ from .groq_compatible_tools import create_groq_compatible_tools, call_tool_manua
 from i2c.utils.json_extraction import extract_json
 from i2c.llm_providers import llm_middle, llm_highest, llm_deepseek
 from i2c.agents.sre_team.multilang_unit_test import unit_test_generator
+from i2c.utils import deprecated
 
 # Legacy implementations (for fallback)
 from .code_modification_manager_agno_legacy import (
@@ -132,36 +133,6 @@ Apply this expertise naturally in your implementation."""
     return expertise
 
 
-# === LEAN KNOWLEDGE INTEGRATION END ===
-
-def _inject_knowledge_into_prompt(base_prompt: str, knowledge_context: str) -> str:
-    """
-    Inject knowledge context into the modification prompt.
-    
-    Args:
-        base_prompt: Original prompt
-        knowledge_context: Retrieved knowledge context
-        
-    Returns:
-        Enhanced prompt with knowledge context
-    """
-    if not knowledge_context:
-        return base_prompt
-        
-    enhanced_prompt = f"""{base_prompt}
-
-=== KNOWLEDGE CONTEXT ===
-Use the following relevant knowledge to inform your code modifications:
-
-{knowledge_context}
-
-Apply patterns, best practices, and examples from the knowledge context above.
-Ensure your modifications align with the provided knowledge.
-=== END KNOWLEDGE CONTEXT ==="""
-    
-    return enhanced_prompt
-# === KNOWLEDGE INTEGRATION END ===
-
 def _build_modular_tool_agents(session_state: Dict[str, Any] = None) -> Dict[str, Agent]:
     """
     Define one lightweight agent per retrieval tool. Each tool agent is only responsible for one tool and returns strict JSON.
@@ -212,20 +183,30 @@ Example:
         "github": github_agent,
     }
 
+@deprecated("Use direct agent approach instead")
 def _create_modular_retrieval_team(session_state: Dict[str, Any] = None) -> Team:
     """
     Build a modular team: 1 agent per tool, plus analyzer and implementer (modifier). All members have access to call the tool agents as helpers.
     """
-    tool_agents = _build_modular_tool_agents(session_state)
-    # Tool agents get exposed to the main agents as callable helpers
-    retrieval_helpers = list(tool_agents.values())
+    print(f"[DEBUG] _create_modular_retrieval_team ENTRY")
+    print(f"[DEBUG] session_state keys: {list(session_state.keys()) if session_state else 'None'}")
+    
+    try:
+        print(f"[DEBUG] Building tool agents...")
+        tool_agents = _build_modular_tool_agents(session_state)
+        print(f"[DEBUG] Tool agents created: {list(tool_agents.keys())}")
+        
+        # Tool agents get exposed to the main agents as callable helpers
+        retrieval_helpers = list(tool_agents.values())
+        print(f"[DEBUG] Retrieval helpers: {len(retrieval_helpers)}")
 
-    analyzer = Agent(
-        name="AnalyzerAgent",
-        model=llm_highest,  # Good at reasoning
-        tools=retrieval_helpers,
-        reasoning=False,  # Disable reasoning to prevent hanging
-        instructions="""
+        print(f"[DEBUG] Creating analyzer agent...")
+        analyzer = Agent(
+            name="AnalyzerAgent",
+            model=llm_highest,  # Good at reasoning
+            tools=retrieval_helpers,
+            reasoning=False,  # Disable reasoning to prevent hanging
+            instructions="""
 You are a senior code analyst with access to three tool specialists: VectorRetrieverAgent, ProjectContextAgent, GitHubFetcherAgent.
 
 - When analyzing a modification request, call the relevant tool agent as needed:
@@ -236,14 +217,16 @@ You are a senior code analyst with access to three tool specialists: VectorRetri
 {"analysis": "...", "sources_used": [...], "plan": ["step1", ...], "recommend_tools": ["vector", "github"]}
 Respond strictly in JSON.
 """
-    )
+        )
+        print(f"[DEBUG] Analyzer agent created")
 
-    implementer = Agent(
-        name="ImplementerAgent",
-        model=llm_highest,  # Focused on quality output
-        tools=retrieval_helpers,
-        reasoning=False,  # Disable reasoning to prevent hanging
-        instructions="""
+        print(f"[DEBUG] Creating implementer agent...")
+        implementer = Agent(
+            name="ImplementerAgent",
+            model=llm_highest,  # Focused on quality output
+            tools=retrieval_helpers,
+            reasoning=False,  # Disable reasoning to prevent hanging
+            instructions="""
 You are an advanced implementer with access to tool agents and a code analysis plan.
 
 - You may call any tool agent as needed (vector/project/github), but be concise.
@@ -252,14 +235,16 @@ You are an advanced implementer with access to tool agents and a code analysis p
 {"file_path": "...", "original": "...", "modified": "..."}
 If you are stuck, use the tool agents to gather additional examples.
 """
-    )
+        )
+        print(f"[DEBUG] Implementer agent created")
 
-    return Team(
-        name="ModularRetrievalModificationTeam",
-        model=llm_middle,
-        members=[analyzer, implementer],
-        mode="coordinate",
-        instructions="""
+        print(f"[DEBUG] Creating team...")
+        team = Team(
+            name="ModularRetrievalModificationTeam",
+            model=llm_middle,
+            members=[analyzer, implementer],
+            mode="coordinate",
+            instructions="""
 You are a fast, robust, modular modification team.
 
 - Each agent has independent responsibility.
@@ -267,10 +252,20 @@ You are a fast, robust, modular modification team.
 - Respond strictly in JSON for each step.
 - The team should work for multi-language and multi-step scenarios.
 """,
-        share_member_interactions=True,
-        enable_agentic_context=False,  # Minimal context window
-        session_state=session_state,
-    )
+            share_member_interactions=True,
+            enable_agentic_context=False,  # Minimal context window
+            session_state=session_state,
+        )
+        print(f"[DEBUG] Team created successfully")
+        print(f"[DEBUG] Team members: {[m.name for m in team.members]}")
+        
+        return team
+        
+    except Exception as e:
+        print(f"[DEBUG] Error in _create_modular_retrieval_team: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 def robust_json_parse(content: Union[str, dict, list]) -> dict:
     from i2c.utils.json_extraction import extract_json_with_fallback
@@ -294,14 +289,18 @@ def apply_modification(
     print("[DEBUG][apply_modification] project_root:", project_path)
     shared = session_state or {}
     
-    # Check for test mode to force legacy path
-    if shared.get("test_mode", False):
-        print("[DEBUG] Test mode - forcing legacy path")
-        return _apply_legacy(modification_step, project_path, retrieved_context, shared)
-    
+    # ADD DEBUG INFO:
     use_retrieval = shared.get("use_retrieval_tools", False)
+    test_mode = shared.get("test_mode", False)
+    print(f"[DEBUG] use_retrieval_tools: {use_retrieval}")
+    print(f"[DEBUG] test_mode: {test_mode}")
+    
+    # REMOVE the test_mode check - let it use modern path
     if use_retrieval:
+        print("[DEBUG] Using modular modification path")
         return _apply_modular_modification(modification_step, project_path, retrieved_context, shared)
+    
+    print("[DEBUG] Using legacy modification path")
     return _apply_legacy(modification_step, project_path, retrieved_context, shared)
 
 def build_code_modification_team(*, session_state: Dict[str, Any] = None, **kwargs) -> Team:
@@ -318,7 +317,13 @@ def _apply_modular_modification(
     retrieved_context: str,
     session_state: Dict[str, Any]
 ) -> Any:
+    print(f"[DEBUG] _apply_modular_modification ENTRY")
+    print(f"[DEBUG] step: {step}")
+    print(f"[DEBUG] project_path: {project_path}")
+    
     try:
+        print(f"[DEBUG] Building base context...")
+        
         # === Enhanced: Get knowledge context and enhance agents ===
         knowledge_context = _get_principle_enhanced_context(session_state, step)
         
@@ -333,9 +338,15 @@ def _apply_modular_modification(
         if knowledge_context:
             base_context["knowledge_hint"] = knowledge_context
         
+        print(f"[DEBUG] Base context built: {len(str(base_context))} chars")
+        
+        print(f"[DEBUG] Creating modular retrieval team...")
         # NEW: Create team with knowledge enhancement
         team = _create_modular_retrieval_team(session_state)
+        print(f"[DEBUG] Team created: {type(team)}")
+        print(f"[DEBUG] Team members: {len(team.members) if hasattr(team, 'members') else 'unknown'}")
         
+        print(f"[DEBUG] Checking team enhancement...")
         # NEW: Enhance team agents with knowledge
         if hasattr(team, 'members') and session_state.get("retrieved_context"):
             from i2c.agents.core_team.enhancer import AgentKnowledgeEnhancer
@@ -349,29 +360,78 @@ def _apply_modular_modification(
                     )
                     print(f"🧠 Enhanced {member.name} with knowledge patterns")
         
+        print(f"[DEBUG] Converting to JSON...")
         team_prompt = json.dumps(base_context)
-        response = team.run(team_prompt)
+        print(f"[DEBUG] Team prompt length: {len(team_prompt)} chars")
+        print(f"[DEBUG] Team prompt preview: {team_prompt[:100]}...")
+        
+        print(f"[DEBUG] About to call team.run()...")
+        # BYPASS hanging team - use direct agent instead
+        try:
+            print(f"[DEBUG] Using direct agent instead of team...")
+            from i2c.agents.core_agents import get_rag_enabled_agent
+            direct_agent = get_rag_enabled_agent("code_builder", session_state=session_state)
+            
+            simple_prompt = f"Modify the file {step.get('file')} to {step.get('what')}. {step.get('how')}. Return the complete modified file content."
+            response = direct_agent.run(simple_prompt)
+            print(f"[DEBUG] Direct agent completed!")
+            
+        except Exception as direct_error:
+            print(f"[DEBUG] Direct agent failed: {direct_error}")
+            # Fallback to legacy
+            return _apply_legacy(step, project_path, retrieved_context, session_state)
+
+        print(f"[DEBUG] Response type: {type(response)}")
+        
         content = getattr(response, "content", str(response))
+        print(f"[DEBUG] Response content type: {type(content)}")
+        print(f"[DEBUG] Response content preview: {str(content)[:200]}...")
+        
+        print(f"[DEBUG] Parsing response...")
         result = robust_json_parse(content)
+        print(f"[DEBUG] Parsed result: {type(result)}")
+        
         file_rel = result.get("file_path", step.get("file", ""))
         file_path = project_path / file_rel
+        
+        print(f"[DEBUG] Target file: {file_path}")
+        
         original = ""
         if file_path.exists() and step.get("action") != "create":
             try:
                 original = file_path.read_text(encoding="utf-8")
-            except:
+                print(f"[DEBUG] Read original file: {len(original)} chars")
+            except Exception as read_error:
+                print(f"[DEBUG] Error reading original file: {read_error}")
                 pass
+        
         modified = result.get("modified", "")
+        print(f"[DEBUG] Modified content length: {len(modified)} chars")
+        
         if not modified or len(modified.strip()) < 10:
+            print(f"[DEBUG] Modified content too short, creating fallback...")
             if step.get("action") == "create":
                 modified = f"""# {step.get('what', 'New file')}
 \n"""
             else:
                 modified = original + f"\n\n# TODO: {step.get('what', 'Add functionality')}\n"
+        
         if modified:
             try:
                 file_path.parent.mkdir(parents=True, exist_ok=True)
+                print(f"[DEBUG] About to write file: {file_path}")
+                print(f"[DEBUG] Modified content preview: {modified[:100]}...")
+                
                 file_path.write_text(modified, encoding="utf-8")
+                
+                # Verify write
+                if file_path.exists():
+                    written_content = file_path.read_text()
+                    print(f"[DEBUG] Actually written: {written_content[:100]}...")
+                    print(f"[DEBUG] Write successful: {len(written_content)} chars")
+                else:
+                    print(f"[DEBUG] ERROR: File not found after write")
+                
                 # Auto-generate unit tests using enhanced multi-language generator
                 try:
                     # Only for files that aren't already test files
@@ -398,17 +458,26 @@ def _apply_modular_modification(
                                 
                 except Exception as e:
                     print(f"⚠️ Unit test generation failed (non-blocking): {e}")
-            except Exception as e:
-                print(f"Write error: {e}")
+                    
+            except Exception as write_error:
+                print(f"[DEBUG] Write error: {write_error}")
+        
         session_state.setdefault("modified_files", {})[file_rel] = modified
+        
         class PatchObject:
             def __init__(self, unified_diff: str):
                 self.unified_diff = unified_diff
+        
+        print(f"[DEBUG] Returning PatchObject with {len(modified)} chars")
         return PatchObject(unified_diff=modified)
+        
     except Exception as e:
-        print(f"Modular modification error: {e}")
+        print(f"[DEBUG] Modular modification error: {e}")
+        import traceback
+        traceback.print_exc()
+        print(f"[DEBUG] Falling back to legacy...")
         return _apply_legacy(step, project_path, retrieved_context, session_state)
-
+    
 # Manual tool usage
 
 def quick_search(query: str, search_type: str = "vector") -> str:

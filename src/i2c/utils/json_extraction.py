@@ -1,4 +1,5 @@
 import json
+from typing import Optional, Any
 
 def extract_json(content: str) -> dict:
     """
@@ -25,16 +26,15 @@ def extract_json(content: str) -> dict:
     raise ValueError(f"Content is a string but no valid JSON found: {content}")
 
 
-def extract_json_with_fallback(content: str, fallback: dict | None = None) -> dict:
-    """
-    Try to extract JSON. If it fails, return fallback if provided.
-    """
+def extract_json_with_fallback(content: str, fallback: Optional[Any] = None) -> Any:
     try:
+        if not content or ("{" not in content and "[" not in content):
+            if fallback is not None:
+                print("[✅] Fallback triggered for empty or non-JSON content")
+                return fallback
         return extract_json(content)
     except Exception as e:
-        from i2c.cli.controller import canvas  # only if canvas is available
-        if 'canvas' in globals():
-            canvas.warning(f"Fallback used due to JSON extraction error: {e}")
-        if fallback:
+        if fallback is not None:
+            print(f"[✅] Fallback triggered due to error: {e}")
             return fallback
         raise

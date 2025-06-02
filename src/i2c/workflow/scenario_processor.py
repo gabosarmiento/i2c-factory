@@ -121,11 +121,30 @@ class ScenarioProcessor:
         canvas.info(f"🧠 Running agent-orchestrated evolution for: {objective.get('task', 'Unknown task')}")
         canvas.info(f"📏 Quality constraints added: {len(quality_constraints)}")
 
+        def clean_session_state(obj):
+            """Remove SessionKnowledgeBase objects recursively"""
+            if isinstance(obj, dict):
+                cleaned = {}
+                for k, v in obj.items():
+                    if 'SessionKnowledgeBase' in str(type(v)) or k == 'knowledge_base':
+                        continue
+                    elif isinstance(v, dict):
+                        cleaned[k] = clean_session_state(v)
+                    elif isinstance(v, list):
+                        cleaned[k] = [clean_session_state(item) for item in v]
+                    else:
+                        cleaned[k] = v
+                return cleaned
+            return obj
+
         try:
             import json
-            canvas.info(f"Full objective being sent to orchestrator: {json.dumps(objective, indent=2)[:500]}...")
+            # Clean the objective before JSON serialization
+            clean_objective = clean_session_state(objective)
+            canvas.info(f"Full objective being sent to orchestrator: {json.dumps(clean_objective, indent=2)[:500]}...")
         except Exception as e:
             canvas.info(f"Could not log full objective: {e}")
+            
         try:
             # Import the agentic orchestrator
             from i2c.workflow.agentic_orchestrator import execute_agentic_evolution_sync
@@ -418,7 +437,7 @@ class ScenarioProcessor:
             enhanced_prompt = self._enhance_prompt_with_architectural_guidance(raw_idea)
             
             from i2c.agents.core_agents import get_rag_enabled_agent
-            temp_agent = get_rag_enabled_agent("input_processor")
+            temp_agent = get_rag_enabled_agent("input_processor", session_state=self.session_state)
             resp = temp_agent.run(enhanced_prompt)
             
             # Update budget manager with metrics from Agno agent
@@ -454,12 +473,28 @@ class ScenarioProcessor:
             canvas.info(f"JSON to parse: {json_str[:100]}...")
 
             # Parse the extracted JSON
-            proc = extract_json_with_fallback(json_str, fallback={
-                "objective": "CLI tool for reflection (fallback)",
-                "language": "python",
-                "system_type": "cli_tool",
-                "architecture_pattern": "Single-Process"
-            })
+            proc = extract_json_with_fallback(
+                json_str,
+                fallback=None  # Don't use hardcoded fallback here
+            )
+            if not isinstance(proc, dict):
+                raise ValueError("Invalid JSON: not a dictionary")
+
+            # Recover values safely if keys are missing
+            if "objective" not in proc or not proc["objective"].strip():
+                canvas.warning("⚠️ Missing 'objective' in LLM response. Using prompt fallback.")
+                proc["objective"] = raw_idea[:80] + "..."
+
+            if "language" not in proc or not proc["language"].strip():
+                inferred_lang = "python" if "python" in raw_idea.lower() or "task" in raw_idea.lower() else "javascript"
+                canvas.warning(f"⚠️ Missing 'language'. Inferring as '{inferred_lang}'.")
+                proc["language"] = inferred_lang
+
+            if "system_type" not in proc:
+                proc["system_type"] = "auto"
+                
+            if "architecture_pattern" not in proc:
+                proc["architecture_pattern"] = "auto"
             if not (isinstance(proc, dict) and "objective" in proc and "language" in proc):
                 raise ValueError("Invalid JSON from LLM")
             
@@ -650,13 +685,19 @@ class ScenarioProcessor:
             
             # ENHANCED: Pass session state with knowledge base to generation
             canvas.info(f"🔍 DEBUG: Passing session_state with knowledge_base: {'knowledge_base' in (self.session_state or {})}")
+            if "knowledge_base" in self.session_state:
+                canvas.success("🧠 DEBUG: Knowledge base available for generation")
+                test_chunks = self.session_state["knowledge_base"].retrieve_knowledge("AGNO", limit=2)
+                canvas.info(f"🔍 DEBUG: Test retrieval got {len(test_chunks)} chunks")
+            else:
+                canvas.error("🔍 DEBUG: No knowledge_base in session_state for generation!")
             result = route_and_execute(
                 action_type='generate',
                 action_detail=self.current_structured_goal,
                 current_project_path=self.current_project_path,
                 current_structured_goal=self.current_structured_goal,
                 architectural_context=(self.session_state or {}).get("architectural_context", {}),
-                session_state=self.session_state  # PASS THE FULL SESSION STATE
+                session_state=self.session_state  
             )
             
             # Handle detailed result
@@ -1113,7 +1154,8 @@ class ScenarioProcessor:
                 action_type='modify',
                 action_detail='r',  # 'r' is the refinement command
                 current_project_path=self.current_project_path,
-                current_structured_goal=self.current_structured_goal
+                current_structured_goal=self.current_structured_goal,
+                session_state=self.session_state  
             )
             if isinstance(result, dict):
                 success = result.get("success", False)

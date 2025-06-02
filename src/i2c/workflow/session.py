@@ -20,7 +20,17 @@ from i2c.cli.budget_display import show_budget_status, show_budget_summary, show
 
 # --- Configuration ---
 DEFAULT_OUTPUT_DIR_BASE = Path("./output")
+# Session state variables
+current_project_path: Path | None = None
+last_raw_idea: str | None = None
+current_structured_goal: dict | None = None
 
+# CREATE SESSION STATE DICT
+session_state = {
+    "current_project_path": None,
+    "current_structured_goal": None,
+    "last_raw_idea": None
+}
 # Updated section for workflow/session.py with simplified budget display integration
 def run_session():
     """Manages the overall user session and interaction loop."""
@@ -156,7 +166,8 @@ def run_session():
                         action_type='generate',
                         action_detail=current_structured_goal,
                         current_project_path=current_project_path,
-                        current_structured_goal=current_structured_goal
+                        current_structured_goal=current_structured_goal,
+                        session_state=session_state 
                     )
                 except ImportError:
                     # Fallback if the recovery function isn't available
@@ -164,7 +175,8 @@ def run_session():
                         action_type='generate',
                         action_detail=current_structured_goal,
                         current_project_path=current_project_path,
-                        current_structured_goal=current_structured_goal
+                        current_structured_goal=current_structured_goal,
+                        session_state=session_state 
                     )
                 if isinstance(result, dict):
                     success = result.get("success", False)
@@ -213,7 +225,8 @@ def run_session():
                         action_type='modify',
                         action_detail=command_detail,
                         current_project_path=current_project_path,
-                        current_structured_goal=current_structured_goal
+                        current_structured_goal=current_structured_goal,
+                        session_state=session_state 
                     )
                 except ImportError:
                     # Fallback if the recovery function isn't available
@@ -221,7 +234,8 @@ def run_session():
                         action_type='modify',
                         action_detail=command_detail,
                         current_project_path=current_project_path,
-                        current_structured_goal=current_structured_goal
+                        current_structured_goal=current_structured_goal,
+                        session_state=session_state 
                     )
                 if isinstance(result, dict):
                     success = result.get("success", False)

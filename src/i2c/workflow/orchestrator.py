@@ -22,7 +22,7 @@ def route_and_execute_with_recovery(
     current_project_path: Path,
     current_structured_goal: dict | None,
     max_retries: int = 0,  # Allow for retries
-    session_state: dict = None  # ADD THIS
+    session_state: dict = None  
 ) -> bool:
     """Enhanced route_and_execute with error recovery"""
     from i2c.cli.controller import canvas
@@ -117,6 +117,12 @@ def route_and_execute(
         bool: Success status
     """
     """Routes action to appropriate workflows using WorkflowController."""
+    canvas.info(f"🔍 DEBUG: route_and_execute called with session_state: {session_state is not None}")
+    if session_state and "knowledge_base" in session_state:
+        canvas.success("🧠 DEBUG: Knowledge base passed to route_and_execute")
+    else:
+        canvas.error("🔍 DEBUG: No knowledge_base in route_and_execute session_state!")
+    
     # Store architectural context in structured goal if provided
     if architectural_context:
         current_structured_goal = current_structured_goal.copy()

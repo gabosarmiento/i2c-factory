@@ -62,7 +62,7 @@ def _create_agno_modification_team(session_state: dict | None = None) -> Team:
     # Create a coordinating team
     return Team(
         name="ModificationTeam",
-        model=llm_highest,
+        model=llm_middle,
         members=[analyzer, modifier],
         mode="coordinate",
         instructions=dedent("""

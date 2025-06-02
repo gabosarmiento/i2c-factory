@@ -120,6 +120,31 @@ src/
 
 ---
 
+## 🧠 Universal Knowledge Integration System
+The i2c Factory features breakthrough Universal Knowledge Integration that transforms any documentation into actionable development patterns:
+
+### 📚 Knowledge-Driven Development
+
+- 🔍 Universal Document Ingestion - PDFs, markdown, APIs, any framework documentation
+- 🧠 Intelligent Pattern Extraction - Automatically discovers framework patterns, conventions, and examples
+- ⚡ Real-Time Knowledge Application - Agents use retrieved knowledge to generate framework-specific code
+- 🎯 Context-Aware Enhancement - Agents understand and apply domain-specific patterns naturally
+
+### 🔄 How Knowledge Integration Works
+
+- 📖 Ingest Documentation → PDFs, guides, cheat sheets for any framework/library
+- 🧩 Extract Patterns → Automatically discover imports, conventions, usage examples
+- 🤖 Enhance Agents → Agents gain deep understanding of framework patterns
+- 💡 Apply Knowledge → Generated code follows framework-specific patterns, not generic templates
+- ✅ Validate Application → Ensure knowledge patterns are properly implemented
+
+---
+
+Perfect! Let's update the README to showcase the **knowledge integration capabilities** with real demos that people can test.
+
+## Updated Getting Started Section
+
+```markdown
 ## 🚀 Getting Started
 
 ### Installation
@@ -133,25 +158,154 @@ pip install -r requirements.txt
 echo "GROQ_API_KEY=your_groq_api_key_here" > .env
 ```
 
-### Quick Start - Architectural Intelligence Mode
+### Quick Start - Knowledge-Driven Development
+
+Test the **Universal Knowledge Integration** with our demo scenarios:
 
 ```bash
-# Generate with architectural understanding
-python main.py --idea "Build a secure task management API with React frontend" --out-dir ./output
+# Demo 1: AGNO-Based Task Management (Knowledge Integration)
+python i2c --scenario src/i2c/demo/scenarios/agno_task_system.json
 
 # The factory will:
-# 1. Detect this is a "fullstack web application"
-# 2. Apply "frontend/backend" architectural pattern  
-# 3. Structure files in proper module boundaries
-# 4. Generate appropriate tests for each language
-# 5. Validate architectural consistency
+# 1. Ingest AGNO documentation (PDF → Vector Database)
+# 2. Extract Agent/Team patterns from docs
+# 3. Generate AGNO-based code (not generic FastAPI)
+# 4. Validate proper framework usage
 ```
 
-### Advanced - Scenario-Based Architectural Evolution
+### Available Demo Scenarios
+
+Test different knowledge integration capabilities:
+
+| Scenario | Framework | Demonstrates |
+|----------|-----------|--------------|
+| `agno_task_system.json` | AGNO Framework | Agent/Team patterns, multi-agent coordination |
+| `react_component_library.json` | React | Modern hooks, component patterns |
+| `django_ecommerce.json` | Django | Model/View/Template, admin patterns |
+| `spring_microservice.json` | Spring Boot | Annotations, dependency injection |
+| `fastapi_ml_service.json` | FastAPI | Async patterns, ML integration |
+
+### Test Knowledge Integration Step-by-Step
 
 ```bash
-python main.py --scenario scenarios/microservice-evolution.json
+# 1. Run AGNO demo first
+python i2c --scenario src/i2c/demo/scenarios/agno_task_system.json
+
+# 2. Check generated code contains AGNO patterns
+ls output/agno_task_system_*/
+cat output/agno_task_system_*/backend/*.py | grep -E "Agent|Team|from agno"
+
+# 3. Verify it's NOT generic FastAPI but true AGNO usage
+# Should see: Agent classes, Team coordination, AGNO imports
 ```
+
+### Advanced - Custom Knowledge Integration
+
+```bash
+# Add your own framework documentation
+python i2c --scenario custom_framework.json
+
+# Your scenario JSON should include:
+# 1. Knowledge ingestion steps for your docs
+# 2. Generation objectives that leverage that knowledge
+# 3. Validation that patterns were applied
+```
+
+## 🧩 Knowledge Integration in Action
+
+### Example: AGNO Framework Integration
+
+**Input Documentation**: `src/i2c/docs/agno_guide.pdf`
+
+**Generated Code Output**:
+```python
+# NOT Generic FastAPI ❌
+from fastapi import FastAPI
+app = FastAPI()
+
+# AGNO-Enhanced Application ✅  
+from agno import Agent, Team
+
+class TaskCreationAgent(Agent):
+    def execute(self, task_data):
+        return {"task_id": 1, "task_name": task_data["task_name"]}
+
+class TaskRetrievalAgent(Agent):  
+    def execute(self, task_id):
+        return {"task_id": task_id, "task_name": "Sample Task"}
+
+# Multi-agent coordination using AGNO Team patterns
+task_management_team = Team([
+    TaskCreationAgent(), 
+    TaskRetrievalAgent()
+])
+```
+
+**Knowledge Flow Visualization**:
+```json
+{
+  "knowledge_integration_flow": [
+    {"step": "Document Ingestion", "status": "✅ 148 chunks from AGNO PDFs"},
+    {"step": "Pattern Extraction", "status": "✅ Found Agent/Team patterns"},
+    {"step": "Agent Enhancement", "status": "✅ Enhanced with AGNO knowledge"},
+    {"step": "Code Generation", "status": "✅ Generated AGNO-based application"},
+    {"step": "Validation", "status": "✅ Verified framework usage"}
+  ]
+}
+```
+```
+
+## First Test Scenario to Create
+
+**File**: `src/i2c/demo/scenarios/agno_task_system.json`
+
+```json
+{
+  "project_name": "agno_task_system",
+  "name": "AGNO Task Management System",
+  "description": "Demonstrates AGNO framework knowledge integration - should generate Agent/Team based code",
+  "steps": [
+    {
+      "type": "knowledge",
+      "name": "Load AGNO Documentation",
+      "doc_path": "src/i2c/docs/agno_guide.pdf",
+      "doc_type": "AGNO Framework Guide",
+      "framework": "AGNO",
+      "version": "latest",
+      "project_name": "agno_task_system",
+      "global": true,
+      "force_refresh": true
+    },
+    {
+      "type": "knowledge", 
+      "name": "Load AGNO Cheat Sheet",
+      "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+      "doc_type": "AGNO Framework Cheat Sheet",
+      "framework": "AGNO",
+      "version": "latest",
+      "project_name": "agno_task_system",
+      "global": true,
+      "force_refresh": true
+    },
+    {
+      "type": "initial_generation",
+      "name": "Generate AGNO Task System",
+      "prompt": "Create a task management system using AGNO framework with multiple agents for different responsibilities: TaskCreatorAgent, TaskAssignerAgent, TaskTrackerAgent, and TaskTeam for coordination. Include proper Agent and Team usage patterns.",
+      "project_name": "agno_task_system",
+      "language": "Python",
+      "system_type": "agentic_task_system"
+    }
+  ]
+}
+```
+
+**Expected Result**: 
+- ✅ Multiple Agent classes (not generic FastAPI)
+- ✅ Team coordination patterns
+- ✅ Proper AGNO imports and usage
+- ✅ Multi-agent task management architecture
+
+Let's run this first test and see the results before creating the other 4 scenarios!
 
 ---
 
@@ -370,3 +524,5 @@ Join us in building the future of **architecturally-intelligent, self-healing so
 
 ---
 ```
+
+

@@ -1,8 +1,10 @@
+# src/i2c/agents/knowledge/pattern_extractor.py
 from typing import Dict, List, Any
 import json
 from agno.agent import Agent
 from builtins import llm_highest
 from i2c.cli.controller import canvas
+from i2c.utils.json_extraction import extract_json_with_fallback
 
 class PatternExtractorAgent(Agent):
     """
@@ -32,51 +34,48 @@ class PatternExtractorAgent(Agent):
             return {}
         
         extraction_prompt = f"""
-Analyze this documentation and extract actionable development patterns:
+    Analyze this documentation and extract actionable development patterns:
 
-DOCUMENTATION:
-{raw_context}
+    DOCUMENTATION:
+    {raw_context}
 
-Extract patterns in this JSON format:
-{{
-    "imports": ["specific import statements that should be used"],
-    "file_structure": ["files/directories that should be created based on framework/practices mentioned"],
-    "conventions": ["coding conventions and naming patterns to follow"],
-    "architecture": ["architectural principles and structural requirements"],
-    "examples": ["concrete code examples if present"]
-}}
+    Extract patterns in this JSON format:
+    {{
+        "imports": ["specific import statements that should be used"],
+        "file_structure": ["files/directories that should be created based on framework/practices mentioned"],
+        "conventions": ["coding conventions and naming patterns to follow"],
+        "architecture": ["architectural principles and structural requirements"],
+        "examples": ["concrete code examples if present"]
+    }}
 
-INTELLIGENCE REQUIRED:
-- If documentation mentions "FastAPI", infer typical FastAPI project structure (main.py, api/, models/)
-- If it mentions "React", infer frontend structure (src/, components/, App.jsx)
-- If it discusses "best practices", translate into specific file/code requirements
-- Extract both explicit and IMPLIED patterns from the context
+    INTELLIGENCE REQUIRED:
+    - If documentation mentions "FastAPI", infer typical FastAPI project structure (main.py, api/, models/)
+    - If it mentions "React", infer frontend structure (src/, components/, App.jsx)
+    - If it discusses "best practices", translate into specific file/code requirements
+    - Extract both explicit and IMPLIED patterns from the context
 
-Return ONLY the JSON, no explanation.
-"""
+    Return ONLY the JSON, no explanation.
+    """
         
         try:
             response = self.run(extraction_prompt)
             content = response.content if hasattr(response, 'content') else str(response)
             
-            # Parse JSON response with better error handling
-            if '```json' in content:
-                json_start = content.find('```json') + 7
-                json_end = content.find('```', json_start)
-                content = content[json_start:json_end].strip()
-            elif '```' in content:
-                json_start = content.find('```') + 3
-                json_end = content.find('```', json_start)
-                content = content[json_start:json_end].strip()
+          
             
-            # Check if content is empty or invalid
-            if not content.strip():
-                canvas.warning("Empty JSON content from PatternExtractorAgent")
-                raise ValueError("Empty JSON response")
+            # Extract patterns with fallback
+            patterns = extract_json_with_fallback(
+                content,
+                fallback={
+                    "imports": [],
+                    "file_structure": [],
+                    "conventions": ["Follow best practices", "Use clear naming"],
+                    "architecture": ["Modular design", "Clean separation of concerns"],
+                    "examples": []
+                }
+            )
             
-            patterns = json.loads(content)
-            
-            # Ensure all required keys exist
+            # Ensure all required keys exist (extra safety)
             required_keys = ['imports', 'file_structure', 'conventions', 'architecture', 'examples']
             for key in required_keys:
                 if key not in patterns:
@@ -94,7 +93,7 @@ Return ONLY the JSON, no explanation.
                 "architecture": ["Modular design", "Clean separation of concerns"],
                 "examples": []
             }
-    
+        
     def validate_pattern_application(self, output: str, patterns: Dict) -> tuple[bool, List[str]]:
         """Validate output applies extracted patterns"""
         if not output or not patterns:
@@ -135,17 +134,12 @@ Return ONLY the JSON, no explanation.
             response = self.run(validation_prompt)
             content = response.content if hasattr(response, 'content') else str(response)
             
-            # Parse JSON response
-            if '```json' in content:
-                json_start = content.find('```json') + 7
-                json_end = content.find('```', json_start)
-                content = content[json_start:json_end].strip()
-            elif '```' in content:
-                json_start = content.find('```') + 3
-                json_end = content.find('```', json_start)
-                content = content[json_start:json_end].strip()
-            
-            result = json.loads(content)
+            fallback_result = {
+                "success": False,
+                "violations": ["Unknown format, JSON could not be parsed"]
+            }
+
+            result = extract_json_with_fallback(content, fallback=fallback_result)
             return result.get('success', False), result.get('violations', [])
             
         except Exception as e:

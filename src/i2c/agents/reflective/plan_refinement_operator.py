@@ -15,6 +15,7 @@ from agno.agent import Agent
 from i2c.cli.controller import canvas
 from builtins import llm_highest,llm_deepseek
 from i2c.workflow.modification.rag_retrieval import retrieve_context_for_planner
+from i2c.utils.json_extraction import extract_json_with_fallback
 
 from i2c.agents.reflective.context_aware_operator import (
     ContextAwareOperator,
@@ -115,12 +116,9 @@ class PlanRefinementOperator(ContextAwareOperator):
         )
 
         parsed_plan: List[Dict]
-        try:
-            parsed_plan = json.loads(initial_plan)
-            if not isinstance(parsed_plan, list):
-                raise ValueError
-        except Exception:  # noqa: BLE001 – catch JSON + type errors together
-            canvas.warning("Initial plan is not valid JSON; starting with empty plan.")
+        parsed_plan = extract_json_with_fallback(initial_plan, fallback=[])
+        if not isinstance(parsed_plan, list):
+            canvas.warning("Initial plan was parsed but not a list; defaulting to empty plan.")
             parsed_plan = []
 
         retrieved_context = retrieve_context_for_planner(
@@ -257,37 +255,16 @@ class PlanRefinementOperator(ContextAwareOperator):
 
     @staticmethod
     def _extract_analysis(response: str) -> Dict:
-        # Attempt to parse first JSON block
-        import re
-
-        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response)
-        if match:
-            try:
-                return json.loads(match.group(1))
-            except Exception:  # noqa: BLE001 – fallback below
-                pass
-        return {"analysis": response, "structured": False}
+        fallback = {"analysis": response, "structured": False}
+        return extract_json_with_fallback(response, fallback=fallback)
 
     @staticmethod
     def _extract_plan(response: str) -> List[Dict]:
-        import re
-
-        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response)
-        if match:
-            try:
-                obj = json.loads(match.group(1))
-                return obj if isinstance(obj, list) else []
-            except Exception:  # noqa: BLE001 – continue
-                pass
-        # fallback: strip and load if array‑looking
-        trimmed = response.strip()
-        if trimmed.startswith("[") and trimmed.endswith("]"):
-            try:
-                obj = json.loads(trimmed)
-                return obj if isinstance(obj, list) else []
-            except Exception:
-                pass
-        canvas.warning("Failed to extract plan; returning empty list.")
+        fallback_result = []
+        result = extract_json_with_fallback(response, fallback=fallback_result)
+        if isinstance(result, list):
+            return result
+        canvas.warning("Plan was not a valid list; returning empty list.")
         return []
 
     ############################################################################

@@ -194,34 +194,51 @@ def _stub_for(rel_path: str, lang: str) -> str:
     return f"{comment} TODO: implement {rel_path}\n"
 
 # helper already in agentic_orchestrator.py
-def _apply_modifications_if_any(result_json: dict, project_path: Path) -> None:
+def _apply_modifications_if_any(result_json: dict, project_path: Path, session_state: Dict[str, Any] = None) -> None:
     mods = result_json.get("modifications", {})
+    print(f"DEBUG: _apply_modifications_if_any called with {mods}")
+    
     if not isinstance(mods, dict) or not mods:
+        print("DEBUG: No modifications to apply")
         return
 
-    prepared: dict[str, str] = {}
-    for rel_path, body in mods.items():
-        if not isinstance(body, str):
-            body = str(body)
+    # NEW: Instead of treating descriptions as code, use direct agent to generate actual code
+    from i2c.agents.core_agents import get_rag_enabled_agent
+    
+    for file_path, description in mods.items():
+        try:
+            print(f"DEBUG: Generating actual code for {file_path}: {description}")
+            
+            agent = get_rag_enabled_agent("code_builder", session_state=session_state)
+            
+            # Read existing file if it exists
+            full_path = project_path / file_path
+            existing_content = ""
+            if full_path.exists():
+                existing_content = full_path.read_text()
+            
+            # Generate actual code based on description
+            prompt = f"""Modify this file: {file_path}
 
-        # full code provided?
-        if "\n" in body.strip():
-            if not body.endswith("\n"):
-                body += "\n"
-            prepared[rel_path] = body
-            continue
+Task: {description}
 
-        # otherwise create stub
-        lang = (
-            LanguageDetector.detect_language(Path(rel_path).suffix)
-            or LanguageDetector.detect_language(body)
-            or ""
-        )
+Current content:
+{existing_content}
 
-        prepared[rel_path] = _stub_for(rel_path, lang.lower())
+Return the complete modified file content with the requested changes implemented."""
 
-    write_files_to_disk(prepared, project_path)
-
+            response = agent.run(prompt)
+            content = getattr(response, 'content', str(response))
+            
+            # Write the actual generated code
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            full_path.write_text(content, encoding='utf-8')
+            
+            print(f"DEBUG: Successfully wrote actual code to {file_path}")
+            
+        except Exception as e:
+            print(f"DEBUG: Error generating code for {file_path}: {e}")
+            
 # --- consolidate helpers ----------------------------------------
 def _ensure_mandatory_files(project_path: Path, arch_ctx: dict):
     required = {
@@ -515,9 +532,44 @@ async def execute_agentic_evolution(
     }
 
     team = build_orchestration_team(team_input)
-    message = Message(role="user", content=json.dumps(team_input))
-    result = await team.arun(message=message)
 
+    # Convert team_input to JSON string with proper error handling
+    try:
+        # First, make sure we have serializable data
+        team_input_copy = team_input.copy() if isinstance(team_input, dict) else team_input
+        
+        if isinstance(team_input_copy, dict):
+            # Remove non-serializable objects
+            team_input_copy.pop('knowledge_base', None)
+            team_input_copy.pop('embed_model', None) 
+            team_input_copy.pop('db_connection', None)
+            
+            # Also clean session_state if it exists
+            if 'session_state' in team_input_copy and isinstance(team_input_copy['session_state'], dict):
+                session_state = team_input_copy['session_state']
+                session_state.pop('knowledge_base', None)
+                session_state.pop('embed_model', None)
+                session_state.pop('db_connection', None)
+                
+            # Convert Path objects to strings
+            for key, value in team_input_copy.items():
+                if hasattr(value, '__str__') and 'Path' in str(type(value)):
+                    team_input_copy[key] = str(value)
+        
+        # Use standard JSON for serialization (output)
+        team_input_json = json.dumps(team_input_copy)
+        message = Message(role="user", content=team_input_json)
+        
+    except (TypeError, ValueError) as e:
+        canvas.error(f"JSON serialization error: {e}")
+        # Use fallback simple string format
+        message = Message(role="user", content=str(team_input))
+    
+    # Add debug before and after:
+    canvas.info(f"🔍 DEBUG: About to call orchestration team...")
+    canvas.info(f"🔍 DEBUG: Team input: {str(message)[:200]}...")
+    result = await team.arun(message=message)
+    canvas.info(f"🔍 DEBUG: Orchestration team result: {str(result)[:200]}...")
     # Skip sandbox waiting entirely - proceed with what we have
     if getattr(result, "event", None) in {"waiting", "run_paused", "intermediate"}:
         canvas.warning(f"Skipping sandbox wait (state: {result.event}) - proceeding with available content")
@@ -534,7 +586,7 @@ async def execute_agentic_evolution(
         elif isinstance(content, dict):
             result_dict = content
         elif isinstance(content, str):
-            from i2c.utils.json_extraction import extract_json_with_fallback
+            from i2c.utils.json_extraction import extract_json_with_fallback, extract_json
             
             fallback = {
                 "decision": "approve", 
@@ -545,11 +597,17 @@ async def execute_agentic_evolution(
                 "reasoning_trajectory": []
             }
             
-            result_dict = extract_json_with_fallback(content, fallback)
+            try:
+                result_dict = extract_json(content)  # No fallback
+            except ValueError as e:
+                return {
+                    "status": "error",
+                    "result": {"reason": f"Failed to parse team response: {str(e)}"}
+                }
         else:
             raise ValueError(f"Unexpected content type: {type(content)}")
 
-        _apply_modifications_if_any(result_dict, project_path)
+        _apply_modifications_if_any(result_dict, project_path,session_state)
         _ensure_mandatory_files(project_path, arch_ctx)
         ensure_dependency_file(project_path, arch_ctx)
         
@@ -783,16 +841,26 @@ def execute_agentic_evolution_sync(
 ) -> Dict[str, Any]:
     """
     Synchronous wrapper for execute_agentic_evolution. Runs the async function to completion.
-
+    
     :param objective: The dictionary describing task, constraints, and metadata.
     :param project_path: Path to the current project directory.
     :param session_state: Optional initial session state passed through runs.
     :returns: Final parsed JSON response from the agent team.
     """
-    return asyncio.get_event_loop().run_until_complete(
+    # Ensure we have an event loop
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError("Loop is closed")
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    # Run the async function
+    return loop.run_until_complete(
         execute_agentic_evolution(objective, project_path, session_state)
     )
-
+    
 __all__ = [
     "execute_agentic_evolution",
     "execute_agentic_evolution_sync",

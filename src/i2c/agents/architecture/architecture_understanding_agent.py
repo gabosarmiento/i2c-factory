@@ -598,53 +598,25 @@ class ArchitectureUnderstandingAgent(Agent):
             else:
                 content = str(content)
             
-            # Clean response - remove markdown if present
-            clean_content = content.strip()
+            # Use your robust JSON extraction utility
+            from i2c.utils.json_extraction import extract_json_with_fallback
             
-            # Remove markdown code blocks
-            if clean_content.startswith("```json"):
-                clean_content = clean_content[7:]
-                if clean_content.endswith("```"):
-                    clean_content = clean_content[:-3]
-            elif clean_content.startswith("```"):
-                clean_content = clean_content[3:]
-                if clean_content.endswith("```"):
-                    clean_content = clean_content[:-3]
-            
-            clean_content = clean_content.strip()
-            
-            # --- Robust JSON extraction -----------------------------------
-            parsed_data: Dict[str, Any] | None = None
-
-            try:
-                # happy-path: the whole string is valid JSON
-                parsed_data = json.loads(clean_content)
-            except json.JSONDecodeError:
-                # tolerate leading / trailing chatter from the LLM
-                first = clean_content.find("{")
-                last  = clean_content.rfind("}")
-                if first != -1 and last != -1 and last > first:
-                    json_block = clean_content[first : last + 1]
-                    parsed_data = json.loads(json_block)
-                else:
-                    raise  # will be caught by outer except
-
-            # At this point we have a dict
+            # Extract JSON with fallback to default analysis
+            parsed_data = extract_json_with_fallback(
+                content, 
+                fallback=self._create_fallback_analysis()
+            )
             
             # Validate required fields and provide defaults
             validated_data = self._validate_and_fix_analysis_data(parsed_data)
             
             return validated_data
             
-        except json.JSONDecodeError as e:
-            print(f"⚠️ JSON parsing failed: {e}")
-            print(f"⚠️ Raw content: {content[:200]}...")
-            return self._create_fallback_analysis()
         except Exception as e:
             print(f"⚠️ Response parsing failed: {e}")
             print(f"⚠️ Content type: {type(content)}")
             return self._create_fallback_analysis()
-
+    
     def _validate_and_fix_analysis_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and fix architectural analysis data structure"""
         

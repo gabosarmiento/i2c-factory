@@ -63,3 +63,10 @@ def test_agentic_flow_with_reject_decision(valid_objective, mock_orchestration_t
         assert result.get("result", {}).get("decision") == "reject"
         assert result.get("result", {}).get("reason") == "Failed security checks"
 
+def test_orchestrator_invalid_json_returns_error(valid_objective,mock_orchestration_team):
+    project_path = Path("tests/assets/agentic_integration")
+    bad = MagicMock(content="not-json")
+    mock_orchestration_team.return_value = bad
+    result = execute_agentic_evolution_sync(valid_objective, project_path)
+    assert result.get("status") == "error"
+

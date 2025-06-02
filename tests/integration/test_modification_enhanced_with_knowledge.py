@@ -11,7 +11,6 @@ from i2c.agents.modification_team.code_modification_manager_agno import (
     apply_modification,
     build_code_modification_team,
     _should_use_knowledge,
-    _get_lean_knowledge_context,
     get_knowledge_cache_stats
 )
 
@@ -51,44 +50,6 @@ def test_smart_knowledge_gating():
         print(f"   ⏭️  Skipping knowledge: {task['what']}")
     
     print("✅ Smart knowledge gating test passed")
-
-def test_lean_knowledge_retrieval():
-    """Test lean knowledge retrieval - maximum 1 API call"""
-    
-    # Create mock knowledge base that tracks calls
-    mock_kb = Mock()
-    mock_kb.retrieve_knowledge.return_value = [
-        {"source": "patterns.py", "content": "Best practices for API development with proper error handling and validation"}
-    ]
-    
-    session_state = {
-        "knowledge_base": mock_kb,
-        "session_id": "lean_test"
-    }
-    
-    print("⚡ Testing lean knowledge retrieval...")
-    
-    # Test complex task (should get knowledge)
-    complex_task = {"what": "create REST API with validation", "file": "api.py"}
-    knowledge = _get_lean_knowledge_context(session_state, complex_task)
-    
-    # Should have made exactly 1 API call
-    assert mock_kb.retrieve_knowledge.call_count == 1
-    assert len(knowledge) > 0
-    assert len(knowledge) <= 400  # Content should be truncated to 400 chars
-    print(f"📞 API calls for complex task: {mock_kb.retrieve_knowledge.call_count}")
-    print(f"📝 Knowledge length: {len(knowledge)} chars (≤400)")
-    
-    # Test trivial task (should NOT get knowledge)
-    trivial_task = {"what": "fix typo", "file": "test.py"}
-    knowledge_trivial = _get_lean_knowledge_context(session_state, trivial_task)
-    
-    # Should still be only 1 API call (no additional calls)
-    assert mock_kb.retrieve_knowledge.call_count == 1
-    assert knowledge_trivial == ""
-    print(f"📞 API calls after trivial task: {mock_kb.retrieve_knowledge.call_count} (no increase)")
-    
-    print("✅ Lean knowledge retrieval test passed")
 
 def test_minimal_api_usage_during_modifications():
     """Test that modifications use minimal API calls"""

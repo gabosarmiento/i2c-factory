@@ -1,7 +1,7 @@
 # i2c/workflow/generation_workflow.py
 from agno.workflow import Workflow, RunResponse
 from pathlib import Path
-from typing import Iterator, Dict, Any
+from typing import Iterator, Dict, Any, AsyncGenerator
 
 # Import existing agents
 
@@ -161,7 +161,7 @@ class GenerationWorkflow(Workflow):
         )
 
 
-    async def knowledge_analysis_phase(self, structured_goal: dict, project_path: Path) -> Iterator[RunResponse]:
+    async def knowledge_analysis_phase(self, structured_goal: dict, project_path: Path) -> AsyncGenerator[RunResponse, None]:
         """Use KnowledgeTeam to analyze context before generation."""
         canvas.step("Analyzing project context with KnowledgeTeam...")
         
@@ -226,12 +226,19 @@ class GenerationWorkflow(Workflow):
                 canvas.info(f"Added {len(structured_goal['constraints'])} quality constraints to planning prompt")
             
             # Build the plan prompt with constraints
-            plan_prompt = f"Objective: {objective}\nLanguage: {language}{constraints_text}"
+            plan_prompt = f"""Objective: {objective}
+            Language: {language}{constraints_text}
+
+            CRITICAL: You must return ONLY a valid JSON object with this exact structure:
+            {{"files": ["path/to/file1.py", "path/to/file2.py", "path/to/file3.py"]}}
+
+            Do not include any explanations, markdown, or reasoning. Return ONLY the raw JSON object.
+            The files should use AGNO framework patterns from your knowledge context."""
             
             # Get RAG-enabled planner with session state
             
             from i2c.agents.core_agents import get_rag_enabled_agent
-            planner = get_rag_enabled_agent("planner", self.session_state)
+            planner = get_rag_enabled_agent("planner", session_state=self.session_state)
 
             # DEBUG: Check if planner has knowledge context
             if self.session_state and "retrieved_context" in self.session_state:
@@ -349,7 +356,7 @@ class GenerationWorkflow(Workflow):
                 
                 # Get RAG-enabled code builder with session state
                 from i2c.agents.core_agents import get_rag_enabled_agent
-                builder = get_rag_enabled_agent("code_builder", self.session_state)
+                builder = get_rag_enabled_agent("code_builder", session_state=self.session_state)
 
                 # DEBUG: Check if builder has knowledge context
                 if hasattr(builder, '_enhanced_with_knowledge'):

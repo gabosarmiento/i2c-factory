@@ -5,8 +5,7 @@ import json
 from pathlib import Path
 
 # Import necessary components (agents, utils, canvas, llms)
-from i2c.agents.core_agents import input_processor_agent
-from i2c.agents.core_agents import project_context_analyzer_agent
+
 from i2c.agents.modification_team.context_reader import context_reader_agent
 from i2c.agents.budget_manager import BudgetManagerAgent
 from i2c.cli.controller import canvas
@@ -14,11 +13,24 @@ from i2c.cli.utils.documentation_type_selector import get_document_type
 from i2c.workflow.utils import sanitize_filename, ensure_project_path
 from builtins import llm_middle
 import hashlib
+from typing import Dict
 from datetime import datetime
 from i2c.workflow.visual_helpers import (
     show_help_message,
     show_project_plan
 )
+
+def get_current_session_state():
+    """Get session state from current context"""
+    # Try to get from scenario processor if available
+    try:
+        import builtins
+        if hasattr(builtins, 'current_session_state'):
+            return builtins.current_session_state
+    except:
+        pass
+    return None
+
 # Function to safely parse JSON, returning None on failure
 def _safe_json_loads(text: str) -> dict | None:
     """Safely parse JSON, handling potentially complex JSON structures."""
@@ -52,7 +64,8 @@ def _safe_json_loads(text: str) -> dict | None:
             canvas.info("Processing JSON prompt content...")
             
             from i2c.agents.core_agents import get_rag_enabled_agent
-            temp_agent = get_rag_enabled_agent("input_processor")
+            session_state = get_current_session_state()
+            temp_agent = get_rag_enabled_agent("input_processor", session_state=session_state)
             response = temp_agent.run(prompt_content)
             response_content = response.content if hasattr(response, 'content') else str(response)
             
@@ -215,7 +228,8 @@ def handle_load_project(path_str: str) -> tuple[Path | None, dict | None]:
 
             # Use direct run - error handling below
             from i2c.agents.core_agents import get_rag_enabled_agent
-            temp_agent = get_rag_enabled_agent("project_context_analyzer")
+            session_state = get_current_session_state()
+            temp_agent = get_rag_enabled_agent("project_context_analyzer", session_state=session_state)
             response = temp_agent.run(prompt)
             analysis_json = response.content if hasattr(response, "content") else str(response)
             analysis_data = _safe_json_loads(analysis_json) # Use safe JSON parsing
@@ -268,7 +282,8 @@ def handle_new_project_idea(raw_idea: str, budget_manager: BudgetManagerAgent, b
     processed_goal = None
     try:
         from i2c.agents.core_agents import get_rag_enabled_agent
-        temp_agent = get_rag_enabled_agent("input_processor")
+        session_state = get_current_session_state()
+        temp_agent = get_rag_enabled_agent("input_processor", session_state=session_state)
         response = temp_agent.run(raw_idea)
         response_content = response.content if hasattr(response, 'content') else str(response)
         processed_goal = _safe_json_loads(response_content) # Use safe JSON parsing

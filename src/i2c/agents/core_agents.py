@@ -2,10 +2,12 @@
 from textwrap import dedent
 from pathlib import Path
 from builtins import llm_middle, llm_highest, llm_small
+
 from i2c.agents.core_team.input_processor import create_input_processor_agent, InputProcessorAgent
 from i2c.agents.core_team.planner import create_planner_agent, PlannerAgent
 from i2c.agents.core_team.code_builder import create_code_builder_agent, CodeBuilderAgent
 from i2c.agents.core_team.project_analyzer import create_project_analyzer_agent, ProjectContextAnalyzerAgent
+
 from i2c.workflow.modification.rag_config import get_embed_model
 from i2c.db_utils import get_db_connection
 # Try to import the canvas for visual logging - fallback to simple print if not available
@@ -21,10 +23,26 @@ except ImportError:
     
 _expertise_cache = {}
 # Knowledge-enhanced agent instantiation
-input_processor_agent = None  # Will be created dynamically
-planner_agent = None
-code_builder_agent = None
-project_context_analyzer_agent = None
+# Create default instances to prevent import errors
+try:
+    input_processor_agent = InputProcessorAgent()
+except:
+    input_processor_agent = None
+
+try:
+    planner_agent = PlannerAgent()
+except:
+    planner_agent = None
+
+try:
+    code_builder_agent = CodeBuilderAgent()
+except:
+    code_builder_agent = None
+
+try:
+    project_context_analyzer_agent = ProjectContextAnalyzerAgent()
+except:
+    project_context_analyzer_agent = None
 
 # Set up factory functions for session state aware instantiation
 def get_rag_enabled_agent(agent_type, session_state=None):
