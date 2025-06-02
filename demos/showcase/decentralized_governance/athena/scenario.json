@@ -1,0 +1,179 @@
+{
+  "project_name": "athena_community_healing",
+  "name": "Athena - Community Healing Protocol",
+  "description": "User-centered AI system that helps divided communities rebuild trust and heal social divisions through carefully designed interactions, shared problem-solving, and restorative justice approaches that prioritize human dignity and cultural sensitivity",
+  "steps": [
+    {
+      "type": "knowledge",
+      "name": "Load AGNO Framework Knowledge",
+      "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+      "doc_type": "AGNO Framework Guide",
+      "framework": "AGNO",
+      "version": "latest",
+      "project_name": "athena_community_healing",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "knowledge", 
+      "name": "Load AGNO Advanced Patterns",
+      "doc_path": "src/i2c/docs/agno_guide.pdf",
+      "doc_type": "AGNO Advanced Guide",
+      "framework": "AGNO",
+      "version": "latest", 
+      "project_name": "athena_community_healing",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "initial_generation",
+      "name": "Generate Community Listening and Understanding System",
+      "prompt": "Create a community-centered listening system using AGNO framework that helps understand the root causes of social divisions. Build CommunityListenerAgent that conducts respectful interviews with community members from all sides of conflicts, CulturalSensitivityAgent that ensures approaches respect diverse backgrounds and traditions, and StorytellingAgent that helps people share their experiences and perspectives in safe, structured ways. Include a platform where community members can anonymously share their concerns, fears, and hopes for healing. The system must prioritize human dignity, cultural humility, and genuine understanding over quick fixes. Create safe spaces for vulnerable voices and marginalized community members.",
+      "project_name": "athena_community_healing"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Trust and Safety Foundation",
+      "objective": {
+        "task": "Create comprehensive trust-building infrastructure that ensures all community members feel safe, heard, and respected throughout the healing process.",
+        "constraints": [
+          "Implement SafeSpaceAgent that creates physically and emotionally secure environments for community dialogue",
+          "Create AnonymityProtectionAgent that protects participant identities while enabling authentic sharing",
+          "Build TraumaInformedAgent that recognizes and responds appropriately to community trauma and historical wounds",
+          "Add NeutralFacilitationAgent that ensures fair representation and prevents dominant voices from silencing others",
+          "Integrate TrustFoundationTeam that coordinates all safety agents with community consent and cultural protocols",
+          "Include community-controlled moderation where local leaders help set guidelines and boundaries",
+          "Add restorative justice principles that focus on healing rather than punishment or blame",
+          "Implement indigenous and traditional conflict resolution practices with community elder guidance"
+        ]
+      },
+      "project_name": "athena_community_healing"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Create Dialogue and Mediation Platform",
+      "objective": {
+        "task": "Build intelligent dialogue facilitation that helps opposing community groups understand each other's perspectives and find common ground.",
+        "constraints": [
+          "Implement DialogueFacilitatorAgent that guides respectful conversations between conflicted parties",
+          "Create EmpathyBridgeAgent that helps participants understand experiences different from their own",
+          "Build CommonGroundAgent that identifies shared values, concerns, and goals across community divisions",
+          "Add ConflictTransformationAgent that reframes adversarial dynamics into collaborative problem-solving",
+          "Integrate CommunityDialogueTeam that coordinates all mediation agents with local cultural wisdom",
+          "Include structured storytelling sessions where people share personal impacts of community conflicts",
+          "Add perspective-taking exercises that help participants see situations through others' eyes",
+          "Implement circle processes and other community-based healing traditions with proper cultural respect"
+        ]
+      },
+      "project_name": "athena_community_healing"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Implement Collaborative Problem-Solving Engine",
+      "objective": {
+        "task": "Create systems that channel community energy toward solving shared challenges rather than perpetuating divisions.",
+        "constraints": [
+          "Create CommunityNeedsAgent that identifies practical problems affecting all community members",
+          "Implement CollaborativeDesignAgent that facilitates joint problem-solving across community divisions",
+          "Build ResourceMobilizationAgent that helps communities organize collective action for shared goals",
+          "Add SuccessAmplificationAgent that celebrates collaborative achievements and positive community changes",
+          "Integrate ProblemSolvingTeam that coordinates all collaboration agents with community ownership priority",
+          "Include project-based healing where former opponents work together on community improvement initiatives",
+          "Add skill-sharing programs that connect people across divides through mutual teaching and learning",
+          "Implement community asset mapping that highlights existing strengths and resources for collective building"
+        ]
+      },
+      "project_name": "athena_community_healing"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Healing Relationship Network",
+      "objective": {
+        "task": "Create systems that support the development of new, positive relationships across former community divisions.",
+        "constraints": [
+          "Implement RelationshipBuildingAgent that facilitates meaningful connections between previously opposed community members",
+          "Create MentorshipAgent that pairs community members for mutual support and understanding across divisions",
+          "Build ForgivenessProcessAgent that supports those ready to engage in forgiveness and reconciliation processes",
+          "Add YouthEngagementAgent that involves younger community members in shaping a more unified future",
+          "Integrate HealingNetworkTeam that coordinates all relationship agents with intergenerational wisdom",
+          "Include family and friend integration programs that extend healing beyond individual participants",
+          "Add community ritual and ceremony design that marks progress and celebrates healing milestones",
+          "Implement peer support networks where community members mentor others through their own healing journeys"
+        ]
+      },
+      "project_name": "athena_community_healing"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Create Progress Monitoring and Adaptation System",
+      "objective": {
+        "task": "Build community-controlled systems for tracking healing progress and adapting approaches based on community feedback and changing needs.",
+        "constraints": [
+          "Implement CommunityFeedbackAgent that continuously gathers input from all community segments on healing effectiveness",
+          "Create ProgressIndicatorAgent that tracks meaningful metrics of social cohesion and reduced conflict",
+          "Build AdaptationAgent that adjusts healing approaches based on community input and changing circumstances",
+          "Add TransparencyAgent that keeps the community informed about progress, challenges, and next steps",
+          "Integrate ProgressMonitoringTeam that coordinates all tracking agents with community accountability",
+          "Include community-defined success metrics that reflect local values and priorities",
+          "Add regular community assemblies where progress is reviewed and approaches are democratically adjusted",
+          "Implement early warning systems that detect potential setbacks and trigger additional support"
+        ]
+      },
+      "project_name": "athena_community_healing"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Implement Sustainable Community Governance",
+      "objective": {
+        "task": "Create governance systems that prevent future conflicts and maintain healing progress through community-controlled decision-making processes.",
+        "constraints": [
+          "Create ConflictPreventionAgent that identifies potential future divisions before they escalate",
+          "Implement InclusiveDecisionAgent that ensures all community voices are heard in future governance",
+          "Build AccountabilityAgent that maintains transparency and prevents abuse of power in community leadership",
+          "Add CivicEngagementAgent that increases community participation in local decision-making processes",
+          "Integrate SustainableGovernanceTeam that coordinates all governance agents with democratic principles",
+          "Include community constitution development that codifies agreed-upon values and conflict resolution processes",
+          "Add leadership development programs that prepare diverse community members for inclusive governance roles",
+          "Implement participatory budgeting and community-controlled resource allocation systems"
+        ]
+      },
+      "project_name": "athena_community_healing"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Legacy and Knowledge Transfer Platform",
+      "objective": {
+        "task": "Create systems that preserve healing knowledge and support other communities facing similar divisions.",
+        "constraints": [
+          "Implement KnowledgePreservationAgent that documents healing processes and lessons learned for community archives",
+          "Create MentorCommunityAgent that enables healed communities to support others beginning their healing journeys",
+          "Build WisdomSharingAgent that facilitates knowledge transfer while respecting community privacy and autonomy",
+          "Add NextGenerationAgent that ensures younger community members learn from healing experiences and can maintain progress",
+          "Integrate LegacyBuildingTeam that coordinates all knowledge agents with community consent and ownership",
+          "Include community storytelling archives that preserve healing narratives for future generations",
+          "Add inter-community learning networks where different communities share healing strategies and support",
+          "Implement research and documentation systems that contribute to global understanding of community healing"
+        ]
+      },
+      "project_name": "athena_community_healing"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Create Ethical Framework and Professional Integration",
+      "objective": {
+        "task": "Build professional integration with conflict resolution specialists while maintaining community autonomy and ethical standards.",
+        "constraints": [
+          "Implement EthicalOversightAgent that ensures all healing approaches meet professional mediation and restorative justice standards",
+          "Create ProfessionalCollaborationAgent that connects communities with trained conflict resolution specialists when needed",
+          "Build CommunityAutonomyAgent that ensures outside professional help respects community self-determination",
+          "Add CulturalCompetencyAgent that maintains cultural sensitivity and prevents colonial or paternalistic approaches",
+          "Integrate EthicalFrameworkTeam that coordinates all professional agents with community sovereignty priority",
+          "Include training programs for local mediators and peacebuilders within the community",
+          "Add connection to international peace-building networks and conflict transformation resources",
+          "Implement ethical review processes that prevent exploitation and ensure community benefit from any research or documentation"
+        ]
+      },
+      "project_name": "athena_community_healing"
+    }
+  ]
+}

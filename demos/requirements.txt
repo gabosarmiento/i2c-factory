@@ -1,0 +1,22 @@
+# Core AGNO requirements
+agno>=1.0.0
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
+
+# Demo-specific packages
+streamlit>=1.28.0
+plotly>=5.17.0
+pandas>=2.1.0
+numpy>=1.25.0
+requests>=2.31.0
+
+# AI/ML packages
+openai>=1.0.0
+anthropic>=0.7.0
+sentence-transformers>=2.2.0
+
+# Utility packages
+python-dotenv>=1.0.0
+pyyaml>=6.0.1

@@ -1,0 +1,143 @@
+{
+  "project_name": "hal_business_intelligence",
+  "name": "HAL - Predictive Business Intelligence",
+  "description": "Comprehensive AI system that connects to business data sources, predicts market shifts 3-6 months ahead, and automatically adjusts strategies before competitors react",
+  "steps": [
+    {
+      "type": "knowledge",
+      "name": "Load AGNO Framework Knowledge",
+      "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+      "doc_type": "AGNO Framework Guide",
+      "framework": "AGNO",
+      "version": "latest",
+      "project_name": "hal_business_intelligence",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "knowledge", 
+      "name": "Load AGNO Advanced Patterns",
+      "doc_path": "src/i2c/docs/agno_guide.pdf",
+      "doc_type": "AGNO Advanced Guide",
+      "framework": "AGNO",
+      "version": "latest", 
+      "project_name": "hal_business_intelligence",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "initial_generation",
+      "name": "Generate Core Data Intelligence Foundation",
+      "prompt": "Create the foundational data intelligence system using AGNO framework. Build DataIngestionAgent that connects to multiple data sources (APIs, databases, files), DataValidationAgent that ensures data quality and consistency, and DataProcessingAgent that cleans and structures incoming data. Include a FastAPI backend with endpoints for data source management, real-time data monitoring, and data quality dashboards. Create database schemas for storing historical data, market signals, and business metrics. The system should handle high-volume real-time data streams and provide data lineage tracking.",
+      "project_name": "hal_business_intelligence"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add Market Analysis Intelligence Layer",
+      "objective": {
+        "task": "Evolve the system to include sophisticated market analysis capabilities with specialized AGNO agents for comprehensive market intelligence.",
+        "constraints": [
+          "Implement MarketSignalAgent that monitors news feeds, social media, financial markets, and industry reports",
+          "Create CompetitorAnalysisAgent that tracks competitor activities, pricing changes, and strategic moves",
+          "Build EconomicIndicatorAgent that analyzes GDP, inflation, employment data, and central bank policies",
+          "Add SentimentAnalysisAgent that processes social media and news sentiment around markets and brands",
+          "Integrate MarketIntelligenceTeam that coordinates all market analysis agents using AGNO delegation",
+          "Include real-time alerting system for significant market events and competitor actions",
+          "Add market trend visualization and interactive dashboards for market conditions",
+          "Implement data fusion algorithms that combine multiple market signals into coherent insights"
+        ]
+      },
+      "project_name": "hal_business_intelligence"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Implement Predictive Forecasting Engine",
+      "objective": {
+        "task": "Add advanced predictive capabilities with machine learning models and scenario planning for 3-6 month market forecasting.",
+        "constraints": [
+          "Create TrendForecastingAgent using ensemble ML models (LSTM, ARIMA, Prophet) for time series prediction",
+          "Implement ScenarioModelingAgent that generates multiple future scenarios with probability assessments",
+          "Build RiskAssessmentAgent that quantifies uncertainty and identifies potential black swan events",
+          "Add PatternRecognitionAgent that identifies recurring market cycles and seasonal patterns",
+          "Integrate PredictiveEngineTeam that orchestrates all forecasting agents with consensus mechanisms",
+          "Include Monte Carlo simulations for stress testing and sensitivity analysis",
+          "Add model validation framework with backtesting and performance metrics",
+          "Implement automated model retraining based on prediction accuracy and new data patterns"
+        ]
+      },
+      "project_name": "hal_business_intelligence"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Strategic Optimization System",
+      "objective": {
+        "task": "Create intelligent strategy optimization that can automatically adjust business tactics based on market predictions and business objectives.",
+        "constraints": [
+          "Implement PricingOptimizationAgent that adjusts prices based on demand forecasts and competitor analysis",
+          "Create InventoryOptimizationAgent that manages stock levels using demand predictions and supply chain data",
+          "Build MarketingOptimizationAgent that allocates budgets across channels based on predicted ROI",
+          "Add ResourceAllocationAgent that optimizes human resources and operational capacity",
+          "Integrate StrategyOptimizationTeam that coordinates all optimization agents with multi-objective goals",
+          "Include what-if analysis tools for testing strategy changes before implementation",
+          "Add automated A/B testing framework for validating optimization recommendations",
+          "Implement constraint-based optimization that respects business rules and regulatory requirements"
+        ]
+      },
+      "project_name": "hal_business_intelligence"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Create Execution and Integration Platform",
+      "objective": {
+        "task": "Build comprehensive execution capabilities that can automatically implement strategy changes across business systems.",
+        "constraints": [
+          "Implement SystemIntegrationAgent with APIs to CRM (Salesforce), ERP (SAP), and marketing platforms",
+          "Create WorkflowExecutionAgent that orchestrates multi-step business process changes",
+          "Build ApprovalWorkflowAgent that manages human-in-the-loop validation for high-impact decisions",
+          "Add AuditTrailAgent that logs all automated decisions and changes for compliance and review",
+          "Integrate ExecutionCoordinatorTeam that manages all execution agents with rollback capabilities",
+          "Include real-time monitoring of executed changes with performance impact tracking",
+          "Add automated rollback mechanisms if strategy changes produce negative outcomes",
+          "Implement notification systems for stakeholders when significant changes are executed"
+        ]
+      },
+      "project_name": "hal_business_intelligence"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Add Advanced Analytics and Reporting",
+      "objective": {
+        "task": "Create comprehensive analytics platform with advanced visualization, reporting, and business intelligence capabilities.",
+        "constraints": [
+          "Implement AnalyticsEngineAgent that generates insights and KPI tracking across all business functions",
+          "Create ReportGenerationAgent that produces automated executive reports with actionable insights",
+          "Build VisualizationAgent that creates dynamic dashboards and interactive data exploration tools",
+          "Add AlertSystemAgent that monitors business metrics and triggers notifications for anomalies",
+          "Integrate BusinessIntelligenceTeam that coordinates all analytics agents with unified reporting",
+          "Include customizable dashboard builder for different stakeholder needs (C-suite, managers, analysts)",
+          "Add natural language query interface for asking business questions in plain English",
+          "Implement automated insight discovery that identifies hidden patterns and opportunities"
+        ]
+      },
+      "project_name": "hal_business_intelligence"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Implement Security and Governance Framework",
+      "objective": {
+        "task": "Add enterprise-grade security, compliance, and governance capabilities to ensure safe autonomous business operations.",
+        "constraints": [
+          "Implement SecurityMonitoringAgent that protects against data breaches and unauthorized access",
+          "Create ComplianceValidationAgent that ensures all decisions meet regulatory requirements",
+          "Build RiskGovernanceAgent that enforces risk limits and escalation procedures",
+          "Add DataPrivacyAgent that manages GDPR, CCPA, and other privacy regulation compliance",
+          "Integrate GovernanceFrameworkTeam that coordinates all security and compliance agents",
+          "Include role-based access control with multi-factor authentication for sensitive operations",
+          "Add comprehensive audit logging with tamper-proof records for regulatory compliance",
+          "Implement automated compliance reporting and risk assessment documentation"
+        ]
+      },
+      "project_name": "hal_business_intelligence"
+    }
+  ]
+}

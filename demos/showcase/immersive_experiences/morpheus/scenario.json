@@ -1,0 +1,161 @@
+{
+  "project_name": "morpheus_therapeutic_reality",
+  "name": "Morpheus - Therapeutic Reality Designer",
+  "description": "User-centered AI system that creates personalized VR therapeutic environments to help individuals overcome phobias, practice difficult conversations, and support mental health recovery through carefully designed immersive experiences",
+  "steps": [
+    {
+      "type": "knowledge",
+      "name": "Load AGNO Framework Knowledge",
+      "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+      "doc_type": "AGNO Framework Guide",
+      "framework": "AGNO",
+      "version": "latest",
+      "project_name": "morpheus_therapeutic_reality",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "knowledge", 
+      "name": "Load AGNO Advanced Patterns",
+      "doc_path": "src/i2c/docs/agno_guide.pdf",
+      "doc_type": "AGNO Advanced Guide",
+      "framework": "AGNO",
+      "version": "latest", 
+      "project_name": "morpheus_therapeutic_reality",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "initial_generation",
+      "name": "Generate User Assessment and Onboarding System",
+      "prompt": "Create a user-centered therapeutic assessment system using AGNO framework. Build UserIntakeAgent that conducts empathetic initial assessments of user needs, fears, and therapeutic goals, TherapeuticNeedsAnalyzer that identifies specific mental health challenges and treatment approaches, and UserComfortAgent that ensures users feel safe and supported throughout the process. Include a web interface where users can describe their challenges in their own words, complete validated psychological assessments, and set personal therapeutic goals. The system should prioritize user consent, privacy, and emotional safety above all else. Create user profiles that respect individual boundaries and cultural sensitivities.",
+      "project_name": "morpheus_therapeutic_reality"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Personalized Environment Design System",
+      "objective": {
+        "task": "Create intelligent environment design that generates therapeutic VR spaces tailored to each user's specific needs and comfort levels.",
+        "constraints": [
+          "Implement EnvironmentDesignerAgent that creates safe, culturally appropriate virtual spaces based on user preferences",
+          "Create ScenarioBuilderAgent that designs graduated exposure scenarios respecting user-defined boundaries",
+          "Build ComfortZoneAgent that ensures users always have safe spaces to retreat to during therapy",
+          "Add AccessibilityAgent that adapts environments for users with disabilities or special needs",
+          "Integrate PersonalizedDesignTeam that coordinates all design agents with user consent at every step",
+          "Include user feedback loops where individuals can modify environments to feel more comfortable",
+          "Add cultural sensitivity validation to ensure environments respect diverse backgrounds",
+          "Implement trigger warning systems and content filtering based on individual trauma histories"
+        ]
+      },
+      "project_name": "morpheus_therapeutic_reality"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Implement Adaptive Therapy Progression Engine",
+      "objective": {
+        "task": "Build intelligent therapy progression that adapts to user pace, comfort levels, and therapeutic outcomes in real-time.",
+        "constraints": [
+          "Create ProgressTrackingAgent that monitors user comfort levels and stress indicators during sessions",
+          "Implement AdaptationAgent that adjusts therapy intensity based on user responses and preferences",
+          "Build MotivationAgent that provides encouragement and celebrates user achievements at their own pace",
+          "Add CrisisInterventionAgent that detects distress and immediately provides support resources",
+          "Integrate TherapyProgressionTeam that coordinates all progression agents with user safety as priority",
+          "Include user-controlled pacing where individuals can slow down, speed up, or pause therapy",
+          "Add integration with human therapists for cases requiring professional intervention",
+          "Implement evidence-based therapeutic frameworks (CBT, exposure therapy, mindfulness) with user choice"
+        ]
+      },
+      "project_name": "morpheus_therapeutic_reality"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Create Immersive Experience and Interaction System",
+      "objective": {
+        "task": "Build the core VR experience engine that creates realistic, therapeutic interactions while maintaining user agency and control.",
+        "constraints": [
+          "Implement VRExperienceAgent that renders high-quality, realistic therapeutic environments",
+          "Create InteractionAgent that enables natural user interactions within virtual therapeutic scenarios",
+          "Build BiometricMonitoringAgent that tracks heart rate, stress levels, and comfort indicators",
+          "Add VoiceCoachingAgent that helps users practice difficult conversations with AI-powered dialogue partners",
+          "Integrate ImmersiveExperienceTeam that coordinates all VR agents with real-time user feedback",
+          "Include haptic feedback integration for enhanced therapeutic presence and grounding techniques",
+          "Add eye tracking and gesture recognition for natural, intuitive interaction with virtual environments",
+          "Implement realistic NPCs (non-player characters) for social anxiety and conversation practice"
+        ]
+      },
+      "project_name": "morpheus_therapeutic_reality"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build User Support and Safety Network",
+      "objective": {
+        "task": "Create comprehensive user support systems that ensure emotional safety, crisis management, and connection to human help when needed.",
+        "constraints": [
+          "Implement EmotionalSupportAgent that provides 24/7 caring, empathetic responses to user distress",
+          "Create CrisisDetectionAgent that identifies when users need immediate human intervention",
+          "Build ResourceConnectionAgent that connects users to local mental health professionals and support groups",
+          "Add PeerSupportAgent that facilitates safe, moderated connections with others facing similar challenges",
+          "Integrate UserSafetyTeam that coordinates all support agents with professional mental health standards",
+          "Include emergency protocols that contact crisis hotlines or emergency services when necessary",
+          "Add family/friend notification systems (with user consent) for support network involvement",
+          "Implement professional therapist integration with secure communication and progress sharing"
+        ]
+      },
+      "project_name": "morpheus_therapeutic_reality"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Create Progress Analytics and Outcome Tracking",
+      "objective": {
+        "task": "Build user-centered analytics that help individuals track their therapeutic progress while maintaining complete privacy control.",
+        "constraints": [
+          "Implement UserProgressAgent that tracks therapeutic milestones and personal growth metrics",
+          "Create InsightGenerationAgent that provides meaningful progress insights in user-friendly language",
+          "Build GoalTrackingAgent that helps users set, adjust, and celebrate personal therapeutic goals",
+          "Add DataPrivacyAgent that ensures users have complete control over their therapeutic data",
+          "Integrate ProgressAnalyticsTeam that coordinates all tracking agents with user privacy as priority",
+          "Include user-controlled data sharing options for family, therapists, or researchers",
+          "Add exportable progress reports that users can share with healthcare providers",
+          "Implement anonymized outcome research contribution (opt-in only) to improve therapy for others"
+        ]
+      },
+      "project_name": "morpheus_therapeutic_reality"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Implement Community and Long-term Support Platform",
+      "objective": {
+        "task": "Create supportive community features and long-term engagement systems that help users maintain therapeutic progress.",
+        "constraints": [
+          "Implement CommunityModerationAgent that maintains safe, supportive peer interaction spaces",
+          "Create MentorshipAgent that connects recovered users with those beginning their therapeutic journey",
+          "Build LifestyleIntegrationAgent that helps users apply therapeutic skills to daily life situations",
+          "Add MaintenanceTherapyAgent that provides ongoing support and relapse prevention strategies",
+          "Integrate CommunityWellnessTeam that coordinates all community agents with user safety and privacy",
+          "Include anonymous peer support groups organized by therapeutic goals and comfort levels",
+          "Add real-world skill transfer exercises that bridge VR therapy to everyday situations",
+          "Implement long-term follow-up check-ins with user consent and personalized continued care"
+        ]
+      },
+      "project_name": "morpheus_therapeutic_reality"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Professional Integration and Compliance Framework",
+      "objective": {
+        "task": "Create enterprise-grade integration with healthcare systems while maintaining strict ethical standards and regulatory compliance.",
+        "constraints": [
+          "Implement HealthcareIntegrationAgent that securely connects with electronic health records and therapy practices",
+          "Create EthicsComplianceAgent that ensures all therapeutic approaches meet professional mental health standards",
+          "Build RegulationAgent that maintains HIPAA, GDPR, and medical device compliance across all jurisdictions",
+          "Add ProfessionalCollaborationAgent that facilitates seamless communication between AI system and human therapists",
+          "Integrate ProfessionalFrameworkTeam that coordinates all integration agents with medical ethics priority",
+          "Include professional therapist training and certification programs for using the platform",
+          "Add clinical research integration for evidence-based therapy improvement with strict ethical oversight",
+          "Implement professional supervision features where licensed therapists can oversee AI-assisted therapy"
+        ]
+      },
+      "project_name": "morpheus_therapeutic_reality"
+    }
+  ]
+}

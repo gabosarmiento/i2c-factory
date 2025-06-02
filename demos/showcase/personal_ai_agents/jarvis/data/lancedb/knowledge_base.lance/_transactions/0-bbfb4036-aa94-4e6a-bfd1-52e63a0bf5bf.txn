@@ -1,0 +1,5 @@
+$bbfb4036-aa94-4e6a-bfd1-52e63a0bf5bf²£(source ÿÿÿÿÿÿÿÿÿ*string08Zdefault+content ÿÿÿÿÿÿÿÿÿ*string08Zdefault=vector ÿÿÿÿÿÿÿÿÿ*fixed_size_list:float:38408Zdefault,category ÿÿÿÿÿÿÿÿÿ*string08Zdefault0last_updated ÿÿÿÿÿÿÿÿÿ*string08Zdefault3knowledge_space ÿÿÿÿÿÿÿÿÿ*string08Zdefault1document_type ÿÿÿÿÿÿÿÿÿ*string08Zdefault-	framework ÿÿÿÿÿÿÿÿÿ*string08Zdefault+version ÿÿÿÿÿÿÿÿÿ*string08Zdefault1parent_doc_id	 ÿÿÿÿÿÿÿÿÿ*string08Zdefault.
+chunk_type
+ ÿÿÿÿÿÿÿÿÿ*string08Zdefault/source_hash ÿÿÿÿÿÿÿÿÿ*string08Zdefault1metadata_json ÿÿÿÿÿÿÿÿÿ*string08Zdefault2knowledge_type ÿÿÿÿÿÿÿÿÿ*string08Zdefault7application_context ÿÿÿÿÿÿÿÿÿ*string08Zdefault3confidence_score ÿÿÿÿÿÿÿÿÿ*float08Zdefault2usage_frequency ÿÿÿÿÿÿÿÿÿ*int3208Zdefault"!
+lance.auto_cleanup.interval20"'
+lance.auto_cleanup.older_than14days

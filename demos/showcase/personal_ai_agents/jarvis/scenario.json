@@ -1,0 +1,57 @@
+{
+  "project_name": "jarvis_emotional_advisor",
+  "name": "Jarvis - Emotional Intelligence Advisor",
+  "description": "AI system that analyzes communication patterns to detect relationship tensions and proactively suggest interventions before conflicts arise",
+  "steps": [
+    {
+      "type": "knowledge",
+      "name": "Load AGNO Framework Knowledge",
+      "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+      "doc_type": "AGNO Framework Guide",
+      "framework": "AGNO",
+      "version": "latest",
+      "project_name": "jarvis_emotional_advisor",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "knowledge", 
+      "name": "Load AGNO Advanced Patterns",
+      "doc_path": "src/i2c/docs/agno_guide.pdf",
+      "doc_type": "AGNO Advanced Guide",
+      "framework": "AGNO",
+      "version": "latest", 
+      "project_name": "jarvis_emotional_advisor",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "initial_generation",
+      "name": "Generate Emotional Intelligence System",
+      "prompt": "Create a sophisticated emotional intelligence advisor system using AGNO framework. The system should analyze communication patterns (emails, messages, calendar events) to detect brewing conflicts and relationship tensions before they escalate. Build specialized AGNO agents that work together: EmotionDetectionAgent for sentiment analysis, PatternRecognitionAgent for historical behavior analysis, InterventionStrategyAgent for personalized solution design, and CommunicationCoachAgent for message crafting. Include a FastAPI backend with endpoints for uploading communications, getting conflict predictions, and receiving intervention suggestions. Add sample data processing and real-time monitoring capabilities. The system should be proactive, not reactive - preventing problems before they happen.",
+      "project_name": "jarvis_emotional_advisor"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Enhance with Advanced Team Coordination",
+      "objective": {
+        "task": "Evolve the emotional intelligence system to use advanced AGNO team coordination patterns. Create a ConflictPreventionTeam that orchestrates all agents with sophisticated delegation and reasoning capabilities.",
+        "constraints": [
+          "Implement EmotionDetectionAgent with advanced sentiment analysis using multiple NLP models",
+          "Create PatternRecognitionAgent that learns from historical interaction data", 
+          "Build InterventionStrategyAgent that generates personalized conflict prevention strategies",
+          "Develop CommunicationCoachAgent that helps craft diplomatically effective messages",
+          "Integrate ConflictPreventionTeam that coordinates all agents using AGNO delegation patterns",
+          "Add real-time monitoring and alerting when tension levels rise above thresholds",
+          "Include machine learning models that improve prediction accuracy over time",
+          "Ensure the system is proactive with early warning systems and intervention timing",
+          "Add comprehensive API endpoints for integration with email systems, chat platforms, and calendars",
+          "Include data privacy and security measures for sensitive communication analysis",
+          "Create intuitive dashboards showing relationship health metrics and trend analysis",
+          "Implement feedback loops where intervention success rates improve future recommendations"
+        ]
+      },
+      "project_name": "jarvis_emotional_advisor"
+    }
+  ]
+}

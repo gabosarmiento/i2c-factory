@@ -1,0 +1,59 @@
+{
+  "project_name": "friday_skill_transfer",
+  "name": "Friday - Universal Skills Transfer + Reality Debugger",
+  "description": "AI system that learns from expert demonstrations and teaches any skill through personalized micro-lessons, plus AR-powered reality debugging for real-world problem solving",
+  "steps": [
+    {
+      "type": "knowledge",
+      "name": "Load AGNO Framework Knowledge",
+      "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+      "doc_type": "AGNO Framework Guide",
+      "framework": "AGNO",
+      "version": "latest",
+      "project_name": "friday_skill_transfer",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "knowledge", 
+      "name": "Load AGNO Advanced Patterns",
+      "doc_path": "src/i2c/docs/agno_guide.pdf",
+      "doc_type": "AGNO Advanced Guide",
+      "framework": "AGNO",
+      "version": "latest", 
+      "project_name": "friday_skill_transfer",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "initial_generation",
+      "name": "Generate Universal Skills Transfer System",
+      "prompt": "Create an revolutionary skills transfer system using AGNO framework that can learn any skill from expert demonstrations and teach it to others through personalized micro-lessons. Build specialized AGNO agents: SkillExtractionAgent that analyzes expert videos/demonstrations to identify key techniques and patterns, LearningPatternAgent that understands how humans acquire different types of skills, PersonalizationAgent that adapts teaching methods to individual learning styles and capabilities, and ARGuideAgent that provides augmented reality step-by-step guidance for real-world application. Include a Reality Debugger feature where users can point their phone camera at broken devices or processes and get instant AR overlay instructions for fixing them. Create a FastAPI backend with endpoints for uploading expert demonstrations, analyzing skill components, generating personalized learning paths, and providing AR guidance. The system should democratize access to specialized knowledge and make expert-level skills learnable by anyone.",
+      "project_name": "friday_skill_transfer"
+    },
+    {
+      "type": "agentic_evolution", 
+      "name": "Enhance with Advanced Learning Intelligence",
+      "objective": {
+        "task": "Evolve the skills transfer system into a comprehensive learning ecosystem with advanced AGNO team coordination and multi-modal learning capabilities.",
+        "constraints": [
+          "Implement SkillExtractionAgent with computer vision and motion analysis for understanding expert demonstrations",
+          "Create LearningPatternAgent that uses cognitive science principles to optimize knowledge transfer",
+          "Build PersonalizationAgent with adaptive algorithms that adjust to individual learning speeds and preferences", 
+          "Develop ARGuideAgent with real-time object recognition and contextual overlay generation",
+          "Integrate SkillTransferTeam that orchestrates all agents using sophisticated AGNO delegation patterns",
+          "Add multi-modal learning support: video analysis, audio processing, haptic feedback integration",
+          "Implement progress tracking with competency assessments and skill mastery validation",
+          "Create reality debugging capabilities with object recognition and repair instruction generation",
+          "Include machine learning models that improve teaching effectiveness based on learner outcomes",
+          "Add collaborative learning features where users can share discoveries and improvements",
+          "Implement safety validation for physical skills to prevent injury during learning",
+          "Create comprehensive skill libraries with difficulty progression and prerequisite mapping",
+          "Add integration with popular learning platforms and professional certification systems",
+          "Include analytics dashboard showing learning effectiveness and skill acquisition rates"
+        ]
+      },
+      "project_name": "friday_skill_transfer"
+    }
+  ]
+}
