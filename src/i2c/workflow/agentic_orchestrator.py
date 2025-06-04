@@ -195,6 +195,17 @@ def _stub_for(rel_path: str, lang: str) -> str:
 
 # helper already in agentic_orchestrator.py
 def _apply_modifications_if_any(result_json: dict, project_path: Path, session_state: Dict[str, Any] = None) -> None:
+   
+    canvas.info(f"🔍 DEBUG: _apply_modifications_if_any called")
+    if session_state:
+        canvas.info(f"🔍 DEBUG: session_state keys: {list(session_state.keys())}")
+        if 'knowledge_base' in session_state:
+            canvas.success("✅ DEBUG: knowledge_base found in _apply_modifications_if_any")
+        else:
+            canvas.error("❌ DEBUG: NO knowledge_base in _apply_modifications_if_any")
+    else:
+        canvas.error("❌ DEBUG: session_state is None in _apply_modifications_if_any")
+       
     mods = result_json.get("modifications", {})
     print(f"DEBUG: _apply_modifications_if_any called with {mods}")
     
@@ -225,11 +236,20 @@ Task: {description}
 Current content:
 {existing_content}
 
+CRITICAL: Return ONLY clean, properly indented code with consistent indentation code(i.e. 4 spaces for Python, 2 for JS).
+- Do not use markdown, backticks, or formatting fences.
+- No extra leading/trailing whitespace
+
 Return the complete modified file content with the requested changes implemented."""
 
             response = agent.run(prompt)
             content = getattr(response, 'content', str(response))
             
+            # Strip markdown formatting if present
+            from i2c.utils.markdown import strip_markdown_code_block
+            print(f"DEBUG: Content ends with: {repr(content[-20:])}")
+            content = strip_markdown_code_block(content)
+            print(f"DEBUG: After strip ends with: {repr(content[-20:])}")              
             # Write the actual generated code
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_text(content, encoding='utf-8')
@@ -531,7 +551,18 @@ async def execute_agentic_evolution(
         "session_state": session_state
     }
 
-    team = build_orchestration_team(team_input)
+    team = build_orchestration_team(session_state=session_state)
+    # DEBUG: Check what we're passing to orchestration team
+    canvas.info(f"🔍 DEBUG: About to call build_orchestration_team")
+    canvas.info(f"🔍 DEBUG: team_input keys: {list(team_input.keys())}")
+    if 'session_state' in team_input and team_input['session_state']:
+        canvas.info(f"🔍 DEBUG: team_input session_state keys: {list(team_input['session_state'].keys())}")
+        if 'knowledge_base' in team_input['session_state']:
+            canvas.success("✅ DEBUG: knowledge_base found in team_input session_state")
+        else:
+            canvas.error("❌ DEBUG: NO knowledge_base in team_input session_state")
+    else:
+        canvas.error("❌ DEBUG: No session_state in team_input")
 
     # Convert team_input to JSON string with proper error handling
     try:
@@ -539,17 +570,16 @@ async def execute_agentic_evolution(
         team_input_copy = team_input.copy() if isinstance(team_input, dict) else team_input
         
         if isinstance(team_input_copy, dict):
-            # Remove non-serializable objects
-            team_input_copy.pop('knowledge_base', None)
+            # Remove non-serializable objects but PRESERVE knowledge_base for the JSON message
             team_input_copy.pop('embed_model', None) 
             team_input_copy.pop('db_connection', None)
             
-            # Also clean session_state if it exists
+            # Also clean session_state if it exists but PRESERVE knowledge_base in the message
             if 'session_state' in team_input_copy and isinstance(team_input_copy['session_state'], dict):
-                session_state = team_input_copy['session_state']
-                session_state.pop('knowledge_base', None)
-                session_state.pop('embed_model', None)
-                session_state.pop('db_connection', None)
+                session_copy = team_input_copy['session_state']
+                session_copy.pop('embed_model', None)
+                session_copy.pop('db_connection', None)
+                # Keep knowledge_base in the JSON message for context
                 
             # Convert Path objects to strings
             for key, value in team_input_copy.items():
@@ -570,6 +600,7 @@ async def execute_agentic_evolution(
     canvas.info(f"🔍 DEBUG: Team input: {str(message)[:200]}...")
     result = await team.arun(message=message)
     canvas.info(f"🔍 DEBUG: Orchestration team result: {str(result)[:200]}...")
+
     # Skip sandbox waiting entirely - proceed with what we have
     if getattr(result, "event", None) in {"waiting", "run_paused", "intermediate"}:
         canvas.warning(f"Skipping sandbox wait (state: {result.event}) - proceeding with available content")
@@ -606,6 +637,13 @@ async def execute_agentic_evolution(
                 }
         else:
             raise ValueError(f"Unexpected content type: {type(content)}")
+
+        # DEBUG: Verify session_state still has knowledge_base before modifications
+        canvas.info(f"🔍 DEBUG: About to call _apply_modifications_if_any")
+        if session_state and 'knowledge_base' in session_state:
+            canvas.success("✅ DEBUG: session_state has knowledge_base for modifications")
+        else:
+            canvas.error("❌ DEBUG: session_state missing knowledge_base for modifications")
 
         _apply_modifications_if_any(result_dict, project_path,session_state)
         _ensure_mandatory_files(project_path, arch_ctx)
@@ -847,6 +885,16 @@ def execute_agentic_evolution_sync(
     :param session_state: Optional initial session state passed through runs.
     :returns: Final parsed JSON response from the agent team.
     """
+    # DEBUG: Check what we receive
+    canvas.info(f"🔍 DEBUG: execute_agentic_evolution_sync received session_state")
+    if session_state:
+        canvas.info(f"🔍 DEBUG: Input session_state keys: {list(session_state.keys())}")
+        if 'knowledge_base' in session_state:
+            canvas.success("✅ DEBUG: knowledge_base found in input")
+        else:
+            canvas.error("❌ DEBUG: NO knowledge_base in input session_state")
+    else:
+        canvas.error("❌ DEBUG: session_state is None in execute_agentic_evolution_sync")
     # Ensure we have an event loop
     try:
         loop = asyncio.get_event_loop()

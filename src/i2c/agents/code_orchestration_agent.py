@@ -83,6 +83,16 @@ class CodeOrchestrationAgent(Agent):
             }
 
         self.session_state = session_state  # the single pointer
+        # DEBUG: Check what orchestration agent receives
+        canvas.info(f"🔍 DEBUG: CodeOrchestrationAgent __init__")
+        if self.session_state:
+            canvas.info(f"🔍 DEBUG: Orchestration agent session_state keys: {list(self.session_state.keys())}")
+            if 'knowledge_base' in self.session_state:
+                canvas.success("✅ DEBUG: Orchestration agent received knowledge_base")
+            else:
+                canvas.error("❌ DEBUG: Orchestration agent missing knowledge_base")
+        else:
+            canvas.error("❌ DEBUG: Orchestration agent received None session_state")
         # # Flush Cache
         # if "knowledge_cache" in self.session_state:
         #     self.session_state["knowledge_cache"] = {}
@@ -141,12 +151,13 @@ class CodeOrchestrationAgent(Agent):
         
         # placeholders; real teams wired in _initialize_teams()
         self.knowledge_team: Team | None = None
-        self.modification_team: Team | None = None
         self.quality_team: Team | None = None
         self.sre_team: Team | None = None
 
         # Build specialist teams with the shared state
+        canvas.info(f"🔍 DEBUG: About to call _initialize_teams()")
         self._initialize_teams()
+        canvas.info(f"🔍 DEBUG: _initialize_teams() completed")
         self._initialize_reflective_operators()
 
     def _initialize_teams(self):
@@ -155,12 +166,11 @@ class CodeOrchestrationAgent(Agent):
 
         # Import only when needed to avoid circular imports
         from i2c.agents.knowledge.knowledge_team import build_knowledge_team
-        from i2c.agents.modification_team.code_modification_manager_agno import build_code_modification_team
         from i2c.agents.quality_team.quality_team import build_quality_team
         from i2c.agents.sre_team.sre_team import build_sre_team
 
         self.knowledge_team = build_knowledge_team(session_state=shared)
-        self.modification_team = build_code_modification_team(session_state=shared)
+        # Remove complex modification team since we use direct agents now
         self.quality_team = build_quality_team(session_state=shared)
         self.sre_team = build_sre_team(session_state=shared)
 
@@ -924,9 +934,14 @@ class CodeOrchestrationAgent(Agent):
             # project_path = Path(self.session_state.get("project_path", ""))
             # result = bridge_agentic_and_workflow_modification(objective, project_path)
             # Use proven direct agent approach instead of hanging bridge
-            from i2c.agents.core_agents import get_rag_enabled_agent
 
+            from i2c.utils.api_route_tracker import inject_api_routes_into_session
             project_path = Path(self.session_state.get("project_path", ""))
+            self.session_state = inject_api_routes_into_session(project_path, self.session_state)
+            canvas.info("🔍 DEBUG: API routes extracted for modification")
+            
+            # Use proven direct agent approach
+            from i2c.agents.core_agents import get_rag_enabled_agent
             task = self.session_state.get("task", "")
 
             canvas.info(f"🔧 Using direct agent modification for: {task}")
@@ -1078,8 +1093,6 @@ class CodeOrchestrationAgent(Agent):
                 if "reasoning_trajectory" not in self.session_state:
                     self.session_state["reasoning_trajectory"] = []
             
-            # 2. Initialize teams with fresh state for this execution
-            await self._setup_teams(project_path)
             
             # 3. Project context analysis phase
             analysis_result = await self._analyze_project_context(project_path, task)
@@ -1244,33 +1257,6 @@ class CodeOrchestrationAgent(Agent):
                 "sre_results": {},
                 "reasoning_trajectory": []
             }
-     
-    async def _setup_teams(self, project_path: Path):
-        """Initialize all specialized teams for this execution"""
-        shared_session = self.session_state  # Ensure shared dict ref
-
-        # Import needed to avoid circular imports
-        from i2c.agents.knowledge.knowledge_team import build_knowledge_team
-        from i2c.agents.modification_team.code_modification_manager_agno import build_code_modification_team
-        from i2c.agents.quality_team.quality_team import build_quality_team
-        from i2c.agents.sre_team.sre_team import build_sre_team
-
-        # Initialize teams with shared session state
-        self.knowledge_team = build_knowledge_team(session_state=shared_session)
-        # Use new enhanced modification team 
-        self.modification_team = build_code_modification_team(
-            project_path=project_path, 
-            session_state=shared_session,
-            config={
-                "enable_security_scanning": True,
-                "strict_validation": True,
-                "detailed_documentation": True,
-                "analysis_depth": "deep"
-            }
-        )
-        self.quality_team = build_quality_team(session_state=shared_session)
-        self.sre_team = build_sre_team(session_state=shared_session)
-
     
     def _detect_languages(self, project_path: Path) -> Dict[str, int]:
         """Detect programming languages used in the project"""

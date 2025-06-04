@@ -43,7 +43,7 @@ class QualityLeadAgent(Agent):
         'all': ['flake8', 'black', 'mypy', 'pytest', 'bandit', 'eslint', 'tsc', 'govet', 'checkstyle']
     }
     
-    def __init__(self, knowledge_base=None, **kwargs):
+    def __init__(self, **kwargs):
         """
         Initialize the Quality Lead Agent.
         
@@ -51,8 +51,6 @@ class QualityLeadAgent(Agent):
             knowledge_base: Optional knowledge base for context retrieval
             **kwargs: Additional arguments for Agent initialization
         """
-        # RAG Integration: Store knowledge base for context retrieval
-        self.knowledge_base = knowledge_base
         
         super().__init__(
             name="QualityLead",
@@ -128,53 +126,43 @@ class QualityLeadAgent(Agent):
     # RAG Integration: Add method to retrieve relevant context
     def _retrieve_context(self, task_description, quality_gates=None):
         """
-        Retrieve relevant context from knowledge base for the quality task.
-        
-        Args:
-            task_description: Description of the validation task
-            quality_gates: List of quality gates to check
-            
-        Returns:
-            String containing relevant context or empty string if no context found
+        Retrieve relevant context from team knowledge base for the quality task.
         """
-        if not self.knowledge_base:
-            return ""
+        canvas.info(f"🔍 DEBUG: _retrieve_context called for: {task_description[:50]}...")
+        
+        # Access team knowledge through AGNO Team pattern
+        if hasattr(self, 'team_session_state') and self.team_session_state and 'knowledge_base' in self.team_session_state:
+            knowledge_base = self.team_session_state['knowledge_base']
+            canvas.success("✅ DEBUG: Found knowledge_base in team_session_state")
             
-        try:
-            # Build a query from the task description and quality gates
-            query = task_description
-            if quality_gates:
-                query += f" quality gates: {' '.join(quality_gates)}"
+            try:
+                query = task_description
+                if quality_gates:
+                    query += f" quality gates: {' '.join(quality_gates)}"
                 
-            # Log the query being used
-            canvas.info(f"[QualityLeadAgent] Retrieving context for: {query[:100]}...")
-            
-            # Retrieve top-k most relevant chunks
-            context_chunks = self.knowledge_base.search(
-                query=query, 
-                limit=3,  # top-k=3
-                max_tokens=800  # Limit context size
-            )
-            
-            # Format the retrieved context
-            if not context_chunks:
-                canvas.info("[QualityLeadAgent] No relevant context found")
+                context_chunks = knowledge_base.retrieve_knowledge(query=query, limit=3)
+                canvas.info(f"🔍 DEBUG: Retrieved {len(context_chunks)} chunks")
+                
+                if not context_chunks:
+                    return ""
+                
+                # Format the context
+                formatted_chunks = []
+                for i, chunk in enumerate(context_chunks):
+                    source = chunk.get('source', 'unknown')
+                    content = chunk.get('content', '').strip()
+                    if len(content) > 1000:
+                        content = content[:1000] + "..."
+                    formatted_chunks.append(f"[Knowledge {i+1}] {source}:\n{content}")
+                
+                return "\n\n".join(formatted_chunks)
+                
+            except Exception as e:
+                canvas.error(f"❌ DEBUG: Knowledge retrieval failed: {e}")
                 return ""
-                
-            # Extract content from chunks and join with separators
-            context_text = "\n\n".join([
-                f"SOURCE: {chunk.get('source', 'unknown')}\n{chunk.get('content', '')}" 
-                for chunk in context_chunks
-            ])
-            
-            # Log what was retrieved for transparency
-            canvas.info(f"[QualityLeadAgent] Retrieved {len(context_chunks)} context chunks ({len(context_text)} chars)")
-            
-            return context_text
-        except Exception as e:
-            canvas.warning(f"[QualityLeadAgent] Error retrieving context: {e}")
-            return ""  # Graceful fallback
-
+        else:
+            canvas.error("❌ DEBUG: No knowledge_base in team_session_state")
+            return ""
     async def _decide_quality_gate_presets_with_llm(
         self, project_path: Path, modified_files: Dict[str, str]
     ) -> List[str]:
@@ -664,7 +652,7 @@ class QualityLeadAgent(Agent):
                 "reasons": [f"Guardrail check error: {str(e)}"]
             }
 
-def build_quality_team(session_state=None, knowledge_base=None) -> Team:
+def build_quality_team(session_state=None) -> Team:
     """
     Build the quality team with a lead agent and specialized members.
     
@@ -675,8 +663,12 @@ def build_quality_team(session_state=None, knowledge_base=None) -> Team:
     Returns:
         Team: Configured quality team
     """
+    knowledge_base = None
+    if session_state and 'knowledge_base' in session_state:
+        knowledge_base = session_state['knowledge_base']
+        canvas.success("✅ DEBUG: Quality team extracted knowledge_base from session_state")
     # Create the Quality lead agent with knowledge base
-    quality_lead = QualityLeadAgent(knowledge_base=knowledge_base)
+    quality_lead = QualityLeadAgent()
     
     # Use shared session if provided, else initialize defaults
     if session_state is None:
@@ -692,6 +684,7 @@ def build_quality_team(session_state=None, knowledge_base=None) -> Team:
         members=[quality_lead],
         mode="collaborate",
         model=llm_middle,
+        knowledge=knowledge_base,
         instructions=[
             "You are the Quality Team, responsible for code quality.",
             "Follow the lead of the QualityLead agent, who will coordinate your activities.",

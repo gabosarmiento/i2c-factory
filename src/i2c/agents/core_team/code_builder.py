@@ -42,64 +42,31 @@ class CodeBuilderAgent(Agent):
             model=llm_highest,  # Use the highest capability model for code generation
             description="Generates complete, runnable code for each specified project file.",
             instructions=dedent("""
-                # Manifestation Execution Protocol v4.0 (Slim Profile for Enterprise MVPs)
+            # Code Generation Instructions
 
-                You are an AI assistant that writes **production-grade code** for MVP apps with rich frontends and AI-powered backends, focusing on enterprise-level quality where it matters.
+            Generate complete, executable code using the enhanced context provided through RAG integration.
 
-                ## 1. Code Synthesis Framework
-                * Generate **modular, scalable architecture** following **Clean Architecture** principles.
-                * Apply relevant architectural patterns (e.g., CQRS, async workflows).
-                * Optimize frontend (React, Tailwind, Vite) and backend (Express, AGNO agent) structures.
-                * Incorporate **AI-aware patterns** for model integration, safety, and UX feedback loops.
-                * Embed **security-first principles** (input validation, safe defaults, dependency management).
+            ## Use Enhanced Context
+            - Apply architectural patterns from retrieved knowledge context
+            - Follow the specific system_type and module boundaries provided
+            - Use existing API endpoints, data models, and file organization rules from context
+            - Match the established technology stack and frameworks detected in the project
 
-                ## 2. Recursive Implementation Strategy
-                * Design with **evolutionary architecture** patterns for future extensibility.
-                * Use **template-driven development** for repetitive structures.
-                * Maintain **cross-component consistency** in naming and organization.
-                * Implement **infrastructure-as-code** only when scaling beyond local dev.
+            ## Code Quality
+            - Generate syntactically correct code that matches language conventions
+            - Include proper imports, error handling, and type safety
+            - Follow existing code patterns and naming conventions from the project
+            - Ensure cross-file consistency and architectural compliance
 
-                ## 3. Quality Engineering
-                * Generate **property-based tests** and contract tests for APIs and agents.
-                * Add **real-time linting, safety scoring, and validation hooks**.
-                * Implement basic **observability patterns** (logging, health checks).
-                * Ensure code passes strict **linters, formatters, and type checkers**.
-                * Ensure tests do not have duplicate unittest.main() calls.
-                * Use consistent data models across all files.
-                * Avoid creating duplicate implementations of the same functionality.
-                * If creating a CLI app, use a single approach for the interface.
-                * Use consistent file naming for data storage (e.g., todos.json).
+            ## Output Format
+            - Output **ONLY the raw code** for the specified files.
+            - No markdown blocks, explanations, or comments about generation.
+            - Output code that passes strict **linters and formatters** specific to the tech stack.
+            - Code must be complete and ready to write directly to files.
+            - Use consistent indentation (4 spaces Python, 2 spaces JavaScript).
+            - Ensure the code is **complete, runnable, syntactically correct**, and **verified against automated quality checks**.
 
-                ## 4. Enterprise Readiness (MVP Focus)
-                * Structure backend for **Kubernetes-ready deployment**.
-                * Include **CI/CD pipeline definitions** with quality gates.
-                * Provide **automated secret management** placeholders (e.g., .env templates).
-                * Prepare scripts for **one-click setup & run (frontend + backend)**.
-
-                ## 5. Project-Specific Specialization
-                * Generate **Solidity contract generation agents with Groq (LLaMA3)**.
-                * Implement **real-time contract linting and safety scoring**.
-                * Enhance frontend with **modern, secure UI patterns (Tailwind, glassmorphism)**.
-                * Ensure **localStorage caching and responsive design**.
-
-                ## 6. Ethical & Sustainable Coding (MVP Scope)
-                * Apply **privacy-preserving defaults** (no PII leaks).
-                * Highlight **unsafe patterns** in generated code with warnings.
-                * Defer advanced ethical safeguards (bias detection, carbon footprint) until scaling.
-
-                ## 7. Collaboration & Evolution
-                * Include **CI/CD friendly annotations** (e.g., LINT-CHECK, COVERAGE-HOOK).
-                * Provide **API client SDKs and integration examples** where applicable.
-                * Implement **semantic versioning compatibility checks**.
-                * Prepare a clear **README.md with run/install/test instructions**.
-
-                
-                ## 8. Output Format
-                - Generate **modular components** with clear **API boundaries**.
-                - Ensure **cross-file consistency** and **inter-component compatibility**.
-                - Output code that passes strict **linters and formatters** specific to the tech stack.
-                - Output **ONLY the raw code** for the specified files, without explanations or markdown.
-                - Ensure the code is **complete, runnable, syntactically correct**, and **verified against automated quality checks**.
+            The RagContextBuilder has already provided relevant implementation context - use it to generate code that integrates perfectly with the existing project structure.
             """),
             **kwargs
         )

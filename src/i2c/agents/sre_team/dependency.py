@@ -7,6 +7,16 @@ import ast
 from pathlib import Path
 from typing import Dict, List, Any, Tuple
 from agno.agent import Agent
+# Import CLI for logging and user input
+try:
+    from i2c.cli.controller import canvas
+except ImportError:
+    class FallbackCanvas:
+        def warning(self, msg): print(f"[WARN_SANDBOX] {msg}")
+        def error(self, msg): print(f"[ERROR_SANDBOX] {msg}")
+        def info(self, msg): print(f"[INFO_SANDBOX] {msg}")
+        def success(self, msg): print(f"[SUCCESS_SANDBOX] {msg}")
+    canvas = FallbackCanvas()
 
 # Helper functions for dependency detection
 PYTHON_IMPORT_MAP = {
@@ -86,6 +96,16 @@ class DependencyVerifierAgent(Agent):
             session_state=session_state or {},
             **kwargs
         )
+        # DEBUG: Check if dependency agent gets knowledge_base
+        canvas.info(f"🔍 DEBUG: DependencyVerifierAgent init")
+        if session_state:
+            canvas.info(f"🔍 DEBUG: DependencyVerifier session_state keys: {list(session_state.keys())}")
+            if 'knowledge_base' in session_state:
+                canvas.success("✅ DEBUG: DependencyVerifier received knowledge_base")
+            else:
+                canvas.error("❌ DEBUG: DependencyVerifier missing knowledge_base")
+        
+
         print("📦 [DependencyVerifierAgent] Initialized (Container-Enhanced Mode).")
         self.docker_available = self._check_docker_availability()
         self.audit_tools = self._check_audit_tools()

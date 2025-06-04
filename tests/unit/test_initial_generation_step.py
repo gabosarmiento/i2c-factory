@@ -1,59 +1,38 @@
-import os
 import json
-from pathlib import Path 
+import tempfile
+from pathlib import Path
+import re
 import pytest
 
-from groq import Groq
+from i2c.workflow.scenario_processor import ScenarioProcessor
+from i2c.cli.controller import canvas
 
-def read_all_code(directory):
-    """Concatenate all Python code in a directory tree into one string."""
-    directory = Path(directory)
-    code_files = sorted(directory.rglob("*.py"))
-    if not code_files:
-        raise FileNotFoundError(f"No .py files found in {directory}")
-    code = []
-    for f in code_files:
-        code.append(f"# === {f.name} ===\n")
-        code.append(f.read_text(encoding="utf-8"))
-    return "\n".join(code)
+PDF_PATH = Path("src/i2c/docs/agno_cheat_sheet.pdf")
+AGNO_IMPORT_PATTERNS = [
+    r'from\s+agno\.knowledge\.pdf_url\s+import\s+PDFUrlKnowledgeBase',
+    r'from\s+agno\.agent\s+import\s+AgentKnowledge',
+    r'from\s+agno\.vectordb\.pgvector\s+import\s+PgVector',
+]
 
-class GroqLLM:
-    def __init__(self, model=None):
-        self.model = model or "llama3-70b-8192"
-        self.api_key = os.environ.get("GROQ_API_KEY")
-        if not self.api_key:
-            raise RuntimeError("Set GROQ_API_KEY in your environment.")
-        self.client = Groq(api_key=self.api_key)
-    def ask(self, prompt):
-        completion = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are a senior AGNO code reviewer. Analyze the codebase for AGNO usage."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0,
-            max_tokens=512
-        )
-        return completion.choices[0].message.content.strip()
 
-llm = GroqLLM()
-
-# --- Test itself ---
-def test_llm_verifies_agno_usage(tmp_path):
-    # Simulate a scenario.json (optional, for local test coverage)
-    scenario_path = tmp_path / "scenario.json"
-    scenario_json = {
+def create_test_scenario():
+    """
+    Create a scenario with a knowledge step (loading the AGNO PDF)
+    followed by an initial_generation step that should _use_ that knowledge.
+    Returns the path to the JSON file and the temp directory (so we can cleanup).
+    """
+    scenario = {
         "name": "AGNO Knowledge Application Test",
-        "description": "Ensure initial generation uses PDF ...",
+        "description": "Ensure initial generation uses PDF knowledge",
         "steps": [
             {
                 "type": "knowledge",
                 "name": "Ingest AGNO Cheat Sheet",
-                "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+                "doc_path": str(PDF_PATH),
                 "doc_type": "AGNO Cheat Sheet",
                 "framework": "AGNO",
                 "version": "1.0",
-                "project_name": "agno_cli_reflector",
+                "project_name": "agno_cli_reflector",  
                 "global": True
             },
             {
@@ -72,55 +51,73 @@ def test_llm_verifies_agno_usage(tmp_path):
             }
         ]
     }
-    scenario_path.write_text(json.dumps(scenario_json), encoding="utf-8")
 
-    # Load scenario and extract project_name robustly
+    tmp = tempfile.TemporaryDirectory()
+    path = Path(tmp.name) / "scenario.json"
+    path.write_text(json.dumps(scenario, indent=2), encoding="utf-8")
+    return path, tmp
+
+
+class TrackingProcessor(ScenarioProcessor):
+    """
+    Subclass that tracks whether ingestion was actually called
+    during process_scenario().
+    """
+    def __init__(self, scenario_path: str):
+        super().__init__(scenario_path=scenario_path)
+        self.ingested_docs = []
+
+    def _handle_knowledge_ingestion(self, document_path, doc_type, metadata, *, is_folder=False, force_refresh=False):
+        """Override the actual method that gets called"""
+        # Record the document being ingested
+        self.ingested_docs.append(str(document_path))
+        canvas.info(f"🔍 DEBUG: Tracked ingestion of {document_path}")
+        
+        # Call the original method
+        return super()._handle_knowledge_ingestion(
+            document_path, doc_type, metadata, 
+            is_folder=is_folder, force_refresh=force_refresh
+        )
+
+@pytest.mark.integration
+def test_agno_knowledge_application():
+    canvas.info("🔎 Starting AGNO knowledge application integration test")
+
+    # 1) Create scenario JSON
+    scenario_path, tmpdir = create_test_scenario()
+
+    # 2) Run it end-to-end
+    processor = TrackingProcessor(str(scenario_path))
+    success = processor.process_scenario()
+    assert success, "❌ process_scenario() failed"
+
+    # 3) Check ingestion happened
+    assert processor.ingested_docs, "❌ Knowledge ingestion was never triggered"
+
+    # ✅ 4) Use the actual generated project path
     scenario = json.loads(scenario_path.read_text(encoding="utf-8"))
-    project_name = scenario.get("project_name")
-    if not project_name:
-        for step in scenario.get("steps", []):
-            if "project_name" in step:
-                project_name = step["project_name"]
-                break
-    assert project_name, "❌ Could not find project_name in scenario or steps"
-
-    # Compose the output directory (assumes your pipeline has written here)
+    project_name = processor.scenario.project_name
     output_dir = Path("output") / project_name
     assert output_dir.exists(), f"❌ Output dir not found: {output_dir}"
+    canvas.info(f"📁 Found generated output at: {output_dir}")
 
-    # Read all code
-    codebase = read_all_code(output_dir)
+    # 5) Read all generated code into one string
+    py_files = list(output_dir.rglob("*.py"))
+    assert py_files, "❌ No Python files generated"
+    code = "\n".join(f.read_text(encoding="utf-8") for f in py_files)
 
-    # LLM analysis
-    prompt = f"""
-You are a senior AGNO developer. Analyze the following codebase and answer:
+    # 6) Assert at least one AGNO import from the cheat-sheet appears
+    found = []
+    for pattern in AGNO_IMPORT_PATTERNS:
+        if re.search(pattern, code):
+            found.append(pattern)
 
-1. Does it use the AGNO framework?
-2. Which AGNO components or patterns are implemented?
-3. Does it reflect an agentic, modular, and reflective architecture?
+    if not found:
+        canvas.error("❌ None of the expected AGNO imports were found in generated code.")
+        canvas.info("Searched patterns:")
+        for pat in AGNO_IMPORT_PATTERNS:
+            canvas.info(f"  • {pat}")
+    else:
+        canvas.success(f"✅ Found AGNO imports: {found}")
 
-Respond with JSON:
-{{
-    "uses_agno": true|false,
-    "components": [...],
-    "justification": "..."
-}}
-
---- CODE START ---
-{codebase}
---- CODE END ---
-"""
-    from i2c.utils.json_extraction import extract_json
-
-    response = llm.ask(prompt)
-    try:
-        result = extract_json(response)
-    except Exception:
-        print("Raw LLM response (not valid JSON):", response)
-        raise
-
-    assert result["uses_agno"], f"❌ LLM judged AGNO not applied. Justification: {result['justification']}"
-
-if __name__ == "__main__":
-    test_llm_verifies_agno_usage(Path("output"))
-    print("✅ LLM AGNO usage test passed")
+    assert found, "❌ Generated code did not apply any AGNO cheat-sheet knowledge"

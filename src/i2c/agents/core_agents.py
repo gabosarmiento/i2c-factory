@@ -48,8 +48,20 @@ except:
 def get_rag_enabled_agent(agent_type, session_state=None):
     """Get knowledge-enhanced agent with internalized expertise"""
     
+    # DEBUG: Track API route context
+    canvas.info(f"🔍 DEBUG: Creating {agent_type} agent")
+    if session_state:
+        canvas.info(f"🔍 DEBUG: Session state keys: {list(session_state.keys())}")
+        if "backend_api_routes" in session_state:
+            routes = session_state["backend_api_routes"]
+            canvas.info(f"🔍 DEBUG: Found API routes: {routes}")
+        else:
+            canvas.info(f"🔍 DEBUG: No API routes in session state")
+    
     try:
         # Direct instantiation with error handling
+        agent_class = None  # Initialize to prevent error
+        
         if agent_type == "input_processor":
             agent_class = InputProcessorAgent
         elif agent_type == "planner":
@@ -62,14 +74,28 @@ def get_rag_enabled_agent(agent_type, session_state=None):
             canvas.error(f"Unknown agent type: {agent_type}")
             return None
         
+        # Check if agent_class was set
+        if agent_class is None:
+            canvas.error(f"Failed to resolve agent class for type: {agent_type}")
+            return None
+        
+        # If no session_state, create basic agent
         if session_state is None:
-            canvas.warning(f"🔍 DEBUG: No session_state for {agent_type}")
+            canvas.warning(f"🔍 DEBUG: No session_state for {agent_type} - creating basic agent")
             return agent_class()
-            
+
+        # DEBUG: Check what's actually in session_state
+        canvas.info(f"🔍 DEBUG: session_state keys for {agent_type}: {list(session_state.keys())}") 
+        
         try:
             # Get knowledge base from session
             knowledge_base = session_state.get("knowledge_base")
             canvas.info(f"🔍 DEBUG: Knowledge base exists in session: {knowledge_base is not None}")
+            
+            # If no knowledge base, create basic agent
+            if knowledge_base is None:
+                canvas.warning(f"🔍 DEBUG: No knowledge_base in session_state for {agent_type}")
+                return agent_class()
             
             # Create knowledge-enhanced agent
             enhanced_agent = create_knowledge_enhanced_agent(
@@ -78,25 +104,60 @@ def get_rag_enabled_agent(agent_type, session_state=None):
                 agent_type
             )
             canvas.info(f"🔍 DEBUG: Enhanced agent created: {type(enhanced_agent).__name__}")
-            # NEW: further enhance if retrieved_context exists
+            
+            # Additional enhancement if retrieved_context exists
             if "retrieved_context" in session_state:
-                from i2c.agents.core_team.enhancer import quick_enhance_agent
-                enhanced_agent = quick_enhance_agent(
-                    enhanced_agent, 
-                    session_state["retrieved_context"], 
-                    agent_type
-                )
-                        
+                try:
+                    from i2c.agents.core_team.enhancer import quick_enhance_agent
+                    enhanced_agent = quick_enhance_agent(
+                        enhanced_agent, 
+                        session_state["retrieved_context"], 
+                        agent_type
+                    )
+                    canvas.info(f"🧠 DEBUG: Agent further enhanced with retrieved context")
+                except ImportError:
+                    canvas.warning("Enhancer module not available - skipping additional enhancement")
+                except Exception as e:
+                    canvas.warning(f"Additional enhancement failed: {e}")
+
+            # Inject API context based on architectural understanding
+            api_context = None
+            if session_state and agent_type == "code_builder":
+                arch_context = session_state.get("architectural_context", {})
+                system_type = arch_context.get("system_type")
+                
+                # Only inject API context for systems that have APIs and UIs
+                if (system_type in ["fullstack_web_app", "microservices"] and 
+                    "backend_api_routes" in session_state):
+                    
+                    api_context = session_state.get("api_route_summary", "")
+                    canvas.info(f"🔍 DEBUG: Injecting API context for {system_type}")              
+            
+                    
+                    if hasattr(enhanced_agent, 'instructions'):
+                        api_instruction = f"""
+
+        CRITICAL API INTEGRATION RULES:
+        {api_context}
+        - Frontend: Use ONLY these endpoints with fetch()
+        - Backend: Maintain endpoint consistency
+        """
+                        enhanced_agent.instructions = enhanced_agent.instructions + api_instruction
+                        canvas.success(f"✅ DEBUG: API instructions added to {agent_type}")
+                    else:
+                        canvas.warning(f"⚠️ DEBUG: {agent_type} has no instructions attribute")
+
             return enhanced_agent
             
         except Exception as e:
             canvas.warning(f"Failed to create enhanced {agent_type}: {e}")
-            return agent_class()  # Fallback
+            canvas.info(f"🔄 DEBUG: Falling back to basic agent for {agent_type}")
+            return agent_class()  # Fallback to basic agent
             
     except Exception as e:
         canvas.error(f"Error creating agent {agent_type}: {e}")
         return None
-
+    
 def _extract_domain_expertise(knowledge_base, agent_role):
     """Extract relevant expertise for specific agent role"""
     

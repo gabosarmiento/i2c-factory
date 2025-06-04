@@ -152,6 +152,12 @@ class ScenarioProcessor:
             # Get start cost for operation tracking
             start_tokens, start_cost = self.budget_manager.get_session_consumption()
             
+            # Ensure knowledge_base is in session_state for agentic evolution
+            if hasattr(self, 'session_state') and self.session_state and 'knowledge_base' in self.session_state:
+                canvas.success("✅ DEBUG: Knowledge_base already in session_state for agentic evolution")
+            else:
+                canvas.warning("⚠️ DEBUG: No knowledge_base in session_state for agentic evolution")
+
             # Execute the agentic evolution
             result = execute_agentic_evolution_sync(
                 objective,
@@ -1274,6 +1280,53 @@ class ScenarioProcessor:
             if success:
                 canvas.success(f"✅ Added {doc_path.name}: {results['successful_files']} files, "
                             f"skipped {results['skipped_files']} (cached)")
+
+                # FLEXIBLE: Create or update knowledge_base in session_state
+                try:
+                    from i2c.workflow.modification.rag_config import get_embed_model
+                    from i2c.db_utils import get_db_connection
+                    
+                    # Initialize session_state if not exists
+                    if not hasattr(self, 'session_state') or self.session_state is None:
+                        self.session_state = {}
+                    
+                    # Create knowledge_base if it doesn't exist, or keep existing one
+                    if 'knowledge_base' not in self.session_state:
+                        db = get_db_connection()
+                        embed_model = get_embed_model()
+                        
+                        if db and embed_model:
+                            # Create the same SessionKnowledgeBase class as in initial_generation
+                            class SessionKnowledgeBase:
+                                def __init__(self, db, embed_model, knowledge_space="agno_task_system"):
+                                    self.db = db
+                                    self.embed_model = embed_model
+                                    self.knowledge_space = knowledge_space
+                                
+                                def retrieve_knowledge(self, query, limit=5):
+                                    from i2c.db_utils import query_context, TABLE_KNOWLEDGE_BASE
+                                    try:
+                                        query_vector = self.embed_model.get_embedding(query)
+                                        df = query_context(self.db, TABLE_KNOWLEDGE_BASE, query_vector, limit)
+                                        if df is not None and not df.empty:
+                                            return [{'source': row['source'], 'content': row['content'], 
+                                                'category': row.get('category', ''), 'knowledge_space': row.get('knowledge_space', ''),
+                                                'framework': row.get('framework', '')} for _, row in df.iterrows()]
+                                        return []
+                                    except Exception as e:
+                                        canvas.error(f"Knowledge retrieval failed: {e}")
+                                        return []
+                            
+                            self.session_state['knowledge_base'] = SessionKnowledgeBase(db, embed_model)
+                            canvas.success("✅ Created new knowledge_base in session_state")
+                        else:
+                            canvas.warning("⚠️ Could not create knowledge_base - missing db or embed_model")
+                    else:
+                        canvas.success("✅ Knowledge_base already exists in session_state - keeping it")
+                        
+                except Exception as e:
+                    canvas.warning(f"⚠️ Could not create/update knowledge_base: {e}")
+                    canvas.success("✅ Knowledge ingested to database - will be available to agents")
                 # DEBUG: Test knowledge retrieval immediately
                 if hasattr(self, 'session_state') and self.session_state and 'knowledge_base' in self.session_state:
                     kb = self.session_state['knowledge_base']
@@ -1325,6 +1378,53 @@ class ScenarioProcessor:
             if success:
                 canvas.success(f"✅ Added {folder_path.name}: {results['successful_files']} files, "
                             f"skipped {results['skipped_files']} (cached)")
+               
+                # FLEXIBLE: Create or update knowledge_base in session_state
+                try:
+                    from i2c.workflow.modification.rag_config import get_embed_model
+                    from i2c.db_utils import get_db_connection
+                    
+                    # Initialize session_state if not exists
+                    if not hasattr(self, 'session_state') or self.session_state is None:
+                        self.session_state = {}
+                    
+                    # Create knowledge_base if it doesn't exist, or keep existing one
+                    if 'knowledge_base' not in self.session_state:
+                        db = get_db_connection()
+                        embed_model = get_embed_model()
+                        
+                        if db and embed_model:
+                            # Create the same SessionKnowledgeBase class as in initial_generation
+                            class SessionKnowledgeBase:
+                                def __init__(self, db, embed_model, knowledge_space="agno_task_system"):
+                                    self.db = db
+                                    self.embed_model = embed_model
+                                    self.knowledge_space = knowledge_space
+                                
+                                def retrieve_knowledge(self, query, limit=5):
+                                    from i2c.db_utils import query_context, TABLE_KNOWLEDGE_BASE
+                                    try:
+                                        query_vector = self.embed_model.get_embedding(query)
+                                        df = query_context(self.db, TABLE_KNOWLEDGE_BASE, query_vector, limit)
+                                        if df is not None and not df.empty:
+                                            return [{'source': row['source'], 'content': row['content'], 
+                                                'category': row.get('category', ''), 'knowledge_space': row.get('knowledge_space', ''),
+                                                'framework': row.get('framework', '')} for _, row in df.iterrows()]
+                                        return []
+                                    except Exception as e:
+                                        canvas.error(f"Knowledge retrieval failed: {e}")
+                                        return []
+                            
+                            self.session_state['knowledge_base'] = SessionKnowledgeBase(db, embed_model)
+                            canvas.success("✅ Created new knowledge_base in session_state")
+                        else:
+                            canvas.warning("⚠️ Could not create knowledge_base - missing db or embed_model")
+                    else:
+                        canvas.success("✅ Knowledge_base already exists in session_state - keeping it")
+                        
+                except Exception as e:
+                    canvas.warning(f"⚠️ Could not create/update knowledge_base: {e}")
+                    canvas.success("✅ Knowledge ingested to database - will be available to agents")
             else:
                 canvas.error(f"Failed to add documentation from {folder_path.name}")
         except Exception as e:

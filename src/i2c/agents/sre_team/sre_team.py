@@ -15,6 +15,16 @@ from i2c.agents.sre_team.dependency import DependencyVerifierAgent
 from i2c.agents.sre_team.sandbox import SandboxExecutorAgent
 from i2c.agents.sre_team.version_control import version_controller
 from i2c.agents.sre_team.multilang_unit_test import unit_test_generator
+# Import CLI for logging and user input
+try:
+    from i2c.cli.controller import canvas
+except ImportError:
+    class FallbackCanvas:
+        def warning(self, msg): print(f"[WARN_SANDBOX] {msg}")
+        def error(self, msg): print(f"[ERROR_SANDBOX] {msg}")
+        def info(self, msg): print(f"[INFO_SANDBOX] {msg}")
+        def success(self, msg): print(f"[SUCCESS_SANDBOX] {msg}")
+    canvas = FallbackCanvas()
 
 class SRELeadAgent(Agent):
     """Enhanced Lead agent for the SRE Team with Docker-integrated operational checks"""
@@ -493,6 +503,23 @@ def build_sre_team(
     Returns:
         Team: Configured enhanced SRE team with Docker integration
     """
+    # DEBUG: Check if SRE team receives knowledge_base
+    canvas.info(f"🔍 DEBUG: build_sre_team called")
+    if session_state:
+        canvas.info(f"🔍 DEBUG: SRE team session_state keys: {list(session_state.keys())}")
+        if 'knowledge_base' in session_state:
+            canvas.success("✅ DEBUG: SRE team received knowledge_base")
+        else:
+            canvas.error("❌ DEBUG: SRE team missing knowledge_base")
+    else:
+        canvas.error("❌ DEBUG: SRE team received None session_state")
+        
+    # 0 Extract knowledge_base from session_state (like core_agents does)
+    knowledge_base = None
+    if session_state and 'knowledge_base' in session_state:
+        knowledge_base = session_state['knowledge_base']
+        canvas.success("✅ DEBUG: SRE team extracted knowledge_base from session_state")
+        
     # 1) Ensure we have a mutable session_state dict
     if session_state is None:
         session_state = {}
@@ -519,6 +546,7 @@ def build_sre_team(
         members=members,
         mode="collaborate",  # lead agent orchestrates
         model=llm_middle,
+        knowledge=knowledge_base, 
         instructions=[
             "You are the Enhanced SRE Team with Docker-integrated operational pipeline.",
             "Follow the Docker-aware workflow orchestrated by the SRELead agent:",

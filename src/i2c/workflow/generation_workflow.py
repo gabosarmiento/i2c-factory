@@ -35,6 +35,16 @@ class GenerationWorkflow(Workflow):
         # Step 0: Knowledge Analysis with KnowledgeTeam (FIXED - NO ASYNC)
         canvas.step("Analyzing context with KnowledgeTeam...")
         try:
+            # DEBUG: Verify knowledge_base before using
+            if 'knowledge_base' in self.session_state:
+                canvas.success("✅ DEBUG: Knowledge base available in GenerationWorkflow")
+                kb = self.session_state['knowledge_base']
+                test_chunks = kb.retrieve_knowledge("test", limit=1)
+                canvas.info(f"🔍 DEBUG: Test retrieval returned {len(test_chunks)} items")
+            else:
+                canvas.error("❌ DEBUG: NO knowledge_base in GenerationWorkflow session_state!")
+                canvas.info(f"🔍 DEBUG: Available keys: {list(self.session_state.keys())}")
+
             from i2c.agents.knowledge.knowledge_team import build_knowledge_team
             import asyncio
 
@@ -43,7 +53,6 @@ class GenerationWorkflow(Workflow):
 
             # CRITICAL DEBUG: Check if KnowledgeTeam can access the database
             canvas.info(f"🔍 CRITICAL: Testing KnowledgeTeam database connection...")
-
             # Check if knowledge_lead has the required components
             canvas.info(f"🔍 CRITICAL: knowledge_lead.knowledge_manager exists: {knowledge_lead.knowledge_manager is not None}")
             canvas.info(f"🔍 CRITICAL: knowledge_lead.embed_model exists: {knowledge_lead.embed_model is not None}")
@@ -143,6 +152,23 @@ class GenerationWorkflow(Workflow):
         for item in self.file_writing_phase(project_path):
             yield item
 
+        # Step 5.5: Extract API routes if system has APIs and UI
+        arch_context = self.session_state.get("architectural_context", {})
+        system_type = arch_context.get("system_type")
+        canvas.info(f"🔍 DEBUG: System type: {system_type}")
+        canvas.info(f"🔍 DEBUG: Arch context: {arch_context}")
+        if system_type in ["fullstack_web_app", "microservices"]:
+            canvas.step("Extracting API routes for UI integration...")
+            try:
+                from i2c.utils.api_route_tracker import inject_api_routes_into_session
+                project_path = Path(self.session_state.get("project_path", ""))
+                canvas.info(f"🔍 DEBUG: Project path: {project_path}")
+                canvas.info(f"🔍 DEBUG: Files in project: {list(project_path.rglob('*.py'))}")
+                self.session_state = inject_api_routes_into_session(project_path, self.session_state)
+                canvas.success("✅ API routes extracted for frontend integration")
+            except Exception as e:
+                canvas.warning(f"⚠️ API route extraction failed: {e}")
+                
         # Step 6: Index files for RAG
         for item in self.index_files_phase(project_path):
             yield item
@@ -386,16 +412,10 @@ class GenerationWorkflow(Workflow):
                 raw = response.content if hasattr(response, 'content') else str(response)
 
                 # Clean code response and remove any "Applied patterns" documentation
-                if raw.strip().startswith("```"):
-                    lines = raw.splitlines()
-                    if lines and lines[0].strip().startswith("```"):
-                        lines = lines[1:]
-                    if lines and lines[-1].strip().startswith("```"):
-                        lines = lines[:-1]
-                    code = "\n".join(lines)
-                else:
-                    code = raw
-
+                from i2c.utils.markdown import strip_markdown_code_block
+                print(f"DEBUG: Content ends with: {repr(code[-20:])}")
+                code = strip_markdown_code_block(raw)
+                print(f"DEBUG: After strip ends with: {repr(code[-20:])}")
                 # Remove any "Applied patterns" or similar documentation sections
                 import re
                 code = re.sub(r'\n*Applied patterns:.*$', '', code, flags=re.DOTALL | re.MULTILINE)
