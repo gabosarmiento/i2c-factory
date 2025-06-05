@@ -152,6 +152,7 @@ class WorkflowController:
         Args:
             structured_goal: Dict with objective and language
             project_path: Path to the project directory
+            session_state: Session state to pass through workflow
             
         Returns:
             bool: Success status
@@ -191,9 +192,39 @@ class WorkflowController:
             project_path=project_path
         )
         
+        # NEW: Extract updated session state from workflow and store it
+        if success and hasattr(workflow, 'session_state'):
+            # Update our session manager with the workflow's final session state
+            for key, value in workflow.session_state.items():
+                if key not in ['action_type', 'structured_goal', 'language']:  # Skip workflow-specific keys
+                    self.session_manager.update_state(**{key: value})
+            
+            canvas.info(f"🔄 DEBUG: Extracted {len(workflow.session_state)} keys from GenerationWorkflow")
+            
+            # Log important keys that were extracted (removed team-specific keys: project_context, validation_results)
+            important_keys = [
+                'knowledge_base', 'architectural_context', 'system_type', 'reflection_memory', 
+                'retrieved_context', 'enhanced_objective', 'db_path', 
+                'project_path', 'backend_api_routes', 'api_route_summary'
+            ]
+            
+            extracted_keys = []
+            missing_keys = []
+            
+            for key in important_keys:
+                if key in workflow.session_state:
+                    extracted_keys.append(key)
+                else:
+                    missing_keys.append(key)
+            
+            if extracted_keys:
+                canvas.success(f"✅ DEBUG: Extracted keys: {', '.join(extracted_keys)}")
+            if missing_keys:
+                canvas.warning(f"⚠️ DEBUG: Missing keys: {', '.join(missing_keys)}")
+
         return success
-    
-    def run_modification_cycle(self, user_request: str, project_path: Path, language: str) -> bool:
+
+    def run_modification_cycle(self, user_request: str, project_path: Path, language: str, session_state: dict = None) -> bool:
         """
         Run the modification cycle workflow with recovery.
         
@@ -219,6 +250,12 @@ class WorkflowController:
         
         # Create and run workflow
         workflow = ModificationWorkflow(session_id=f"{self.session_id}-mod")
+        
+        # NEW: Merge session state into workflow if provided
+        if session_state:
+            workflow.session_state.update(session_state)
+            canvas.info(f"🔍 DEBUG: Merged session_state into ModificationWorkflow")
+        
         success = self.run_workflow_with_recovery(
             workflow,
             max_attempts=1,
@@ -229,15 +266,24 @@ class WorkflowController:
             embed_model=embed_model
         )
         
+        # NEW: Extract updated session state from modification workflow
+        if success and hasattr(workflow, 'session_state'):
+            for key, value in workflow.session_state.items():
+                if key not in ['user_request', 'language']:  # Skip workflow-specific keys
+                    self.session_manager.update_state(**{key: value})
+            
+            canvas.info(f"🔄 DEBUG: Extracted session state from ModificationWorkflow")
+
         return success
     
-    def run_sre_workflow(self, project_path: Path, language: str) -> bool:
+    def run_sre_workflow(self, project_path: Path, language: str, session_state: dict = None) -> bool:
         """
-        Run the SRE workflow with the existing SelfHealingController.
+        Run the SRE workflow with session state coordination.
         
         Args:
             project_path: Path to the project directory
             language: The programming language
+            session_state: Session state to pass to SRE workflow
             
         Returns:
             bool: Success status
@@ -248,25 +294,38 @@ class WorkflowController:
             language=language
         )
         
-        # Use the existing SelfHealingController
-        canvas.info("🔍 [WorkflowController] Running SRE Workflow via SelfHealingController...")
+        # NEW: Merge passed session state
+        if session_state:
+            for key, value in session_state.items():
+                self.session_manager.update_state(**{key: value})
+            canvas.info(f"🔄 DEBUG: Merged session state into SRE workflow")
+        
+        # Get current session state for SRE workflow
+        current_session_state = self.session_manager.get_state()
+        
+        canvas.info("🔍 [WorkflowController] Running SRE Workflow via SRETeam...")
         
         try:
-            import asyncio
-            # Create controller and run workflow
-            healing_controller = SelfHealingController(
-                session_id=f"{self.session_id}-sre"
-            )
-            success, results = asyncio.run(healing_controller.run_with_recovery(
-                project_path=project_path,
-                language=language
-            ))
+            # NEW: Use the enhanced SRE team with session state
+            from i2c.agents.sre_team.sre_team import build_sre_team
             
-            # Extract analysis summary for later use
-            if "analysis_summary" in results:
-                self.session_manager.update_state(
-                    analysis_summary=results["analysis_summary"]
-                )
+            sre_team = build_sre_team(
+                project_path=project_path,
+                session_state=current_session_state
+            )
+            
+            # Run SRE validation
+            sre_results = sre_team.run_sync()
+            
+            success = sre_results.get("passed", False)
+            
+            # Extract SRE results for later use
+            self.session_manager.update_state(
+                sre_results=sre_results,
+                analysis_summary=sre_results.get("summary", {}),
+                deployment_ready=sre_results.get("deployment_ready", False),
+                docker_ready=sre_results.get("docker_ready", False)
+            )
             
             if success:
                 canvas.success("✅ [WorkflowController] SRE Workflow completed successfully!")
@@ -279,38 +338,86 @@ class WorkflowController:
             canvas.error(f"❌ [WorkflowController] Error running SRE Workflow: {e}")
             return False
     
-    def run_quality_workflow(self, project_path: Path, structured_goal: dict) -> bool:
+    def run_quality_workflow(self, project_path: Path, structured_goal: dict, session_state: dict = None) -> bool:
         """
-        Run the quality workflow with recovery.
+        Run the quality workflow with session state coordination.
         
         Args:
             project_path: Path to the project directory
             structured_goal: Dict with objective and language
+            session_state: Session state to pass to quality workflow
             
         Returns:
             bool: Success status
         """
+        # NEW: Merge passed session state
+        if session_state:
+            for key, value in session_state.items():
+                self.session_manager.update_state(**{key: value})
+            canvas.info(f"🔄 DEBUG: Merged session state into Quality workflow")
+        
+        # Get current session state
+        current_session_state = self.session_manager.get_state()
+        
         # Get code_map and analysis_summary from session state
-        code_map = self.session_manager.get_value("code_map", {})
-        analysis_summary = self.session_manager.get_value("analysis_summary", {})
+        code_map = current_session_state.get("code_map", {})
+        analysis_summary = current_session_state.get("analysis_summary", {})
         
         if not code_map:
             canvas.warning("⚠️ [WorkflowController] No code map available for quality workflow.")
             return False
         
-        # Create and run workflow
-        workflow = QualityWorkflow(session_id=f"{self.session_id}-quality")
-        success = self.run_workflow_with_recovery(
-            workflow,
-            max_attempts=1,
-            project_path=project_path,
-            structured_goal=structured_goal,
-            code_map=code_map,
-            analysis_summary=analysis_summary
-        )
+        canvas.info("🔍 [WorkflowController] Running Quality Workflow via QualityTeam...")
         
-        return success
-    
+        try:
+            # NEW: Use the enhanced Quality team with session state
+            from i2c.agents.quality_team.quality_team import build_quality_team
+            
+            quality_team = build_quality_team(session_state=current_session_state)
+            
+            # Create quality validation message
+            validation_message = {
+                "instruction": "Validate the modified files using all relevant quality gates.",
+                "project_path": str(project_path),
+                "modified_files": code_map,
+                "quality_gates": []  # Will be determined by the team
+            }
+            
+            # Run quality validation using the team
+            from agno.agent import Message
+            message = Message(role="user", content=str(validation_message))
+            
+            quality_results = quality_team.run(message=message)
+            
+            # Extract results (assuming quality team returns structured results)
+            success = getattr(quality_results, 'passed', True) if hasattr(quality_results, 'passed') else True
+            
+            # Store quality results in session state
+            self.session_manager.update_state(
+                quality_results=quality_results,
+                quality_validation_passed=success
+            )
+            
+            if success:
+                canvas.success("✅ [WorkflowController] Quality Workflow completed successfully!")
+            else:
+                canvas.error("❌ [WorkflowController] Quality Workflow failed.")
+                
+            return success
+            
+        except Exception as e:
+            canvas.error(f"❌ [WorkflowController] Error running Quality Workflow: {e}")
+            # Fallback to legacy approach
+            workflow = QualityWorkflow(session_id=f"{self.session_id}-quality")
+            return self.run_workflow_with_recovery(
+                workflow,
+                max_attempts=1,
+                project_path=project_path,
+                structured_goal=structured_goal,
+                code_map=code_map,
+                analysis_summary=analysis_summary
+            )
+
     def run_complete_workflow(self, action_type: str, action_detail: Any, 
                             project_path: Path, structured_goal: dict, 
                             session_state: dict = None) -> bool:
@@ -322,6 +429,7 @@ class WorkflowController:
             action_detail: Structured goal or user request
             project_path: Path to the project directory
             structured_goal: Dict with objective and language
+            session_state: Session state to maintain across workflows
             
         Returns:
             bool: Overall success status
@@ -334,23 +442,36 @@ class WorkflowController:
             language=structured_goal.get("language") if structured_goal else "python"
         )
         
+        # NEW: Merge passed session_state into session manager
+        if session_state:
+            for key, value in session_state.items():
+                self.session_manager.update_state(**{key: value})
+            canvas.info(f"🔄 DEBUG: Merged {len(session_state)} keys into WorkflowController session")
+        
         # 1. Run main cycle (generation or modification)
         if action_type == "generate":
             canvas.info(f"🏭 [WorkflowController] Starting Generation Cycle...")
-            # Pass session_state to generation cycle
-            if session_state:
-                canvas.info(f"🔍 DEBUG: Passing session_state to generation cycle: {'knowledge_base' in session_state}")
+            
+            # Get current session state from session manager
+            current_session_state = self.session_manager.get_state()
+            canvas.info(f"🔍 DEBUG: Passing {len(current_session_state)} session keys to generation cycle")
+            
             main_cycle_success = self.run_generation_cycle(
                 structured_goal=action_detail,
                 project_path=project_path,
-                session_state=session_state  # ADD THIS
+                session_state=current_session_state
             )
         elif action_type == "modify":
             canvas.info(f"🏭 [WorkflowController] Starting Modification Cycle...")
+            
+            # Get current session state from session manager
+            current_session_state = self.session_manager.get_state()
+            
             main_cycle_success = self.run_modification_cycle(
                 user_request=action_detail,
                 project_path=project_path,
-                language=structured_goal.get("language", "python")
+                language=structured_goal.get("language", "python"),
+                session_state=current_session_state  # NEW: Pass session state
             )
         else:
             canvas.error(f"❌ [WorkflowController] Unknown action type: {action_type}")
@@ -360,11 +481,17 @@ class WorkflowController:
         if not main_cycle_success:
             canvas.error(f"❌ [WorkflowController] Main cycle failed.")
             return False
-        
-        # 2. Run SRE workflow
+
+        # 1.5. Extract API routes for frontend-backend integration (NEW)
+        current_session_state = self.session_manager.get_state()
+        self._extract_api_routes_for_integration(project_path, current_session_state)
+
+        # 2. Run SRE workflow with current session state
+        current_session_state = self.session_manager.get_state()
         sre_success = self.run_sre_workflow(
             project_path=project_path,
-            language=structured_goal.get("language", "python")
+            language=structured_goal.get("language", "python"),
+            session_state=current_session_state
         )
         
         # Check SRE success
@@ -372,11 +499,14 @@ class WorkflowController:
             canvas.error(f"❌ [WorkflowController] SRE workflow failed.")
             return False
         
-        # 3. Run quality workflow
+        # 3. Run quality workflow with current session state
+        current_session_state = self.session_manager.get_state()
         quality_success = self.run_quality_workflow(
             project_path=project_path,
-            structured_goal=structured_goal
-        )
+            structured_goal=structured_goal,
+            session_state=current_session_state
+        )       
+
         
         # Final status
         # Resilient success logic - don't fail entire workflow for quality/SRE issues
@@ -415,3 +545,68 @@ class WorkflowController:
             canvas.error(f"❌ [WorkflowController] Main generation failed.")
 
         return overall_success
+    
+    def _extract_api_routes_for_integration(self, project_path: Path, session_state: dict):
+        """
+        Extract API routes from backend files and store in session state for frontend integration.
+        This ensures frontend components can connect to real backend endpoints.
+        """
+        try:
+            # Check if this is a system that needs API integration
+            arch_context = session_state.get("architectural_context", {})
+            system_type = arch_context.get("system_type")
+            
+            if system_type not in ["fullstack_web_app", "microservices"]:
+                canvas.info(f"🔍 DEBUG: Skipping API extraction for system type: {system_type}")
+                return
+            
+            # Check if backend files exist
+            backend_files = list(project_path.rglob("backend/**/*.py")) + list(project_path.rglob("**/main.py")) + list(project_path.rglob("**/app.py"))
+            if not backend_files:
+                canvas.info("🔍 DEBUG: No backend files found - skipping API extraction")
+                return
+            
+            canvas.step("Extracting API routes for frontend-backend integration...")
+            
+            # Import API route extraction utilities
+            from i2c.utils.api_route_tracker import APIRouteExtractor, FrontendAPIInjector
+            
+            # Extract routes from the project
+            extractor = APIRouteExtractor()
+            routes = extractor.extract_from_project(project_path)
+            
+            # Store routes in session state
+            session_state['backend_api_routes'] = routes
+            
+            # Create API summary for frontend injection
+            injector = FrontendAPIInjector(routes)
+            session_state['api_route_summary'] = injector.api_summary
+            
+            # Update session manager
+            self.session_manager.update_state(
+                backend_api_routes=routes,
+                api_route_summary=injector.api_summary
+            )
+            
+            # Log success
+            total_routes = sum(len(endpoints) for endpoints in routes.values())
+            if total_routes > 0:
+                canvas.success(f"✅ Extracted {total_routes} API routes for frontend integration")
+                
+                # Debug: show extracted routes
+                for method, endpoints in routes.items():
+                    if endpoints:
+                        canvas.info(f"   {method.upper()}: {len(endpoints)} endpoints")
+                        for endpoint in endpoints[:3]:  # Show first 3
+                            path = endpoint.get('full_path') or endpoint.get('path', '')
+                            canvas.info(f"     - {path}")
+                        if len(endpoints) > 3:
+                            canvas.info(f"     ... and {len(endpoints) - 3} more")
+            else:
+                canvas.warning("⚠️ No API routes found in backend files")
+                
+        except Exception as e:
+            canvas.warning(f"⚠️ API route extraction failed: {e}")
+            # Don't fail the workflow, just log the error
+            import traceback
+            canvas.warning(f"API extraction error details: {traceback.format_exc()}")

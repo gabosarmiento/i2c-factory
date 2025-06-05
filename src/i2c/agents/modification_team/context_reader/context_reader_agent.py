@@ -21,6 +21,7 @@ if loaded_embedding_model is None:
         # No further fallbacks - we'll just have None and handle the case properly
         
 from .context_indexer import ContextIndexer
+from .incremental_indexer import IncrementalContextIndexer
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -36,22 +37,27 @@ class ContextReaderAgent:
         self,
         project_path: Path,
         progress_callback: Optional[Callable[[str, Any], None]] = None,
+        use_incremental: bool = True,
     ):
         self.project_path = project_path
         self.progress_callback = progress_callback
+        self.use_incremental = use_incremental
 
         # Load embedding model
         self.embedding_model: Any | None = loaded_embedding_model
         if not self.embedding_model:
             logger.warning("No embedding model loaded; RAG will fail later.")
 
-        # Initialize the indexer - don't create table here
+        # Initialize the appropriate indexer
         try:
-            logger.info(f"DEBUG: ContextIndexer = {ContextIndexer}, type = {type(ContextIndexer)}")
-
-            self.indexer = ContextIndexer(self.project_path)
+            if self.use_incremental:
+                logger.info("Using IncrementalContextIndexer for intelligent change detection")
+                self.indexer = IncrementalContextIndexer(self.project_path)
+            else:
+                logger.info("Using legacy ContextIndexer for full reindexing")
+                self.indexer = ContextIndexer(self.project_path)
         except Exception as e:
-            logger.error(f"Error creating ContextIndexer: {e}", exc_info=True)
+            logger.error(f"Error creating indexer: {e}", exc_info=True)
             self.indexer = None
 
     def index_project_context(
@@ -76,9 +82,12 @@ class ContextReaderAgent:
         if not self.indexer:
             # Try to create indexer again if it was None
             try:
-                self.indexer = ContextIndexer(path)
+                if self.use_incremental:
+                    self.indexer = IncrementalContextIndexer(path)
+                else:
+                    self.indexer = ContextIndexer(path)
             except Exception as e:
-                err = f"ContextIndexer unavailable: {e}"
+                err = f"Indexer unavailable: {e}"
                 logger.error(err)
                 return {
                     "files_indexed": 0,
@@ -94,11 +103,15 @@ class ContextReaderAgent:
             except Exception as e:
                 logger.warning(f"start-callback failed: {e}")
 
-        # Call the indexer
+        # Call the appropriate indexer method
         try:
             logger.info(f"Starting indexing of {path}")
-            status = self.indexer.index_project()
-            logger.info(f"Indexing completed with status: {status}")
+            if self.use_incremental:
+                status = self.indexer.index_project_incrementally()
+                logger.info(f"Incremental indexing completed with status: {status}")
+            else:
+                status = self.indexer.index_project()
+                logger.info(f"Full indexing completed with status: {status}")
         except Exception as e:
             # Log the detailed error trace
             import traceback
@@ -123,4 +136,4 @@ class ContextReaderAgent:
 
 # Singleton para imports
 default_root = Path(os.getenv("DEFAULT_PROJECT_ROOT", "."))
-context_reader_agent = ContextReaderAgent(default_root)
+context_reader_agent = ContextReaderAgent(default_root, use_incremental=True)

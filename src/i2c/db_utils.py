@@ -80,68 +80,6 @@ def get_db_connection() -> Optional[lancedb.db.LanceDBConnection]:
         canvas.error(f"Failed to connect to LanceDB at {db_uri}: {e}")
         return None
 
-# def get_or_create_table(
-#     db: lancedb.db.LanceDBConnection,
-#     table_name: str,
-#     schema: pa.Schema,
-#     force_recreate: bool = False
-# ) -> Optional[lancedb.table.LanceTable]:
-#     """Gets or creates a LanceDB table with a specific schema.
-    
-#     Args:
-#         db: LanceDB connection
-#         table_name: Name of the table
-#         schema: PyArrow schema defining the table structure
-#         force_recreate: If True, drops and recreates the table even if it exists
-        
-#     Returns:
-#         LanceTable object or None if operation fails
-#     """
-#     try:
-#         # Handle force recreation
-#         if force_recreate and table_name in db.table_names():
-#             canvas.info(f"Dropping existing {table_name} table")
-#             try:
-#                 db.drop_table(table_name)
-#             except Exception as e:
-#                 canvas.warning(f"Error dropping table {table_name}: {e}")
-                
-#         # Check if table exists
-#         if table_name in db.table_names():
-#             tbl = db.open_table(table_name)
-#             # Debug: Print schema equality check details
-#             canvas.info(f"Schema equality check for {table_name}: {tbl.schema == schema}")
-#             canvas.info(f"Schema hash comparison: {hash(str(tbl.schema))} vs {hash(str(schema))}")
-            
-#             # Additional debug for field-by-field comparison
-#             tbl_fields = {f.name: (str(f.type), f.nullable) for f in tbl.schema}
-#             schema_fields = {f.name: (str(f.type), f.nullable) for f in schema}
-            
-#             # Check fields and properties
-#             for name in schema_fields:
-#                 if name not in tbl_fields:
-#                     canvas.error(f"Field {name} missing in table schema")
-#                 elif tbl_fields[name] != schema_fields[name]:
-#                     canvas.error(f"Field {name} differs: table={tbl_fields[name]}, expected={schema_fields[name]}")
-            
-#             # Check the list of field names matches exactly
-#             if set(tbl_fields.keys()) != set(schema_fields.keys()):
-#                 canvas.error(f"Field sets don't match: table has {set(tbl_fields.keys())}, expected {set(schema_fields.keys())}")
-            
-#             # Check for schema compatibility
-#             if tbl.schema != schema:
-#                 canvas.error(f"Table schema: {tbl.schema}")
-#                 canvas.error(f"Expected schema: {schema}")
-#                 canvas.error(f"Schema mismatch for '{table_name}'. Use force_recreate=True to reset.")
-#                 return None
-#             return tbl
-#         else:
-#             canvas.info(f"Creating {table_name} table")
-#             return db.create_table(table_name, schema=schema)
-#     except Exception as e:
-#         canvas.error(f"Open/create table '{table_name}' failed: {e}")
-#         return None
-
 def get_or_create_table(
     db: lancedb.db.LanceDBConnection,
     table_name: str,
@@ -186,8 +124,7 @@ def get_or_create_table(
                 return None
     except Exception as e:
         canvas.error(f"Open/create table '{table_name}' failed: {e}")
-        return None
-    
+        return None   
 # --- Chunk Upsert for Code & Knowledge ---
 
 def add_or_update_chunks(
@@ -263,7 +200,7 @@ def add_or_update_chunks(
         canvas.error(f"Error in add_or_update_chunks: {e}")
         return False
     
-# --- Basic Query Context ---
+# --- Hybrid Query Context ---
 
 def query_context(
     db: lancedb.db.LanceDBConnection,
@@ -297,7 +234,6 @@ def query_context(
     except Exception as e:
         canvas.error(f"query_context error: {e}")
         return None
-
 # --- Enhanced Knowledge API ---
 
 def query_context_filtered(

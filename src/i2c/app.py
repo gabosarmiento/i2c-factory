@@ -45,7 +45,7 @@ def load_environment():
 
 def initialize_budget_manager():
     """Sets up and globally registers the budget manager."""
-    global_budget_manager = BudgetManagerAgent(session_budget=10.0)
+    global_budget_manager = BudgetManagerAgent(session_budget=None)
     builtins.global_budget_manager = global_budget_manager
     print("💰 Budget manager initialized with $10 session budget.")
 

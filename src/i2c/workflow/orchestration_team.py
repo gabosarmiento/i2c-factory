@@ -19,20 +19,11 @@ def build_orchestration_team(session_state=None) -> Team:
     """
     Build the orchestration team with enhanced architectural and knowledge intelligence.
     """
-    # DEBUG: Check what orchestration team receives
-    canvas.info(f"🔍 DEBUG: build_orchestration_team called")
-    if session_state:
-        canvas.info(f"🔍 DEBUG: Orchestration team input session_state keys: {list(session_state.keys())}")
-        if 'knowledge_base' in session_state:
-            canvas.success("✅ DEBUG: Orchestration team found knowledge_base in input")
-        else:
-            canvas.error("❌ DEBUG: Orchestration team missing knowledge_base in input")
     
     # Extract knowledge_base from session_state (AGNO pattern)
     extracted_knowledge_base = None
     if session_state and 'knowledge_base' in session_state:
         extracted_knowledge_base = session_state['knowledge_base']
-        canvas.success("✅ DEBUG: Extracted knowledge_base for orchestration team")
     
     # Use empty dict if no initial state is provided
     if session_state is None:

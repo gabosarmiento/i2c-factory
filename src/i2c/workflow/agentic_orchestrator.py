@@ -195,22 +195,26 @@ def _stub_for(rel_path: str, lang: str) -> str:
 
 # helper already in agentic_orchestrator.py
 def _apply_modifications_if_any(result_json: dict, project_path: Path, session_state: Dict[str, Any] = None) -> None:
-   
-    canvas.info(f"🔍 DEBUG: _apply_modifications_if_any called")
-    if session_state:
-        canvas.info(f"🔍 DEBUG: session_state keys: {list(session_state.keys())}")
-        if 'knowledge_base' in session_state:
-            canvas.success("✅ DEBUG: knowledge_base found in _apply_modifications_if_any")
-        else:
-            canvas.error("❌ DEBUG: NO knowledge_base in _apply_modifications_if_any")
-    else:
-        canvas.error("❌ DEBUG: session_state is None in _apply_modifications_if_any")
-       
+          
     mods = result_json.get("modifications", {})
-    print(f"DEBUG: _apply_modifications_if_any called with {mods}")
+    
+    # DEBUG: Check session state before modifications
+    if session_state:
+        canvas.info(f"🔍 DEBUG: Session state keys before modifications: {list(session_state.keys())}")
+        if "backend_api_routes" in session_state:
+            routes = session_state["backend_api_routes"]
+            total_routes = sum(len(endpoints) for endpoints in routes.values())
+            canvas.info(f"🔍 DEBUG: Found {total_routes} API routes in session state")
+        else:
+            canvas.warning("🔍 DEBUG: No backend_api_routes in session state")
+        
+        if "api_route_summary" in session_state:
+            canvas.info(f"🔍 DEBUG: api_route_summary exists in session state")
+        else:
+            canvas.warning("🔍 DEBUG: No api_route_summary in session state")
     
     if not isinstance(mods, dict) or not mods:
-        print("DEBUG: No modifications to apply")
+        canvas.info("🔍 DEBUG: No modifications to apply")
         return
 
     # NEW: Instead of treating descriptions as code, use direct agent to generate actual code
@@ -218,7 +222,6 @@ def _apply_modifications_if_any(result_json: dict, project_path: Path, session_s
     
     for file_path, description in mods.items():
         try:
-            print(f"DEBUG: Generating actual code for {file_path}: {description}")
             
             agent = get_rag_enabled_agent("code_builder", session_state=session_state)
             
@@ -247,9 +250,10 @@ Return the complete modified file content with the requested changes implemented
             
             # Strip markdown formatting if present
             from i2c.utils.markdown import strip_markdown_code_block
-            print(f"DEBUG: Content ends with: {repr(content[-20:])}")
+            
             content = strip_markdown_code_block(content)
-            print(f"DEBUG: After strip ends with: {repr(content[-20:])}")              
+            import re
+            content = re.sub(r'(```\s*\n*)?Applied patterns:.*$', '', content, flags=re.DOTALL | re.MULTILINE)              
             # Write the actual generated code
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_text(content, encoding='utf-8')
@@ -257,7 +261,47 @@ Return the complete modified file content with the requested changes implemented
             print(f"DEBUG: Successfully wrote actual code to {file_path}")
             
         except Exception as e:
-            print(f"DEBUG: Error generating code for {file_path}: {e}")
+                    print(f"DEBUG: Error generating code for {file_path}: {e}")
+
+    # NEW: Re-index context after all modifications are applied
+    if session_state and mods:
+        try:
+            canvas.step("🔄 Re-indexing project context after modifications...")
+            
+            # 1. Re-index project context
+            from i2c.agents.modification_team.context_reader.context_reader_agent import ContextReaderAgent
+            reader_agent = ContextReaderAgent(project_path)
+            status = reader_agent.index_project_context()
+            canvas.info(f"🔍 DEBUG: Re-indexed {status.get('files_indexed', 0)} files, {status.get('chunks_indexed', 0)} chunks")
+            
+            # 2. Check if backend files were modified
+            backend_files_changed = any(
+                file_path.startswith("backend/") or "api" in file_path.lower() or file_path.endswith(".py")
+                for file_path in mods.keys()
+            )
+            
+            # 3. Re-extract API routes if backend changed
+            if backend_files_changed:
+                canvas.step("🔄 Re-extracting API routes after backend changes...")
+                from i2c.utils.api_route_tracker import inject_api_routes_into_session
+                updated_session_state = inject_api_routes_into_session(project_path, session_state)
+                
+                # Update the session_state reference
+                session_state.update(updated_session_state)
+                
+                if "backend_api_routes" in session_state:
+                    routes = session_state["backend_api_routes"]
+                    total_routes = sum(len(endpoints) for endpoints in routes.values())
+                    canvas.success(f"✅ Re-extracted {total_routes} API routes")
+                else:
+                    canvas.warning("⚠️ No API routes found after re-extraction")
+            else:
+                canvas.info("🔍 DEBUG: No backend files changed, skipping API route re-extraction")
+                
+        except Exception as e:
+            canvas.error(f"❌ Error updating context after modifications: {e}")
+            import traceback
+            canvas.error(traceback.format_exc())
             
 # --- consolidate helpers ----------------------------------------
 def _ensure_mandatory_files(project_path: Path, arch_ctx: dict):
@@ -389,20 +433,31 @@ async def execute_agentic_evolution(
             
             if hasattr(knowledge_base, 'retrieve_knowledge'):
                 knowledge_items = knowledge_base.retrieve_knowledge(task, limit=5)
+                canvas.info(f"🔍 DEBUG: knowledge_base.retrieve_knowledge returned {len(knowledge_items) if knowledge_items else 0} items")
+    
                 if knowledge_items:
+                    canvas.info(f"🔍 DEBUG: First item type: {type(knowledge_items[0])}")
+                    canvas.info(f"🔍 DEBUG: First item: {knowledge_items[0]}")
+                    canvas.info(f"🔍 DEBUG: First item keys: {knowledge_items[0].keys() if isinstance(knowledge_items[0], dict) else 'not dict'}")
+        
                     context_parts = []
-                    for item in knowledge_items:
-                        context_parts.append(f"Source: {item.get('source', 'Unknown')}")
-                        context_parts.append(item.get('content', ''))
+                    for i, item in enumerate(knowledge_items):
+                        source = item.get('source', 'Unknown')
+                        content = item.get('content', '')
+                        canvas.info(f"🔍 DEBUG: Item {i} - source: {source}")
+                        canvas.info(f"🔍 DEBUG: Item {i} - content length: {len(content)}")
+                        canvas.info(f"🔍 DEBUG: Item {i} - content preview: {content[:100]}...")
+                        context_parts.append(f"Source: {source}")
+                        context_parts.append(content)
                         context_parts.append("---")
                     session_state["retrieved_context"] = "\n".join(context_parts)
                     canvas.info(f"🧠 Retrieved knowledge context for agentic evolution: {len(knowledge_items)} items")
-
-                    # DEBUG: Check knowledge content
-                    canvas.info(f"🔍 DEBUG: Knowledge context length: {len(session_state['retrieved_context'])} chars")
-                    canvas.info(f"🔍 DEBUG: Contains 'Agent': {'Agent' in session_state['retrieved_context']}")
-                    canvas.info(f"🔍 DEBUG: Contains 'Team': {'Team' in session_state['retrieved_context']}")
-                    canvas.info(f"🔍 DEBUG: Context preview: {session_state['retrieved_context'][:200]}...")
+                    # DEBUG: Search specifically for import patterns
+                    import_search_items = knowledge_base.retrieve_knowledge("from agno import Agent", limit=5)
+                    canvas.info(f"🔍 DEBUG: Direct import search returned {len(import_search_items) if import_search_items else 0} items")
+                    if import_search_items:
+                        for i, item in enumerate(import_search_items):
+                            canvas.info(f"🔍 DEBUG: Import item {i}: {item.get('content', '')[:200]}...")
                     
         except Exception as e:
             canvas.warning(f"Failed to retrieve knowledge context: {e}")
@@ -465,8 +520,6 @@ async def execute_agentic_evolution(
         
         reflection_context += f"\n== PROGRESS SUMMARY ==\nSuccess rate: {reflection_insights['success_rate']}\n"
         
-        # Log for debugging
-        print(f"Enhanced reflection context: {reflection_context}")
         
         # Inject into objective
         if isinstance(objective.get("task"), str):
@@ -552,17 +605,6 @@ async def execute_agentic_evolution(
     }
 
     team = build_orchestration_team(session_state=session_state)
-    # DEBUG: Check what we're passing to orchestration team
-    canvas.info(f"🔍 DEBUG: About to call build_orchestration_team")
-    canvas.info(f"🔍 DEBUG: team_input keys: {list(team_input.keys())}")
-    if 'session_state' in team_input and team_input['session_state']:
-        canvas.info(f"🔍 DEBUG: team_input session_state keys: {list(team_input['session_state'].keys())}")
-        if 'knowledge_base' in team_input['session_state']:
-            canvas.success("✅ DEBUG: knowledge_base found in team_input session_state")
-        else:
-            canvas.error("❌ DEBUG: NO knowledge_base in team_input session_state")
-    else:
-        canvas.error("❌ DEBUG: No session_state in team_input")
 
     # Convert team_input to JSON string with proper error handling
     try:
@@ -595,11 +637,7 @@ async def execute_agentic_evolution(
         # Use fallback simple string format
         message = Message(role="user", content=str(team_input))
     
-    # Add debug before and after:
-    canvas.info(f"🔍 DEBUG: About to call orchestration team...")
-    canvas.info(f"🔍 DEBUG: Team input: {str(message)[:200]}...")
     result = await team.arun(message=message)
-    canvas.info(f"🔍 DEBUG: Orchestration team result: {str(result)[:200]}...")
 
     # Skip sandbox waiting entirely - proceed with what we have
     if getattr(result, "event", None) in {"waiting", "run_paused", "intermediate"}:
@@ -638,12 +676,6 @@ async def execute_agentic_evolution(
         else:
             raise ValueError(f"Unexpected content type: {type(content)}")
 
-        # DEBUG: Verify session_state still has knowledge_base before modifications
-        canvas.info(f"🔍 DEBUG: About to call _apply_modifications_if_any")
-        if session_state and 'knowledge_base' in session_state:
-            canvas.success("✅ DEBUG: session_state has knowledge_base for modifications")
-        else:
-            canvas.error("❌ DEBUG: session_state missing knowledge_base for modifications")
 
         _apply_modifications_if_any(result_dict, project_path,session_state)
         _ensure_mandatory_files(project_path, arch_ctx)
@@ -885,16 +917,7 @@ def execute_agentic_evolution_sync(
     :param session_state: Optional initial session state passed through runs.
     :returns: Final parsed JSON response from the agent team.
     """
-    # DEBUG: Check what we receive
-    canvas.info(f"🔍 DEBUG: execute_agentic_evolution_sync received session_state")
-    if session_state:
-        canvas.info(f"🔍 DEBUG: Input session_state keys: {list(session_state.keys())}")
-        if 'knowledge_base' in session_state:
-            canvas.success("✅ DEBUG: knowledge_base found in input")
-        else:
-            canvas.error("❌ DEBUG: NO knowledge_base in input session_state")
-    else:
-        canvas.error("❌ DEBUG: session_state is None in execute_agentic_evolution_sync")
+
     # Ensure we have an event loop
     try:
         loop = asyncio.get_event_loop()

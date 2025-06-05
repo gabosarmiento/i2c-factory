@@ -14,36 +14,50 @@ class GenerationWorkflow(Workflow):
     Agno workflow for project generation cycle.
     Uses existing agents and follows the same steps as execute_generation_cycle.
     """
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Initialize ONLY missing workflow-specific keys (preserve existing session state)
         self.session_state.setdefault("generation_memory", [])
+        
+        # Debug session state initialization (without modifying)
+        canvas.info(f"🔍 DEBUG: GenerationWorkflow initialized with {len(self.session_state)} session keys")
+        important_keys = ['knowledge_base', 'architectural_context', 'backend_api_routes', 'retrieved_context']
+        for key in important_keys:
+            if key in self.session_state:
+                canvas.success(f"✅ DEBUG: GenerationWorkflow has {key}")
+            else:
+                canvas.warning(f"⚠️ DEBUG: GenerationWorkflow missing {key}")
 
     def run(self, structured_goal: dict, project_path: Path) -> Iterator[RunResponse]:
         """Execute the generation workflow, yielding responses at each step."""
         canvas.start_process(f"Generation Cycle for: {project_path.name}")
         
-        # Initialize session state
+        # Reset workflow-specific state (preserve important session state)
         self.session_state["generation_memory"] = []
-        self.session_state["language"] = structured_goal.get("language")
-        self.session_state["objective"] = structured_goal.get("objective")
+        
+        # Only set these if they don't already exist (preserve passed values)
+        self.session_state.setdefault("language", structured_goal.get("language"))
+        self.session_state.setdefault("objective", structured_goal.get("objective"))
+        self.session_state.setdefault("project_path", str(project_path))
+        self.session_state.setdefault("structured_goal", structured_goal)
+        
+        # Always reset code_map for this workflow run
         self.session_state["code_map"] = None
         
+        # Debug session state at start of workflow (without modifying)
+        canvas.info(f"🔍 DEBUG: Generation workflow starting with session keys: {list(self.session_state.keys())}")
+        if "backend_api_routes" in self.session_state:
+            routes = self.session_state["backend_api_routes"]
+            total_routes = sum(len(endpoints) for endpoints in routes.values())
+            canvas.info(f"🔍 DEBUG: Generation workflow has {total_routes} API routes from previous steps")
         # Start workflow
         yield RunResponse(content=f"🚀 Starting Generation Workflow for: {project_path.name}")
         
         # Step 0: Knowledge Analysis with KnowledgeTeam (FIXED - NO ASYNC)
         canvas.step("Analyzing context with KnowledgeTeam...")
         try:
-            # DEBUG: Verify knowledge_base before using
-            if 'knowledge_base' in self.session_state:
-                canvas.success("✅ DEBUG: Knowledge base available in GenerationWorkflow")
-                kb = self.session_state['knowledge_base']
-                test_chunks = kb.retrieve_knowledge("test", limit=1)
-                canvas.info(f"🔍 DEBUG: Test retrieval returned {len(test_chunks)} items")
-            else:
-                canvas.error("❌ DEBUG: NO knowledge_base in GenerationWorkflow session_state!")
-                canvas.info(f"🔍 DEBUG: Available keys: {list(self.session_state.keys())}")
 
             from i2c.agents.knowledge.knowledge_team import build_knowledge_team
             import asyncio
@@ -51,78 +65,15 @@ class GenerationWorkflow(Workflow):
             knowledge_team = build_knowledge_team(self.session_state)
             knowledge_lead = knowledge_team.members[0]
 
-            # CRITICAL DEBUG: Check if KnowledgeTeam can access the database
-            canvas.info(f"🔍 CRITICAL: Testing KnowledgeTeam database connection...")
-            # Check if knowledge_lead has the required components
-            canvas.info(f"🔍 CRITICAL: knowledge_lead.knowledge_manager exists: {knowledge_lead.knowledge_manager is not None}")
-            canvas.info(f"🔍 CRITICAL: knowledge_lead.embed_model exists: {knowledge_lead.embed_model is not None}")
-
-            # Test direct database access
-            try:
-                from i2c.db_utils import get_db_connection
-                db = get_db_connection()
-                if db and "knowledge_base" in db.table_names():
-                    kb_table = db.open_table("knowledge_base")
-                    row_count = len(kb_table.to_pandas())
-                    canvas.info(f"🔍 CRITICAL: Direct DB access shows {row_count} rows in knowledge_base")
-                else:
-                    canvas.error(f"🔍 CRITICAL: Direct DB access failed - no knowledge_base table")
-            except Exception as e:
-                canvas.error(f"🔍 CRITICAL: Direct DB access error: {e}")
-
-            # Test if KnowledgeTeam can retrieve anything
-            # Test if KnowledgeTeam can retrieve anything
-            if knowledge_lead.knowledge_manager:
-                try:
-                    test_retrieval = knowledge_lead.knowledge_manager.retrieve_knowledge("test", limit=1)
-                    canvas.info(f"🔍 CRITICAL: KnowledgeTeam test retrieval returned {len(test_retrieval)} items")
-                    
-                    # Test AGNO-specific retrieval
-                    agno_retrieval = knowledge_lead.knowledge_manager.retrieve_knowledge("AGNO", limit=3)
-                    canvas.info(f"🔍 CRITICAL: AGNO retrieval returned {len(agno_retrieval)} items")
-                    
-                    if agno_retrieval:
-                        for i, item in enumerate(agno_retrieval[:2]):
-                            canvas.info(f"🔍 CRITICAL: AGNO item {i}: {str(item)[:200]}...")
-                    
-                except Exception as e:
-                    canvas.error(f"🔍 CRITICAL: KnowledgeTeam retrieval failed: {e}")
-            else:
-                canvas.error(f"🔍 CRITICAL: KnowledgeTeam has no knowledge_manager!")
-                
-
             current_project_path = Path(self.session_state.get("project_path", "."))
             task = structured_goal.get("objective", "")
-            
-            canvas.info(f"🔍 DEBUG: Using KnowledgeTeam to analyze task: {task}")
             
             # CALL IT SYNCHRONOUSLY
             project_context = asyncio.run(knowledge_lead.analyze_project_context(
                 project_path=current_project_path,
                 task=task
             ))
-            
-            canvas.info(f"🔍 DEBUG: KnowledgeTeam analysis complete")
-
-            # DEBUG: Log what the KnowledgeTeam actually found
-            canvas.info(f"🔍 DEBUG: Project context keys: {list(project_context.keys())}")
-
-            if "documentation" in project_context:
-                docs = project_context["documentation"]
-                canvas.info(f"🔍 DEBUG: Documentation keys: {list(docs.keys())}")
-                
-                if "references" in docs:
-                    refs = docs["references"]
-                    canvas.info(f"🔍 DEBUG: Found {len(refs)} references")
-                    for i, ref in enumerate(refs[:2]):
-                        canvas.info(f"🔍 DEBUG: Ref {i}: {str(ref)[:200]}...")
-
-            if "best_practices" in project_context:
-                bp = project_context["best_practices"]
-                canvas.info(f"🔍 DEBUG: Found {len(bp)} best practices")
-                for i, practice in enumerate(bp[:2]):
-                    canvas.info(f"🔍 DEBUG: Practice {i}: {str(practice)[:200]}...")
-
+ 
             # Store the context
             self.session_state["knowledge_context"] = project_context
 
@@ -155,17 +106,24 @@ class GenerationWorkflow(Workflow):
         # Step 5.5: Extract API routes if system has APIs and UI
         arch_context = self.session_state.get("architectural_context", {})
         system_type = arch_context.get("system_type")
-        canvas.info(f"🔍 DEBUG: System type: {system_type}")
-        canvas.info(f"🔍 DEBUG: Arch context: {arch_context}")
+
         if system_type in ["fullstack_web_app", "microservices"]:
             canvas.step("Extracting API routes for UI integration...")
             try:
                 from i2c.utils.api_route_tracker import inject_api_routes_into_session
                 project_path = Path(self.session_state.get("project_path", ""))
-                canvas.info(f"🔍 DEBUG: Project path: {project_path}")
-                canvas.info(f"🔍 DEBUG: Files in project: {list(project_path.rglob('*.py'))}")
-                self.session_state = inject_api_routes_into_session(project_path, self.session_state)
-                canvas.success("✅ API routes extracted for frontend integration")
+                
+                # Update session state while preserving existing keys
+                updated_session_state = inject_api_routes_into_session(project_path, self.session_state)
+                self.session_state.update(updated_session_state)
+                
+                # Debug what was extracted
+                if "backend_api_routes" in self.session_state:
+                    routes = self.session_state["backend_api_routes"]
+                    total_routes = sum(len(endpoints) for endpoints in routes.values())
+                    canvas.success(f"✅ API routes extracted: {total_routes} endpoints for frontend integration")
+                else:
+                    canvas.warning("⚠️ No API routes extracted")
             except Exception as e:
                 canvas.warning(f"⚠️ API route extraction failed: {e}")
                 
@@ -239,8 +197,11 @@ class GenerationWorkflow(Workflow):
         """Plan files based on structured goal."""
         canvas.step("Planning minimal file structure...")
         
-        language = structured_goal.get("language")
-        objective = structured_goal.get("objective")
+        # Use values from session state if available, fallback to structured_goal
+        language = self.session_state.get("language") or structured_goal.get("language")
+        objective = self.session_state.get("objective") or structured_goal.get("objective")
+        
+        canvas.info(f"🔍 DEBUG: Planning with language={language}, objective={objective[:50]}...")
         
         try:
             # Check for constraints and add them to the prompt
@@ -262,22 +223,11 @@ class GenerationWorkflow(Workflow):
             The files should use AGNO framework patterns from your knowledge context."""
             
             # Get RAG-enabled planner with session state
+            canvas.info(f"🔍 DEBUG: Creating planner with {len(self.session_state)} session keys")
             
             from i2c.agents.core_agents import get_rag_enabled_agent
             planner = get_rag_enabled_agent("planner", session_state=self.session_state)
 
-            # DEBUG: Check if planner has knowledge context
-            if self.session_state and "retrieved_context" in self.session_state:
-                canvas.info(f"🧠 DEBUG: Planner has knowledge context: {len(self.session_state['retrieved_context'])} chars")
-                canvas.info(f"🔍 DEBUG: Context preview: {self.session_state['retrieved_context'][:150]}...")
-            else:
-                canvas.warning("⚠️ DEBUG: Planner missing knowledge context")
-
-            if hasattr(planner, '_enhanced_with_knowledge'):
-                canvas.info(f"✅ DEBUG: Planner enhanced with knowledge")
-            else:
-                canvas.warning("⚠️ DEBUG: Planner not enhanced with knowledge")
-            
             # Use the enhanced planner
             response = planner.run(plan_prompt)
             
@@ -286,9 +236,6 @@ class GenerationWorkflow(Workflow):
             # Process response into file list
             # Process response into file list using robust JSON extraction
             from i2c.utils.json_extraction import extract_json_with_fallback
-
-            # DEBUG: Log what the planner actually returned
-            canvas.info(f"🔍 DEBUG: Planner raw response: {content[:200]}...")
 
             # Fallback file plan in case JSON extraction fails
             fallback_plan = ["backend/main.py", "backend/app.py", "frontend/src/App.jsx"]
@@ -308,8 +255,6 @@ class GenerationWorkflow(Workflow):
                 if not isinstance(file_plan, list):
                     canvas.warning("Planner response was not a list, using fallback")
                     file_plan = fallback_plan
-                    
-                canvas.info(f"🔍 DEBUG: Extracted file plan: {file_plan}")
                 
             except Exception as e:
                 canvas.error(f"JSON extraction failed: {e}")
@@ -336,40 +281,21 @@ class GenerationWorkflow(Workflow):
         """Generate code for planned files."""
         canvas.step("Generating code files...")
 
-        # DEBUG: Check if AGNO knowledge is still available for code generation
-        if "knowledge_context" in self.session_state:
-            kc = self.session_state["knowledge_context"]
-            if "documentation" in kc:
-                refs = kc["documentation"].get("references", [])
-                canvas.info(f"🔍 DEBUG: Code generation has {len(refs)} knowledge references")
-                
-                # Check if any reference contains AGNO content
-                agno_found = False
-                for ref in refs:
-                    if isinstance(ref, dict) and "content" in ref:
-                        if "agno" in ref["content"].lower():
-                            agno_found = True
-                            break
-                canvas.info(f"🔍 DEBUG: AGNO content found in knowledge: {agno_found}")
-            else:
-                canvas.warning("🔍 DEBUG: No documentation in knowledge_context")
-        else:
-            canvas.warning("🔍 DEBUG: No knowledge_context in session_state")
-
-        file_plan = self.session_state.get("file_plan", [])
-        
         file_plan = self.session_state.get("file_plan", [])
         objective = self.session_state.get("objective")
         language = self.session_state.get("language")
         generated_code = {}
         
+        canvas.info(f"🔍 DEBUG: Generating code for {len(file_plan)} files with language={language}")
+        
         # Check for constraints and add them to the prompt
         constraints_text = ""
-        if "constraints" in self.session_state:
+        constraints_source = self.session_state.get("constraints") or self.session_state.get("structured_goal", {}).get("constraints", [])
+        if constraints_source:
             constraints_text = "\n\n# QUALITY CONSTRAINTS (MUST FOLLOW):\n"
-            for i, constraint in enumerate(self.session_state["constraints"], 1):
+            for i, constraint in enumerate(constraints_source, 1):
                 constraints_text += f"{i}. {constraint}\n"
-            canvas.info(f"Added {len(self.session_state['constraints'])} quality constraints to code generation prompt")
+            canvas.info(f"Added {len(constraints_source)} quality constraints to code generation prompt")
         
         try:
             for file_path in file_plan:
@@ -380,31 +306,22 @@ class GenerationWorkflow(Workflow):
                     f"Do not generate generic code if specific patterns are provided."
                 )
                 
+                # ENHANCE FRONTEND PROMPTS WITH API ROUTES
+                is_frontend_file = self._is_frontend_file(file_path)
+                if is_frontend_file and "backend_api_routes" in self.session_state:
+                    canvas.info(f"🔗 Enhancing frontend file {file_path} with API route integration")
+                    try:
+                        from i2c.utils.api_route_tracker import enhance_frontend_generation_with_apis
+                        build_prompt = enhance_frontend_generation_with_apis(
+                            build_prompt, self.session_state, self._get_component_type(file_path)
+                        )
+                        canvas.success(f"✅ Frontend prompt enhanced with {sum(len(routes) for routes in self.session_state['backend_api_routes'].values())} API routes")
+                    except Exception as e:
+                        canvas.warning(f"⚠️ Failed to enhance frontend prompt: {e}")
+                
                 # Get RAG-enabled code builder with session state
                 from i2c.agents.core_agents import get_rag_enabled_agent
                 builder = get_rag_enabled_agent("code_builder", session_state=self.session_state)
-
-                # DEBUG: Check if builder has knowledge context
-                if hasattr(builder, '_enhanced_with_knowledge'):
-                    canvas.info(f"✅ DEBUG: Builder enhanced with {len(builder._knowledge_patterns)} patterns")
-                    canvas.info(f"🔍 DEBUG: First pattern: {list(builder._knowledge_patterns.keys())[0] if builder._knowledge_patterns else 'None'}")
-                else:
-                    canvas.warning("⚠️ DEBUG: Builder not enhanced with knowledge")
-
-                if hasattr(builder, 'instructions') and isinstance(builder.instructions, list):
-                    canvas.info(f"📋 DEBUG: Builder has {len(builder.instructions)} instructions")
-                    canvas.info(f"🔍 DEBUG: First instruction: {builder.instructions[0][:100] if builder.instructions else 'None'}...")
-                    
-                    # ADD DETAILED DEBUG
-                    canvas.info(f"📋 DEBUG: Builder instructions preview:")
-                    for i, instruction in enumerate(builder.instructions[:3]):
-                        canvas.info(f"  {i+1}: {instruction[:100]}...")
-                    
-                    # Check if knowledge is actually in the instructions
-                    instructions_text = " ".join(builder.instructions).lower()
-                    knowledge_indicators = ['agno', 'agent', 'team', 'framework', 'import', 'pattern']
-                    found_indicators = [word for word in knowledge_indicators if word in instructions_text]
-                    canvas.info(f"🔍 DEBUG: Knowledge indicators in instructions: {found_indicators}")
 
                 # Use the enhanced builder
                 response = builder.run(build_prompt)
@@ -413,14 +330,11 @@ class GenerationWorkflow(Workflow):
 
                 # Clean code response and remove any "Applied patterns" documentation
                 from i2c.utils.markdown import strip_markdown_code_block
-                print(f"DEBUG: Content ends with: {repr(code[-20:])}")
                 code = strip_markdown_code_block(raw)
-                print(f"DEBUG: After strip ends with: {repr(code[-20:])}")
                 # Remove any "Applied patterns" or similar documentation sections
                 import re
-                code = re.sub(r'\n*Applied patterns:.*$', '', code, flags=re.DOTALL | re.MULTILINE)
-                code = re.sub(r'\n*# Applied patterns:.*$', '', code, flags=re.DOTALL | re.MULTILINE)
-                    
+                code = re.sub(r'(```\s*\n*)?Applied patterns:.*$', '', code, flags=re.DOTALL | re.MULTILINE)
+
                 generated_code[file_path] = code.strip()
                 canvas.success(f"Generated: {file_path}")
                 
@@ -620,4 +534,39 @@ class GenerationWorkflow(Workflow):
                 content=f"❌ Code indexing failed: {e}",
                 extra_data={"error": str(e)}
             )
+    
+    def _is_frontend_file(self, file_path: str) -> bool:
+        """Detect if a file is part of the frontend"""
+        frontend_indicators = [
+            # React/Vue/Angular files
+            '.jsx', '.tsx', '.vue', '.svelte',
+            # Frontend directories
+            'frontend/', 'client/', 'ui/', 'web/', 'src/components/', 'src/pages/',
+            # Frontend build files
+            'package.json', 'index.html', 'App.js', 'App.jsx', 'App.tsx',
+            # CSS/Styling
+            '.css', '.scss', '.sass', '.less',
+            # Frontend config
+            'webpack.config', 'vite.config', 'next.config'
+        ]
+        
+        file_path_lower = file_path.lower()
+        return any(indicator in file_path_lower for indicator in frontend_indicators)
+    
+    def _get_component_type(self, file_path: str) -> str:
+        """Determine the type of frontend component being generated"""
+        file_path_lower = file_path.lower()
+        
+        if 'component' in file_path_lower:
+            return 'component'
+        elif 'page' in file_path_lower or 'route' in file_path_lower:
+            return 'page'
+        elif 'app.jsx' in file_path_lower or 'app.tsx' in file_path_lower:
+            return 'app'
+        elif 'dashboard' in file_path_lower:
+            return 'dashboard'
+        elif 'form' in file_path_lower:
+            return 'form'
+        else:
+            return 'general'
             

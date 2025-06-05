@@ -8,7 +8,6 @@ import json
 import time
 from pathlib import Path
 from typing import Dict, List, Set, Any, Tuple
-from agno.agent import Agent
 # Import CLI for logging and user input
 try:
     from i2c.cli.controller import canvas
@@ -20,7 +19,7 @@ except ImportError:
         def success(self, msg): print(f"[SUCCESS_SANDBOX] {msg}")
     canvas = FallbackCanvas()
 
-class SandboxExecutorAgent(Agent):
+class SandboxExecutorAgent:
     """
     Enhanced Syntax + Test Runner with Docker container support:
       1) Checks syntax with py_compile (fallback for non-containerized)
@@ -41,14 +40,60 @@ class SandboxExecutorAgent(Agent):
     
     def __init__(self, project_path=None, **kwargs):
         self.project_path = Path(project_path) if project_path else Path(".")
-        super().__init__(
-            name="Sandbox",
-            model=None,  # No LLM needed
-            description="Runs tests and syntax checks using Docker or fallback",
-            **kwargs
-        )
+        self.name = "Sandbox"
         canvas.info("🏃 [SandboxExecutorAgent] Initialized (Container-Enhanced Mode).")
         self.docker_available = self._check_docker_availability()
+    
+    async def run(self) -> Dict[str, Any]:
+        """
+        AGNO-compatible async run method for SRE team integration.
+        Runs tests using Docker containers when available, falls back to local execution.
+        """
+        try:
+            # Detect primary language from project
+            language = self._detect_project_language()
+            
+            # Execute tests using the existing execute method
+            success, message = self.execute(self.project_path, language)
+            
+            return {
+                "passed": success,
+                "issues": [] if success else [message],
+                "container_based": self.docker_available and self._has_docker_configuration(self.project_path),
+                "language": language,
+                "message": message
+            }
+        except Exception as e:
+            return {
+                "passed": False,
+                "issues": [f"Sandbox execution failed: {str(e)}"],
+                "container_based": False,
+                "language": "unknown",
+                "message": f"Error: {str(e)}"
+            }
+    
+    def _detect_project_language(self) -> str:
+        """Detect the primary language of the project"""
+        # Check for Python files
+        python_files = list(self.project_path.rglob("*.py"))
+        if python_files:
+            return "python"
+        
+        # Check for JavaScript/TypeScript files
+        js_files = list(self.project_path.rglob("*.js")) + list(self.project_path.rglob("*.ts")) + list(self.project_path.rglob("*.jsx")) + list(self.project_path.rglob("*.tsx"))
+        if js_files:
+            return "javascript"
+        
+        # Check for other languages
+        go_files = list(self.project_path.rglob("*.go"))
+        if go_files:
+            return "go"
+        
+        java_files = list(self.project_path.rglob("*.java"))
+        if java_files:
+            return "java"
+        
+        return "python"  # Default fallback
 
     def _check_docker_availability(self) -> bool:
         """Check if Docker is available and running"""
@@ -116,10 +161,15 @@ class SandboxExecutorAgent(Agent):
         try:
             canvas.info("   📦 Building services with docker-compose...")
             
-            # Build all services
-            build_result = subprocess.run([
-                'docker-compose', 'build', '--no-cache'
-            ], cwd=project_path, capture_output=True, text=True, timeout=300)
+            # Build all services (try both docker-compose and docker compose)
+            try:
+                build_result = subprocess.run([
+                    'docker', 'compose', 'build', '--no-cache'
+                ], cwd=project_path, capture_output=True, text=True, timeout=300)
+            except FileNotFoundError:
+                build_result = subprocess.run([
+                    'docker-compose', 'build', '--no-cache'
+                ], cwd=project_path, capture_output=True, text=True, timeout=300)
             
             if build_result.returncode != 0:
                 error_msg = f"Docker compose build failed: {build_result.stderr}"
@@ -187,10 +237,16 @@ class SandboxExecutorAgent(Agent):
             
             command = test_commands.get(service_name, ['echo', 'No test command defined'])
             
-            # Run tests in the service container
-            result = subprocess.run([
-                'docker-compose', 'run', '--rm', service_name
-            ] + command, cwd=project_path, capture_output=True, text=True, timeout=120)
+            # Run tests in the service container with unique container name
+            container_name = f"test-{service_name}-{int(time.time())}"
+            try:
+                result = subprocess.run([
+                    'docker', 'compose', 'run', '--rm', '--name', container_name, service_name
+                ] + command, cwd=project_path, capture_output=True, text=True, timeout=120)
+            except FileNotFoundError:
+                result = subprocess.run([
+                    'docker-compose', 'run', '--rm', '--name', container_name, service_name
+                ] + command, cwd=project_path, capture_output=True, text=True, timeout=120)
             
             if result.returncode == 0:
                 canvas.success(f"   ✅ {service_name} tests passed.")
@@ -277,8 +333,16 @@ class SandboxExecutorAgent(Agent):
     def _cleanup_docker_compose(self, project_path: Path):
         """Clean up docker-compose resources"""
         try:
-            subprocess.run(['docker-compose', 'down', '--volumes', '--remove-orphans'], 
-                         cwd=project_path, capture_output=True, timeout=30)
+            # Stop and remove all containers (try both commands)
+            try:
+                subprocess.run(['docker', 'compose', 'down', '--volumes', '--remove-orphans'], 
+                             cwd=project_path, capture_output=True, timeout=30)
+            except FileNotFoundError:
+                subprocess.run(['docker-compose', 'down', '--volumes', '--remove-orphans'], 
+                             cwd=project_path, capture_output=True, timeout=30)
+            # Remove any dangling containers with snippet prefix
+            subprocess.run(['docker', 'ps', '-a', '--filter', 'name=snippet-', '-q'], 
+                         capture_output=True, timeout=10)
         except:
             pass  # Ignore cleanup errors
 

@@ -4,7 +4,7 @@
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import asyncio
-from builtins import llm_highest, llm_middle
+from builtins import llm_highest, llm_middle, llm_middle_alt
 from agno.team import Team
 from agno.agent import Agent
 
@@ -30,11 +30,7 @@ class SRELeadAgent(Agent):
     """Enhanced Lead agent for the SRE Team with Docker-integrated operational checks"""
     
     def __init__(self, *, project_path: Path, session_state: dict[str,Any], **kwargs):
-        super().__init__(
-            name="SRELead",
-            model=llm_middle,  
-            role="Leads the SRE team to ensure operational excellence with Docker-integrated pipeline",
-            instructions=[
+        instructions = [
                 "You are the lead of the enhanced SRE Team with Docker-integrated operational pipeline.",
                 "Your job is to coordinate the complete Docker-aware validation workflow:",
                 "1. Generate dependency manifests (requirements.txt, package.json)",
@@ -50,23 +46,15 @@ class SRELeadAgent(Agent):
                 "- Run security scans inside containers to match production environment",
                 "- Fallback to local execution only when Docker is unavailable",
                 
-                # Message parsing instructions (unchanged)
-                "You will receive messages in this format:",
-                "{",
-                "  'instruction': 'Review the proposed code changes for operational risks, performance issues, and deployment readiness.',",
-                "  'project_path': '/path/to/project',",
-                "  'modified_files': {'file.py': 'content...', 'file2.js': 'content...'}", 
-                "}",
-                
-                # Enhanced processing instructions
-                "When you receive a message, follow the Docker-integrated workflow:",
-                "1. Detect project architecture and programming languages",
-                "2. Generate dependency manifests using DependencyVerifierAgent",
-                "3. Generate Docker configurations using DockerConfigAgent", 
-                "4. Run container-based syntax and test validation using SandboxExecutorAgent",
-                "5. Execute container-aware dependency security scanning",
-                "6. Verify version control readiness",
-                "7. Format comprehensive response with all validation results",
+                # Simple coordination instructions
+                "You coordinate the SRE team to ensure deployment readiness.",
+                "Work with your team members to:",
+                "1. Check if dependency files exist, generate if missing",
+                "2. Create Docker configurations for the project architecture",
+                "3. Test code changes (prefer Docker, fallback to local)",
+                "4. Check for obvious deployment blockers",
+                "",
+                "Focus on the essentials - can this app be deployed and run via Docker?",
                 
                 # Enhanced response formatting
                 "Return results in this enhanced format:",
@@ -92,11 +80,16 @@ class SRELeadAgent(Agent):
                 "    'container_tests_run': boolean,",
                 "    'container_security_scanned': boolean",
                 "  }",
-                "}",
-            ],
+                "}"
+        ]
+
+        super().__init__(
+            name="SRELead",
+            model=llm_middle_alt,  
+            role="Leads the SRE team to ensure operational excellence with Docker-integrated pipeline",
+            instructions=instructions,
             **kwargs
-        )
-        
+        )   
         self.project_path = Path(project_path)
         self.team_session_state = session_state
         
@@ -503,22 +496,11 @@ def build_sre_team(
     Returns:
         Team: Configured enhanced SRE team with Docker integration
     """
-    # DEBUG: Check if SRE team receives knowledge_base
-    canvas.info(f"🔍 DEBUG: build_sre_team called")
-    if session_state:
-        canvas.info(f"🔍 DEBUG: SRE team session_state keys: {list(session_state.keys())}")
-        if 'knowledge_base' in session_state:
-            canvas.success("✅ DEBUG: SRE team received knowledge_base")
-        else:
-            canvas.error("❌ DEBUG: SRE team missing knowledge_base")
-    else:
-        canvas.error("❌ DEBUG: SRE team received None session_state")
         
     # 0 Extract knowledge_base from session_state (like core_agents does)
     knowledge_base = None
     if session_state and 'knowledge_base' in session_state:
         knowledge_base = session_state['knowledge_base']
-        canvas.success("✅ DEBUG: SRE team extracted knowledge_base from session_state")
         
     # 1) Ensure we have a mutable session_state dict
     if session_state is None:
@@ -541,34 +523,33 @@ def build_sre_team(
     ]
 
     # 4) Create the enhanced AGNO Team
+    team_instructions = [
+            "You are the SRE Team ensuring code changes work and the app is deployment-ready.",
+            "",
+            "Your mission: Make sure the final app can run via 'docker-compose up'",
+            "",
+            "Essential workflow:",
+            "1. Generate dependency files (requirements.txt, package.json) if missing",
+            "2. Create Docker configs (Dockerfile, docker-compose.yml) for the app architecture", 
+            "3. Test the code changes work (Docker containers preferred, local fallback)",
+            "4. Quick dependency security check",
+            "",
+            "Key focus:",
+            "- Does the app have what it needs to run in Docker?",
+            "- Are there any obvious issues that would break deployment?",
+            "- Can someone actually use docker-compose to run this app?",
+            "",
+            "Return: passed (true/false), deployment_ready, docker_ready, and brief summary.",
+            "Keep it simple - you're one gear in a larger engine."
+    ]
+    
     team = Team(
         name="EnhancedSRETeam",
         members=members,
         mode="collaborate",  # lead agent orchestrates
         model=llm_middle,
         knowledge=knowledge_base, 
-        instructions=[
-            "You are the Enhanced SRE Team with Docker-integrated operational pipeline.",
-            "Follow the Docker-aware workflow orchestrated by the SRELead agent:",
-            "1. Generate dependency manifests (requirements.txt, package.json)",
-            "2. Create Docker configurations (Dockerfile, docker-compose.yml)",
-            "3. Run container-based testing for production-like validation",
-            "4. Execute container-aware security scanning",
-            "5. Verify version control and deployment readiness",
-            "",
-            "DOCKER-FIRST APPROACH:",
-            "- Prefer container-based validation over local execution",
-            "- Generate production-like environments for testing",
-            "- Ensure security scanning matches deployment environment",
-            "- Fallback gracefully when Docker is not available",
-            "",
-            "Focus on issues that would affect:",
-            "- Container build and deployment",
-            "- Production environment stability",
-            "- Security vulnerabilities in dependencies",
-            "- Cross-platform compatibility",
-            "- Performance under load"
-        ],
+        instructions=team_instructions,
         session_state=session_state
     )
 

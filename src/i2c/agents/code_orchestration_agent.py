@@ -83,16 +83,11 @@ class CodeOrchestrationAgent(Agent):
             }
 
         self.session_state = session_state  # the single pointer
-        # DEBUG: Check what orchestration agent receives
-        canvas.info(f"🔍 DEBUG: CodeOrchestrationAgent __init__")
-        if self.session_state:
-            canvas.info(f"🔍 DEBUG: Orchestration agent session_state keys: {list(self.session_state.keys())}")
-            if 'knowledge_base' in self.session_state:
-                canvas.success("✅ DEBUG: Orchestration agent received knowledge_base")
-            else:
-                canvas.error("❌ DEBUG: Orchestration agent missing knowledge_base")
-        else:
-            canvas.error("❌ DEBUG: Orchestration agent received None session_state")
+        
+        # Initialize reusable knowledge enhancer to avoid recreating instances
+        from i2c.agents.core_team.enhancer import AgentKnowledgeEnhancer
+        self.knowledge_enhancer = AgentKnowledgeEnhancer()
+
         # # Flush Cache
         # if "knowledge_cache" in self.session_state:
         #     self.session_state["knowledge_cache"] = {}
@@ -155,9 +150,9 @@ class CodeOrchestrationAgent(Agent):
         self.sre_team: Team | None = None
 
         # Build specialist teams with the shared state
-        canvas.info(f"🔍 DEBUG: About to call _initialize_teams()")
+        
         self._initialize_teams()
-        canvas.info(f"🔍 DEBUG: _initialize_teams() completed")
+        
         self._initialize_reflective_operators()
 
     def _initialize_teams(self):
@@ -785,12 +780,10 @@ class CodeOrchestrationAgent(Agent):
                 
                 # Also enhance quality team members with knowledge
                 if hasattr(self.quality_team, 'members'):
-                    from i2c.agents.core_team.enhancer import AgentKnowledgeEnhancer
-                    enhancer = AgentKnowledgeEnhancer()
                     
                     for member in self.quality_team.members:
                         if hasattr(member, 'name') and 'quality' in member.name.lower():
-                            enhancer.enhance_agent_with_knowledge(
+                            self.knowledge_enhancer.enhance_agent_with_knowledge(
                                 member, 
                                 self.session_state["retrieved_context"], 
                                 "quality_validator",
@@ -938,7 +931,6 @@ class CodeOrchestrationAgent(Agent):
             from i2c.utils.api_route_tracker import inject_api_routes_into_session
             project_path = Path(self.session_state.get("project_path", ""))
             self.session_state = inject_api_routes_into_session(project_path, self.session_state)
-            canvas.info("🔍 DEBUG: API routes extracted for modification")
             
             # Use proven direct agent approach
             from i2c.agents.core_agents import get_rag_enabled_agent
@@ -970,16 +962,15 @@ class CodeOrchestrationAgent(Agent):
 
                 response = agent.run(modification_prompt)
                
-                canvas.info(f"🔍 DEBUG: Agent response type: {type(response)}")
-                canvas.info(f"🔍 DEBUG: Agent response content: {str(response)[:200]}...")
+
                 # Parse response and create result format expected by orchestration
                 modified_files = {}
                 if hasattr(response, 'content'):
                     content = response.content
-                    canvas.info(f"🔍 DEBUG: Response content: {str(content)[:200]}...")
+                    
                 else:
                     content = str(response)
-                    canvas.info(f"🔍 DEBUG: Response as string: {content[:200]}...")
+                    
                 
                 # Extract files from response (simple approach for now)
                 if existing_files:

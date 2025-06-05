@@ -12,7 +12,18 @@
       "version": "latest",
       "project_name": "jarvis_emotional_advisor",
       "global": true,
-      "force_refresh": false
+      "force_refresh": true
+    },
+    {
+      "type": "knowledge",
+      "name": "Load AGNO Working Examples",
+      "doc_path": "https://raw.githubusercontent.com/agno-agi/agno/main/cookbook/getting_started/01_basic_agent.py",
+      "doc_type": "AGNO Code Examples",
+      "framework": "AGNO",
+      "version": "latest", 
+      "project_name": "jarvis_emotional_advisor",
+      "global": true,
+      "force_refresh": true
     },
     {
       "type": "knowledge", 
@@ -20,6 +31,17 @@
       "doc_path": "src/i2c/docs/agno_guide.pdf",
       "doc_type": "AGNO Advanced Guide",
       "framework": "AGNO",
+      "version": "latest", 
+      "project_name": "jarvis_emotional_advisor",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "knowledge",
+      "name": "Load FastAPI React Integration Guide",
+      "doc_path": "https://raw.githubusercontent.com/tiangolo/full-stack-fastapi-postgresql/master/{{cookiecutter.project_slug}}/backend/app/main.py",
+      "doc_type": "FastAPI Integration Examples",
+      "framework": "FastAPI+React",
       "version": "latest", 
       "project_name": "jarvis_emotional_advisor",
       "global": true,
@@ -75,6 +97,20 @@
           "Create sample communication scenarios and demo data for immediate impressive demonstrations",
           "Add responsive design that works beautifully on desktop, tablet, and mobile devices",
           "Include dark/light theme options and professional branding for enterprise deployment readiness"
+        ]
+      },
+      "project_name": "jarvis_emotional_advisor"
+    },
+    {
+      "type": "agentic_evolution", 
+      "objective": {
+        "task": "Ensure the backend has a complete FastAPI server with working endpoints that the frontend components can call. Create proper API integration between frontend and backend.",
+        "constraints": [
+          "Backend must have main.py with FastAPI app and uvicorn server",
+          "Frontend components must use actual fetch() calls to backend APIs", 
+          "APIs must match the frontend component expectations",
+          "Include proper CORS configuration for frontend-backend communication",
+          "All endpoints must return real data, not dummy responses"
         ]
       },
       "project_name": "jarvis_emotional_advisor"

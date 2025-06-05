@@ -106,12 +106,17 @@ class FrontendAPIInjector:
             
             for method, endpoints in self.routes.items():
                 if endpoints:
-                    summary_lines.append(f"\n{method} ENDPOINTS:")
+                    summary_lines.append(f"\n{method.upper()} ENDPOINTS:")
                     for endpoint in endpoints:
                         # Handle different field names from extractor
                         path = endpoint.get('full_path') or endpoint.get('path', '')
                         function = endpoint.get('function', 'unknown')
-                        summary_lines.append(f"  - {method} {path} (function: {function})")
+                        summary_lines.append(f"  - {method.upper()} {path} (function: {function})")
+            
+            if len(summary_lines) == 1:  # Only the header
+                summary_lines.append("\n(No API endpoints found)")
+            
+            return "\n".join(summary_lines)
 
     def enhance_frontend_prompt(self, original_prompt: str, component_type: str = "general") -> str:
         """Enhance frontend generation prompt with real API endpoints"""

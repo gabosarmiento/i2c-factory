@@ -103,7 +103,7 @@ def route_and_execute(
     architectural_context: Dict[str, Any] = None,
     budget_manager: Any = None, 
     session_state: Dict[str, Any] = None    
-) -> bool:
+) -> Dict[str, Any]:
     """
     Routes action to appropriate workflows using WorkflowController.
     
@@ -112,9 +112,11 @@ def route_and_execute(
         action_detail: The goal or modification details
         current_project_path: Path to the project directory
         current_structured_goal: Dict with objective and language
+        architectural_context: Optional architectural context
+        session_state: Optional session state with knowledge and routing info
         
     Returns:
-        bool: Success status
+        Dict[str, Any]: Result with success status, error info, and updated session_state
     """
     """Routes action to appropriate workflows using WorkflowController."""
     canvas.info(f"🔍 DEBUG: route_and_execute called with session_state: {session_state is not None}")
@@ -177,7 +179,13 @@ def route_and_execute(
                 if generated_files:
                     show_file_list("Generated Files", generated_files, current_project_path)
                 canvas.success(f"✅ Project generated successfully!")
-                return {"success": True, "error": None}
+                
+                # Include updated session state from workflow controller
+                result = {"success": True, "error": None}
+                if hasattr(controller, 'session_manager') and controller.session_manager:
+                    result["session_state"] = controller.session_manager.get_state()
+                    canvas.info(f"🔄 DEBUG: Returning session state with {len(result['session_state'])} keys")
+                return result
             else:
                 error_msg = controller.get_last_error() or "Generation workflow failed"
                 return {"success": False, "error": error_msg}

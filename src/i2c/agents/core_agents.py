@@ -104,9 +104,20 @@ def get_rag_enabled_agent(agent_type, session_state=None):
                 agent_type
             )
             canvas.info(f"🔍 DEBUG: Enhanced agent created: {type(enhanced_agent).__name__}")
+            # Log important session state keys only to reduce noise
+            important_keys = ['knowledge_base', 'architectural_context', 'retrieved_context', 'backend_api_routes']
+            
+            if session_state:
+                present_important = [key for key in important_keys if key in session_state]
+                if present_important:
+                    canvas.info(f"🔍 DEBUG: Important session keys present: {', '.join(present_important)}")
+                else:
+                    canvas.info(f"🔍 DEBUG: No important session keys found in {len(session_state)} total keys")
             
             # Additional enhancement if retrieved_context exists
             if "retrieved_context" in session_state:
+                canvas.info(f"🔍 DEBUG: retrieved_context exists, length: {len(session_state['retrieved_context'])}")
+                canvas.info(f"🔍 DEBUG: retrieved_context preview: {session_state['retrieved_context'][:200]}...")
                 try:
                     from i2c.agents.core_team.enhancer import quick_enhance_agent
                     enhanced_agent = quick_enhance_agent(
@@ -159,87 +170,45 @@ def get_rag_enabled_agent(agent_type, session_state=None):
         return None
     
 def _extract_domain_expertise(knowledge_base, agent_role):
-    """Extract relevant expertise for specific agent role"""
+    """Let the agent search for its own expertise using agentic search"""
     
     # Check cache first
     cache_key = f"{agent_role}_{id(knowledge_base)}"
     if cache_key in _expertise_cache:
-        canvas.info(f"🔍 DEBUG: Using cached expertise for {agent_role}")
         return _expertise_cache[cache_key]
     
     if not knowledge_base:
-        canvas.info(f"🔍 DEBUG: No knowledge base for {agent_role}")
-        _expertise_cache[cache_key] = []
+        canvas.error(f"🔍 DEBUG: No knowledge_base provided for {agent_role}")
         return []
     
-    # TEST: Try to find what's actually in the knowledge base
-    canvas.info(f"🔍 DEBUG: Testing what's available in knowledge base for {agent_role}")
+    try:
+        # DEBUG: Check knowledge space
+        canvas.info(f"🔍 DEBUG: Knowledge base type: {type(knowledge_base)}")
+        if hasattr(knowledge_base, 'knowledge_space'):
+            canvas.info(f"🔍 DEBUG: Searching in knowledge space: {knowledge_base.knowledge_space}")
+        
+        # Use the agent's natural search capability
+        query = f"How to build and implement {agent_role} agents with best practices and examples"
+        canvas.info(f"🔍 DEBUG: Searching with query: '{query}'")
+        
+        results = knowledge_base.retrieve_knowledge(query=query, limit=8)
+        canvas.info(f"🔍 DEBUG: retrieve_knowledge returned: {type(results)}, length: {len(results) if results else 0}")
+        
+        if results:
+            canvas.info(f"🔍 DEBUG: First result: {results[0] if results else 'None'}")
+            _expertise_cache[cache_key] = results
+            canvas.success(f"🔍 DEBUG: Agent found {len(results)} knowledge items for {agent_role}")
+            return results
+        
+        canvas.warning(f"🔍 DEBUG: No results returned for {agent_role}")
+        return []
+        
+    except Exception as e:
+        canvas.error(f"Knowledge search failed for {agent_role}: {e}")
+        import traceback
+        canvas.error(f"Full traceback: {traceback.format_exc()}")
+        return []
     
-    # Try very broad queries to see what content exists
-    broad_queries = ["framework", "library", "pattern", "example", "usage", "import", "class", "agent", "team"]
-    found_content = []
-    
-    for broad_query in broad_queries:
-        try:
-            results = knowledge_base.retrieve_knowledge(query=broad_query, limit=3)
-            if results:
-                canvas.info(f"🔍 DEBUG: Found {len(results)} results for '{broad_query}'")
-                # Log what we actually found to understand the content
-                for i, result in enumerate(results[:1]):
-                    content_preview = result.get('content', '')[:200]
-                    source = result.get('source', 'Unknown')
-                    canvas.info(f"🔍 DEBUG: Sample from '{source}': {content_preview}...")
-                found_content.extend(results)
-                break  # Use the first successful broad query
-        except Exception as e:
-            canvas.error(f"🔍 DEBUG: Broad query '{broad_query}' failed: {e}")
-            continue
-    
-    if found_content:
-        result = found_content[:8]
-        _expertise_cache[cache_key] = result
-        canvas.success(f"🔍 DEBUG: Using {len(result)} items from broad search for {agent_role}")
-        return result
-    
-    # Fallback: Try original specific queries
-    canvas.info(f"🔍 DEBUG: No broad results found, trying specific queries for {agent_role}")
-    
-    role_queries = {
-        "input_processor": ["requirement analysis", "user story clarification", "project scoping"],
-        "planner": ["software architecture", "file structure", "project planning"], 
-        "code_builder": ["code generation", "programming patterns", "implementation"],
-        "project_analyzer": ["code analysis", "project structure", "architecture review"]
-    }
-    
-    queries = role_queries.get(agent_role.lower(), [agent_role])
-    all_expertise = []
-    
-    for query in queries:
-        try:
-            # Get principles and patterns for this domain
-            principles = knowledge_base.retrieve_knowledge(
-                query=f"principles best practices {query}", 
-                limit=3
-            )
-            examples = knowledge_base.retrieve_knowledge(
-                query=f"examples patterns {query}",
-                limit=2
-            )
-            
-            all_expertise.extend(principles)
-            all_expertise.extend(examples)
-            
-        except Exception:
-            continue
-    
-    result = all_expertise[:8]  # Limit to top 8 pieces
-    
-    # Cache the result
-    _expertise_cache[cache_key] = result
-    canvas.info(f"🔍 DEBUG: Final result - cached {len(result)} expertise items for {agent_role}")
-    
-    return result
-
 def _inject_expertise_into_agent(agent, expertise, agent_role):
     """Inject deep expertise with reasoning chains"""
     
@@ -279,8 +248,9 @@ Think like an expert who naturally reasons through problems using internalized k
 
 def create_knowledge_enhanced_agent(base_agent_class, knowledge_base=None, agent_role=""):
     """Create agent with internalized knowledge instead of external references"""
-    
+    canvas.info(f"🔍 DEBUG: create_knowledge_enhanced_agent called with agent_role='{agent_role}', knowledge_base={knowledge_base is not None}")
     if knowledge_base is None:
+        canvas.warning(f"🔍 DEBUG: No knowledge_base provided for {agent_role} - returning basic agent")
         # Return regular agent if no knowledge
         return base_agent_class()
     

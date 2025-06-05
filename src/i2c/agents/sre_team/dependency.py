@@ -4,9 +4,9 @@
 import subprocess
 import json
 import ast
+import time
 from pathlib import Path
 from typing import Dict, List, Any, Tuple
-from agno.agent import Agent
 # Import CLI for logging and user input
 try:
     from i2c.cli.controller import canvas
@@ -78,7 +78,7 @@ def _write_json(path: Path, obj) -> None:
     """Write JSON to file safely"""
     path.write_text(json.dumps(obj, indent=2) + "\n", encoding='utf-8')
 
-class DependencyVerifierAgent(Agent):
+class DependencyVerifierAgent:
     """
     Enhanced dependency checker with container-aware security scanning:
     - Checks dependencies in requirements.txt for vulnerabilities using pip-audit
@@ -89,13 +89,8 @@ class DependencyVerifierAgent(Agent):
     
     def __init__(self, project_path=None, session_state=None, **kwargs):
         self.project_path = Path(project_path) if project_path else Path(".")
-        super().__init__(
-            name="DependencyVerifier",
-            role="Runs container-aware dependency checks",
-            model=None,
-            session_state=session_state or {},
-            **kwargs
-        )
+        self.session_state = session_state or {}
+        self.name = "DependencyVerifier"
         # DEBUG: Check if dependency agent gets knowledge_base
         canvas.info(f"🔍 DEBUG: DependencyVerifierAgent init")
         if session_state:
@@ -109,6 +104,29 @@ class DependencyVerifierAgent(Agent):
         print("📦 [DependencyVerifierAgent] Initialized (Container-Enhanced Mode).")
         self.docker_available = self._check_docker_availability()
         self.audit_tools = self._check_audit_tools()
+    
+    async def run(self) -> Dict[str, Any]:
+        """
+        AGNO-compatible async run method for SRE team integration.
+        Runs dependency security scanning.
+        """
+        try:
+            # Run dependency security check
+            issues = self.check_dependencies(self.project_path)
+            
+            return {
+                "passed": len(issues) == 0,
+                "issues": issues,
+                "container_based": self.docker_available and self._has_docker_configuration(self.project_path),
+                "audit_tools_available": self.audit_tools
+            }
+        except Exception as e:
+            return {
+                "passed": False,
+                "issues": [f"Dependency check failed: {str(e)}"],
+                "container_based": False,
+                "audit_tools_available": {}
+            }
         
     def _check_docker_availability(self) -> bool:
         """Check if Docker is available for container-based scanning"""
@@ -367,13 +385,22 @@ class DependencyVerifierAgent(Agent):
         try:
             # 1️⃣ Build all images up-front so dependency scans run in a clean layer set
             print("   📦 Building containers for security scanning...")
-            build_result = subprocess.run(
-                ["docker-compose", "build", "--no-cache"],
-                cwd=project_path,
-                capture_output=True,
-                text=True,
-                timeout=300,          # 5 minutes
-            )
+            try:
+                build_result = subprocess.run(
+                    ["docker", "compose", "build", "--no-cache"],
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,          # 5 minutes
+                )
+            except FileNotFoundError:
+                build_result = subprocess.run(
+                    ["docker-compose", "build", "--no-cache"],
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,          # 5 minutes
+                )
 
             if build_result.returncode != 0:
                 issues.append(
@@ -423,11 +450,18 @@ class DependencyVerifierAgent(Agent):
             print(f"   🔍 Scanning {service_name} service dependencies ({language})...")
             
             if language == "python":
-                # Run pip-audit inside the backend container
-                audit_result = subprocess.run([
-                    'docker-compose', 'run', '--rm', service_name,
-                    'pip-audit', '--format=json', '--exit-zero'
-                ], cwd=project_path, capture_output=True, text=True, timeout=120)
+                # Run pip-audit inside the backend container with unique name
+                container_name = f"audit-{service_name}-{int(time.time())}"
+                try:
+                    audit_result = subprocess.run([
+                        'docker', 'compose', 'run', '--rm', '--name', container_name, service_name,
+                        'pip-audit', '--format=json', '--exit-zero'
+                    ], cwd=project_path, capture_output=True, text=True, timeout=120)
+                except FileNotFoundError:
+                    audit_result = subprocess.run([
+                        'docker-compose', 'run', '--rm', '--name', container_name, service_name,
+                        'pip-audit', '--format=json', '--exit-zero'
+                    ], cwd=project_path, capture_output=True, text=True, timeout=120)
                 
                 if audit_result.returncode == 0 and audit_result.stdout:
                     try:
@@ -447,11 +481,18 @@ class DependencyVerifierAgent(Agent):
                     issues.append(f"{service_name}: pip-audit scan failed")
                     
             elif language == "node":
-                # Run npm audit inside the frontend container
-                audit_result = subprocess.run([
-                    'docker-compose', 'run', '--rm', service_name,
-                    'npm', 'audit', '--json'
-                ], cwd=project_path, capture_output=True, text=True, timeout=120)
+                # Run npm audit inside the frontend container with unique name
+                container_name = f"audit-{service_name}-{int(time.time())}"
+                try:
+                    audit_result = subprocess.run([
+                        'docker', 'compose', 'run', '--rm', '--name', container_name, service_name,
+                        'npm', 'audit', '--json'
+                    ], cwd=project_path, capture_output=True, text=True, timeout=120)
+                except FileNotFoundError:
+                    audit_result = subprocess.run([
+                        'docker-compose', 'run', '--rm', '--name', container_name, service_name,
+                        'npm', 'audit', '--json'
+                    ], cwd=project_path, capture_output=True, text=True, timeout=120)
                 
                 if audit_result.stdout:
                     try:
@@ -673,6 +714,8 @@ class DependencyVerifierAgent(Agent):
             "passed": len(issues) == 0,
             "files_created": created,
             "issues": issues,
+            "container_based": self.docker_available and self._has_docker_configuration(self.project_path),
+            "audit_tools_available": self.audit_tools
         }
 
 # Pre-instantiated agent for quick access
