@@ -231,19 +231,83 @@ def _apply_modifications_if_any(result_json: dict, project_path: Path, session_s
             if full_path.exists():
                 existing_content = full_path.read_text()
             
-            # Generate actual code based on description
-            prompt = f"""Modify this file: {file_path}
+            # Extract comprehensive context from session_state
+            language = session_state.get('language', 'python') if session_state else 'python'
+            arch_context = session_state.get('architectural_context', {}) if session_state else {}
+            system_type = session_state.get('system_type', 'unknown') if session_state else 'unknown'
+            structured_goal = session_state.get('current_structured_goal', {}) if session_state else {}
+            constraints = structured_goal.get('constraints', [])
+            code_map = session_state.get('code_map', {}) if session_state else {}
+            
+            # Detect file language from extension
+            from pathlib import Path
+            file_ext = Path(file_path).suffix.lower()
+            file_language_map = {
+                '.py': 'python', '.js': 'javascript', '.jsx': 'javascript', 
+                '.ts': 'typescript', '.tsx': 'typescript', '.java': 'java', 
+                '.go': 'go', '.css': 'css', '.html': 'html'
+            }
+            target_language = file_language_map.get(file_ext, language)
+            
+            # Determine architectural module context
+            module_context = ""
+            if arch_context and 'modules' in arch_context:
+                if file_path.startswith('backend/'):
+                    module_info = arch_context['modules'].get('backend', {})
+                    module_context = f"Backend Module: {module_info.get('responsibilities', [])} | Languages: {module_info.get('languages', [])}"
+                elif file_path.startswith('frontend/'):
+                    module_info = arch_context['modules'].get('frontend', {})
+                    module_context = f"Frontend Module: {module_info.get('responsibilities', [])} | Languages: {module_info.get('languages', [])}"
+            
+            # Build constraint context
+            constraint_context = ""
+            if constraints:
+                constraint_context = f"\nPROJECT CONSTRAINTS:\n" + "\n".join(f"- {c}" for c in constraints[:5])
+            
+            # Build architectural rules
+            arch_rules = ""
+            if system_type == "fullstack_web_app":
+                arch_rules = f"""
+ARCHITECTURAL RULES FOR FULLSTACK WEB APP:
+- Backend files (.py) must contain ONLY Python code - no JavaScript/Node.js syntax
+- Frontend files (.js/.jsx) must contain ONLY JavaScript/React code - no Python syntax  
+- Maintain clear separation between backend/ and frontend/ directories
+- Backend: Use FastAPI patterns, Python imports, Python data structures
+- Frontend: Use React patterns, ES6 imports, JavaScript data structures
+"""
+            
+            # Generate enhanced prompt with full context
+            prompt = f"""Modify this {target_language} file: {file_path}
 
-Task: {description}
+SYSTEM CONTEXT:
+- System Type: {system_type}
+- Target Language for this file: {target_language}
+- File Extension: {file_ext}
+{f"- Module Context: {module_context}" if module_context else ""}
+{arch_rules}
+{constraint_context}
 
-Current content:
+TASK: {description}
+
+CRITICAL ENTRY POINT REQUIREMENTS:
+- If this is backend/main.py in a fullstack app, ensure it imports routers from api/endpoints.py
+- If this is a main entry file, ensure it connects to all the API implementations  
+- Check that main.py includes app.include_router() for any routers defined in api/ files
+- Ensure CORS middleware is properly configured for frontend communication
+
+CURRENT FILE CONTENT:
 {existing_content}
 
-CRITICAL: Return ONLY clean, properly indented code with consistent indentation code(i.e. 4 spaces for Python, 2 for JS).
-- Do not use markdown, backticks, or formatting fences.
+CRITICAL REQUIREMENTS:
+- Generate ONLY {target_language} code (file extension: {file_ext})
+- For .py files: Use Python syntax, imports, and patterns ONLY
+- For .js/.jsx files: Use JavaScript/React syntax, imports, and patterns ONLY  
+- Follow {system_type} architectural patterns
+- Use consistent indentation (4 spaces for Python, 2 for JS/React)
+- Return ONLY clean code - no markdown, backticks, or formatting fences
 - No extra leading/trailing whitespace
 
-Return the complete modified file content with the requested changes implemented."""
+Return the complete modified file content with the requested changes implemented in {target_language}."""
 
             response = agent.run(prompt)
             content = getattr(response, 'content', str(response))
@@ -304,7 +368,8 @@ Return the complete modified file content with the requested changes implemented
             canvas.error(traceback.format_exc())
             
 # --- consolidate helpers ----------------------------------------
-def _ensure_mandatory_files(project_path: Path, arch_ctx: dict):
+def _ensure_mandatory_files(project_path: Path, arch_ctx: dict, session_state: Dict[str, Any] = None):
+    """Smart mandatory file creation that doesn't overwrite good existing code."""
     required = {
         "fullstack_web_app": [
             ("backend/main.py", "python"),
@@ -316,11 +381,94 @@ def _ensure_mandatory_files(project_path: Path, arch_ctx: dict):
 
     for rel_path, lang in required:
         target = project_path / rel_path
-        if not target.exists():
+        
+        if target.exists():
+            # File exists - check if it's good or needs enhancement
+            content = target.read_text()
+            
+            if _is_good_implementation(content, rel_path, session_state):
+                canvas.success(f"✅ {rel_path} already has good implementation - keeping it")
+                continue
+            else:
+                canvas.warning(f"⚠️ {rel_path} exists but needs enhancement")
+                _enhance_with_agent(target, content, rel_path, lang, arch_ctx, session_state)
+        else:
+            # File missing - create with template
+            canvas.info(f"📝 Creating missing {rel_path}")
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(TEMPLATES_BY_LANG.get(lang, f"# TODO: {rel_path}\n"))
 
+def _is_good_implementation(content: str, file_path: str, session_state: Dict[str, Any] = None) -> bool:
+    """Check if existing file is a good implementation or just a stub."""
+    
+    if file_path == "backend/main.py":
+        has_router_import = any(pattern in content for pattern in [
+            "from api.endpoints import", "from .api.endpoints import", "app.include_router"
+        ])
+        has_fastapi_setup = "FastAPI()" in content and "uvicorn" in content
+        api_routes = session_state.get("backend_api_routes", {}) if session_state else {}
+        
+        if api_routes and not has_router_import:
+            return False  # Has routes but no import - needs fixing
+        
+        return has_fastapi_setup and (not api_routes or has_router_import)
+    
+    elif file_path == "frontend/src/App.jsx":
+        has_react = "import React" in content and "function App" in content
+        is_just_hello = "Hello from the auto-generated scaffold" in content
+        return has_react and not is_just_hello
+    
+    return len(content.strip().split('\n')) > 5
 
+def _enhance_with_agent(file_path: Path, current_content: str, rel_path: str, lang: str, arch_ctx: dict, session_state: Dict[str, Any] = None):
+    """Use an agent to enhance an existing file instead of overwriting it."""
+    try:
+        from i2c.agents.core_agents import get_rag_enabled_agent
+        
+        agent = get_rag_enabled_agent("code_builder", session_state=session_state)
+        api_routes = session_state.get("backend_api_routes", {}) if session_state else {}
+        
+        api_context = ""
+        if api_routes and rel_path == "backend/main.py":
+            api_context = f"""
+CRITICAL: This fullstack app has API routes that need to be connected:
+{api_routes}
+
+The main.py MUST import and include these routers:
+- Add: from api.endpoints import router  
+- Add: app.include_router(router, prefix="/api")
+- Ensure CORS middleware is configured for frontend communication
+"""
+        
+        enhancement_prompt = f"""Enhance this {lang} file: {rel_path}
+
+CURRENT CONTENT:
+{current_content}
+
+SYSTEM: {arch_ctx.get("system_type", "unknown")}
+{api_context}
+
+REQUIREMENTS:
+- Keep all existing good code
+- Fix missing imports or connections  
+- Add router imports and app.include_router() if API routes exist
+- Ensure proper FastAPI setup and CORS for fullstack apps
+
+Return the enhanced file content."""
+
+        response = agent.run(enhancement_prompt)
+        enhanced_content = getattr(response, 'content', str(response))
+        
+        from i2c.utils.markdown import strip_markdown_code_block
+        enhanced_content = strip_markdown_code_block(enhanced_content)
+        
+        file_path.write_text(enhanced_content)
+        canvas.success(f"✅ Enhanced {rel_path} with agent assistance")
+        
+    except Exception as e:
+        canvas.error(f"Error enhancing {rel_path}: {e}")
+        file_path.write_text(TEMPLATES_BY_LANG.get(lang, f"# TODO: {rel_path}\n"))
+        
 def is_json_like_string(s: str) -> bool:
     s = s.strip()
     return s.startswith("{") and s.endswith("}")
@@ -425,39 +573,33 @@ async def execute_agentic_evolution(
     if "reflection_memory" not in session_state:
         session_state["reflection_memory"] = []
     
-    # NEW: Ensure knowledge context is available for all teams
+    # SIMPLIFIED: Ensure knowledge context is available
     if "retrieved_context" not in session_state and "knowledge_base" in session_state:
         try:
             knowledge_base = session_state["knowledge_base"]
             task = objective.get("task", "")
             
-            if hasattr(knowledge_base, 'retrieve_knowledge'):
+            if hasattr(knowledge_base, 'retrieve_knowledge') and task:
                 knowledge_items = knowledge_base.retrieve_knowledge(task, limit=5)
                 canvas.info(f"🔍 DEBUG: knowledge_base.retrieve_knowledge returned {len(knowledge_items) if knowledge_items else 0} items")
     
                 if knowledge_items:
-                    canvas.info(f"🔍 DEBUG: First item type: {type(knowledge_items[0])}")
-                    canvas.info(f"🔍 DEBUG: First item: {knowledge_items[0]}")
-                    canvas.info(f"🔍 DEBUG: First item keys: {knowledge_items[0].keys() if isinstance(knowledge_items[0], dict) else 'not dict'}")
-        
+                    # Create retrieved_context with FIXED content structure
                     context_parts = []
-                    for i, item in enumerate(knowledge_items):
+                    for item in knowledge_items[:3]:  # Limit to 3 items
                         source = item.get('source', 'Unknown')
-                        content = item.get('content', '')
-                        canvas.info(f"🔍 DEBUG: Item {i} - source: {source}")
-                        canvas.info(f"🔍 DEBUG: Item {i} - content length: {len(content)}")
-                        canvas.info(f"🔍 DEBUG: Item {i} - content preview: {content[:100]}...")
+                        content = item.get('content', '')[:500]  # Limit content to 500 chars
                         context_parts.append(f"Source: {source}")
                         context_parts.append(content)
                         context_parts.append("---")
+                    
                     session_state["retrieved_context"] = "\n".join(context_parts)
-                    canvas.info(f"🧠 Retrieved knowledge context for agentic evolution: {len(knowledge_items)} items")
-                    # DEBUG: Search specifically for import patterns
-                    import_search_items = knowledge_base.retrieve_knowledge("from agno import Agent", limit=5)
-                    canvas.info(f"🔍 DEBUG: Direct import search returned {len(import_search_items) if import_search_items else 0} items")
-                    if import_search_items:
-                        for i, item in enumerate(import_search_items):
-                            canvas.info(f"🔍 DEBUG: Import item {i}: {item.get('content', '')[:200]}...")
+                    canvas.success(f"✅ Created retrieved_context ({len(session_state['retrieved_context'])} chars)")
+                    canvas.info(f"🧠 Knowledge available for AGNO agents via session_state")
+                    
+                    # DEBUG: Verify AGNO agents can access knowledge base
+                    canvas.info(f"🔍 DEBUG: Knowledge base type: {type(knowledge_base)}")
+                    canvas.info(f"🔍 DEBUG: AGNO agents can query knowledge dynamically")
                     
         except Exception as e:
             canvas.warning(f"Failed to retrieve knowledge context: {e}")
@@ -678,7 +820,7 @@ async def execute_agentic_evolution(
 
 
         _apply_modifications_if_any(result_dict, project_path,session_state)
-        _ensure_mandatory_files(project_path, arch_ctx)
+        _ensure_mandatory_files(project_path, arch_ctx, session_state)
         ensure_dependency_file(project_path, arch_ctx)
         
         # Store reflection about this step

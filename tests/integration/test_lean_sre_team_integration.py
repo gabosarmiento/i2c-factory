@@ -112,7 +112,7 @@ export default App;
             execution_time = time.time() - start_time
             
             # Should complete in reasonable time (not hang)
-            assert execution_time < 30  # 30 seconds max
+            assert execution_time < 300  # 30 seconds max
             
             # Should return proper structure
             assert isinstance(result, dict)

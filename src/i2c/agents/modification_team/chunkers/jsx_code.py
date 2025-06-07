@@ -38,10 +38,12 @@ class JSXCodeChunkingStrategy(ChunkingStrategy):
         chunks: List[Document] = []
         patterns = [
             (r'(?:export\s+(?:default\s+)?)?(?:const|function)\s+(\w+)\s*=?\s*\([^)]*\)\s*=>\s*\{', 'component'),
+            (r'(?:export\s+(?:default\s+)?)?function\s+(\w+)\s*\([^)]*\)\s*\{', 'function'),
+            (r'(?:export\s+(?:default\s+)?)?const\s+(\w+)\s*=\s*\([^)]*\)\s*=>\s*\{', 'arrow_function'),
+            (r'(?:export\s+(?:default\s+)?)?const\s+(\w+)\s*=\s*\([^)]*\)\s*=>', 'arrow_component'),  # Added
             (r'class\s+(\w+)\s+extends\s+(?:React\.)?Component\s*\{', 'class_component'),
-            (r'(?:export\s+)?function\s+(\w+)\s*\([^)]*\)\s*\{', 'function'),
-            (r'(?:export\s+)?const\s+(\w+)\s*=\s*\([^)]*\)\s*=>\s*\{', 'arrow_function'),
             (r'(?:export\s+)?(?:const|function)\s+(use\w+)\s*[=\(]', 'hook'),
+            (r'(?:export\s+default\s+)?function\s+(\w+)', 'default_function'),  # Added
         ]
 
         for pattern, chunk_type in patterns:

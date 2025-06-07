@@ -211,6 +211,7 @@ class IncrementalContextIndexer:
             # Get appropriate chunker
             try:
                 if file_path.suffix.lower() in ['.js', '.jsx']:
+                    # Use improved JSX detection
                     chunks = get_js_chunks(document)
                 else:
                     chunker = get_chunker_for_path(file_path)

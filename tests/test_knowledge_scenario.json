@@ -1,0 +1,37 @@
+{
+  "project_name": "test_knowledge_accumulation",
+  "steps": [
+    {
+      "type": "knowledge",
+      "name": "Load AGNO Knowledge",
+      "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+      "doc_type": "AGNO Framework",
+      "project_name": "test_knowledge_accumulation",
+      "force_refresh": false
+    },
+    {
+      "type": "initial_generation",
+      "name": "Create API with 2 endpoints",
+      "prompt": "Create FastAPI app with /health and /users endpoints using AGNO patterns",
+      "project_name": "test_knowledge_accumulation"
+    },
+    {
+      "type": "knowledge",
+      "name": "Load More AGNO Knowledge",
+      "doc_path": "src/i2c/docs/agno_guide.pdf",
+      "doc_type": "AGNO Advanced Guide",
+      "project_name": "test_knowledge_accumulation",
+      "force_refresh": false
+    },
+    {
+      "type": "agentic_evolution",
+      "objective": {
+        "task": "Add /posts endpoint using advanced AGNO patterns",
+        "constraints": [
+          "Keep existing endpoints"
+        ]
+      },
+      "project_name": "test_knowledge_accumulation"
+    }
+  ]
+}

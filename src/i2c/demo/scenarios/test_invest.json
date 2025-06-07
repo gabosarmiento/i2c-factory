@@ -1,0 +1,262 @@
+{
+  "project_name": "ultimate_trading_ai",
+  "name": "Ultimate AI-Powered Autonomous Trading System",
+  "description": "Create the most sophisticated autonomous trading system using Agno AI agents with comprehensive market intelligence, risk management, and profit optimization capabilities",
+  "steps": [
+    {
+      "type": "narration",
+      "name": "Initialize Advanced Trading Session",
+      "message": "🚀 Starting Ultimate AI-Powered Autonomous Trading System Development",
+      "pause": 2
+    },
+    {
+      "type": "knowledge_folder",
+      "name": "Load Comprehensive Trading Intelligence",
+      "folder_path": "src/i2c/docs/knowledge/forex/forex_intelligence.json",
+      "doc_type": "Trading Intelligence",
+      "project_name": "trading_intelligence_base",
+      "framework": "forex_trading",
+      "version": "2025",
+      "global": true,
+      "force_refresh": false,
+      "description": "Load all trading knowledge files including market sessions, forex intelligence, and strategy data"
+    },
+    {
+      "type": "knowledge",
+      "name": "Load Market Sessions Timing Intelligence",
+      "doc_path": "src/i2c/docs/knowledge/forex/market_sessions_timing.json",
+      "doc_type": "Market Timing Intelligence",
+      "project_name": "trading_intelligence_base",
+      "framework": "market_timing",
+      "version": "2025",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "knowledge", 
+      "name": "Load Forex Intelligence Data",
+      "doc_path": "src/i2c/docs/knowledge/forex/llm_forex_strategy_automation_schema.json",
+      "doc_type": "Forex Market Intelligence",
+      "project_name": "trading_intelligence_base",
+      "framework": "forex_analysis",
+      "version": "2025",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "knowledge",
+      "name": "Load Intraday Strategy Intelligence",
+      "doc_path": "src/i2c/docs/knowledge/forex/intraday_strat.json", 
+      "doc_type": "Intraday Strategy Intelligence",
+      "project_name": "trading_intelligence_base",
+      "framework": "intraday_trading",
+      "version": "2025",
+      "global": true,
+      "force_refresh": false
+    },
+    {
+      "type": "knowledge",
+      "name": "Load Agno Framework Documentation",
+      "doc_path": "src/i2c/docs/agno_cheat_sheet.pdf",
+      "doc_type": "Agno Framework Guide",
+      "project_name": "agno_framework_knowledge",
+      "framework": "agno_ai",
+      "version": "2025",
+      "global": true,
+      "force_refresh": false,
+      "description": "Load comprehensive Agno framework documentation including agents, teams, tools, memory, knowledge, and workflows"
+    },
+    {
+      "type": "knowledge", 
+      "name": "Load Agno Architecture Concepts",
+      "doc_path": "src/i2c/docs/agno_guide.pdf",
+      "doc_type": "Agno Architecture Guide",
+      "project_name": "agno_framework_knowledge",
+      "framework": "agno_architecture",
+      "version": "2025", 
+      "global": true,
+      "force_refresh": false,
+      "description": "Load detailed Agno agent architecture concepts and implementation patterns"
+    },
+    {
+      "type": "initial_generation",
+      "name": "Build Foundation Trading Tools with Agno",
+      "prompt": "Create a robust foundation for autonomous trading by building essential Agno tools first. Focus on creating reusable, reliable components using Agno's @tool decorator pattern:\n\n**AGNO TOOLS FOUNDATION:**\n```python\nfrom agno.tools import tool\nfrom agno.agent import Agent\nfrom agno.models.openai import OpenAIChat\nimport pandas as pd\nimport numpy as np\nfrom datetime import datetime\nimport json\n```\n\n**CORE TRADING TOOLS TO BUILD:**\n\n1) **Market Data Tools**:\n```python\n@tool(description=\"Get real-time forex data for a currency pair\")\ndef get_forex_data(pair: str, timeframe: str = \"1H\") -> dict:\n    \"\"\"Fetch real-time forex data using available APIs\n    \n    Args:\n        pair: Currency pair (e.g., 'EUR/USD', 'GBP/USD')\n        timeframe: Chart timeframe ('1M', '5M', '15M', '1H', '4H', '1D')\n    \n    Returns:\n        dict: OHLCV data with timestamp\n    \"\"\"\n    # Implementation here\n    pass\n\n@tool(description=\"Calculate technical indicators for forex analysis\")\ndef calculate_technical_indicators(data: dict, indicators: list) -> dict:\n    \"\"\"Calculate technical indicators from price data\n    \n    Args:\n        data: OHLCV price data\n        indicators: List of indicators to calculate ['RSI', 'MACD', 'EMA', 'BB']\n    \n    Returns:\n        dict: Calculated indicator values\n    \"\"\"\n    # Implementation here\n    pass\n```\n\n2) **Risk Management Tools**:\n```python\n@tool(description=\"Calculate optimal position size based on risk parameters\")\ndef calculate_position_size(account_balance: float, risk_percent: float, stop_loss_pips: int, pip_value: float) -> dict:\n    \"\"\"Calculate position size using risk management rules\n    \n    Args:\n        account_balance: Current account balance\n        risk_percent: Risk percentage per trade (e.g., 0.02 for 2%)\n        stop_loss_pips: Stop loss distance in pips\n        pip_value: Value per pip for the currency pair\n        \n    Returns:\n        dict: Position size, risk amount, and validation\n    \"\"\"\n    # Implementation here\n    pass\n\n@tool(description=\"Assess market risk and volatility\")\ndef assess_market_risk(pair: str, current_data: dict, lookback_periods: int = 20) -> dict:\n    \"\"\"Assess current market risk and volatility conditions\n    \n    Args:\n        pair: Currency pair to analyze\n        current_data: Recent price data\n        lookback_periods: Number of periods for volatility calculation\n        \n    Returns:\n        dict: Risk assessment with volatility metrics\n    \"\"\"\n    # Implementation here\n    pass\n```\n\n**SIMPLE AGENT TO TEST TOOLS:**\n```python\n# Create basic trading agent using the tools\ntrading_agent = Agent(\n    name=\"BasicTradingAgent\",\n    model=OpenAIChat(id=\"gpt-4o\"),\n    tools=[\n        get_forex_data,\n        calculate_technical_indicators,\n        calculate_position_size,\n        assess_market_risk\n    ],\n    show_tool_calls=True,\n    search_knowledge=True,\n    description=\"Basic trading agent that uses fundamental trading tools for analysis and decision making\"\n)\n```\n\n**TOOL INTEGRATION REQUIREMENTS:**\n- Each tool should be self-contained and testable\n- Tools should reference the loaded knowledge (forex intelligence, market sessions)\n- Tools should handle errors gracefully and return meaningful messages\n- Tools should include proper type hints and documentation\n- Tools should be composable (one tool can call another)\n\nCreate a solid foundation that can be extended later with more sophisticated features.",
+      "project_name": "ultimate_trading_ai"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Advanced Technical Analysis Tools",
+      "objective": {
+        "task": "Create comprehensive technical analysis tools using Agno @tool decorators with forex intelligence integration:\n\n**TECHNICAL INDICATOR TOOLS:**\n```python\n@tool(description=\"Calculate RSI with divergence detection\")\ndef calculate_rsi_with_divergence(data: dict, period: int = 14, timeframe: str = \"1H\") -> dict:\n    \"\"\"Calculate RSI and detect divergences using forex intelligence rules\n    \n    Args:\n        data: OHLCV price data\n        period: RSI calculation period\n        timeframe: Chart timeframe for divergence rules\n    \n    Returns:\n        dict: RSI values, divergence signals, and confidence scores\n    \"\"\"\n    # Use forex intelligence RSI rules based on timeframe\n    # 1H: 70/30 thresholds with 3-candle confirmation\n    # 4H: 75/25 thresholds for stronger extremes\n    pass\n\n@tool(description=\"Calculate MACD with histogram analysis\")\ndef calculate_macd_signals(data: dict, fast: int = 12, slow: int = 26, signal: int = 9) -> dict:\n    \"\"\"Calculate MACD with signal analysis using forex intelligence\n    \n    Args:\n        data: OHLCV price data\n        fast: Fast EMA period\n        slow: Slow EMA period\n        signal: Signal line period\n    \n    Returns:\n        dict: MACD values, crossovers, and histogram reversal signals\n    \"\"\"\n    # Implement histogram reversal detection (3 consecutive bars)\n    # Signal line crossovers with validity periods\n    pass\n```\n\nImplement all tools with proper error handling, logging, and integration with the loaded forex intelligence knowledge.",
+        "constraints": [
+          "Must implement all technical indicators as Agno @tool decorators",
+          "Must use forex intelligence rules for indicator thresholds and confirmations",
+          "Must include pattern recognition with confidence scoring from knowledge base",
+          "Must implement multi-timeframe analysis with confluence detection",
+          "Must apply timeframe-specific rules from forex intelligence",
+          "Must include proper error handling and data validation",
+          "Must provide detailed reasoning for all signals",
+          "Must integrate with market regime detection",
+          "Must include volatility analysis and regime classification",
+          "Must support all major currency pairs with pair-specific rules"
+        ]
+      },
+      "project_name": "ultimate_trading_ai"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Market Session and Timing Tools",
+      "objective": {
+        "task": "Create market session and timing tools using the market_sessions_timing.json knowledge:\n\n**SESSION DETECTION TOOLS:**\n```python\n@tool(description=\"Get current trading session and characteristics\")\ndef get_current_session() -> dict:\n    \"\"\"Determine current trading session based on UTC time\n    \n    Returns:\n        dict: Current session, peak activity times, and characteristics\n    \"\"\"\n    # Asian: 00:00-09:00 UTC (peak 01:00-05:00)\n    # European: 07:00-16:00 UTC (peak 08:00-12:00)\n    # US: 13:00-22:00 UTC (peak 13:00-17:00)\n    pass\n\n@tool(description=\"Get optimal currency pairs for current session\")\ndef get_session_optimal_pairs(session: str = None) -> dict:\n    \"\"\"Get optimal currency pairs for trading session\n    \n    Args:\n        session: Trading session ('asian', 'european', 'us') or auto-detect\n    \n    Returns:\n        dict: High/moderate/low activity pairs with volatility expectations\n    \"\"\"\n    # Asian: USD/JPY, AUD/USD, NZD/USD high activity\n    # European: EUR/USD, GBP/USD, USD/CHF high activity\n    # US: EUR/USD, GBP/USD, USD/JPY, USD/CAD high activity\n    pass\n```\n\nIntegrate all tools with the loaded market_sessions_timing.json knowledge for accurate session detection and timing decisions.",
+        "constraints": [
+          "Must use market_sessions_timing.json data for all session logic",
+          "Must implement accurate UTC time-based session detection",
+          "Must include pair-specific optimal trading windows",
+          "Must check for session overlaps and volatility periods",
+          "Must integrate holiday schedules and special conditions",
+          "Must provide session-appropriate strategy recommendations",
+          "Must include liquidity assessment and spread monitoring",
+          "Must implement weekly and monthly pattern recognition",
+          "Must provide clear reasoning for all timing decisions",
+          "Must handle timezone conversions and daylight saving time"
+        ]
+      },
+      "project_name": "ultimate_trading_ai"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Interactive Brokers API Tools", 
+      "objective": {
+        "task": "Create robust Interactive Brokers API integration using Agno @tool decorators:\n\n**IB API TOOLS FOUNDATION:**\n```python\nfrom agno.tools import tool\nfrom ibapi.client import EClient\nfrom ibapi.wrapper import EWrapper\nfrom ibapi.contract import Contract\nfrom ibapi.order import Order\nimport threading\nimport time\n\n@tool(description=\"Connect to Interactive Brokers TWS or Gateway\")\ndef connect_ib(host: str = \"127.0.0.1\", port: int = 7497, client_id: int = 1) -> dict:\n    \"\"\"Establish connection to Interactive Brokers API\n    \n    Args:\n        host: IB Gateway/TWS host (default localhost)\n        port: IB Gateway/TWS port (7497 for TWS, 4002 for Gateway)\n        client_id: Unique client identifier\n    \n    Returns:\n        dict: Connection status and details\n    \"\"\"\n    # Implementation with proper error handling\n    pass\n\n@tool(description=\"Get real-time forex quote from Interactive Brokers\")\ndef get_ib_forex_quote(symbol: str, base_currency: str = \"USD\") -> dict:\n    \"\"\"Get real-time forex quote from IB\n    \n    Args:\n        symbol: Currency symbol (e.g., 'EUR', 'GBP', 'JPY')\n        base_currency: Base currency (default USD)\n    \n    Returns:\n        dict: Real-time bid/ask/last prices\n    \"\"\"\n    # Implementation here\n    pass\n\n@tool(description=\"Place forex order through Interactive Brokers\")\ndef place_ib_forex_order(symbol: str, action: str, quantity: float, order_type: str = \"MKT\", limit_price: float = None) -> dict:\n    \"\"\"Place forex order through IB API\n    \n    Args:\n        symbol: Currency pair (e.g., 'EUR.USD')\n        action: 'BUY' or 'SELL'\n        quantity: Order quantity\n        order_type: 'MKT', 'LMT', 'STP', etc.\n        limit_price: Limit price (for limit orders)\n    \n    Returns:\n        dict: Order confirmation and details\n    \"\"\"\n    # Implementation with validation\n    pass\n```\n\nFocus on reliability and robustness over complexity.",
+        "constraints": [
+          "Must implement all IB API functions as Agno @tool decorators",
+          "Must include comprehensive error handling and validation",
+          "Must implement proper connection management",
+          "Must add rate limiting for API calls",
+          "Must validate all orders before submission",
+          "Must support both paper and live trading modes",
+          "Must include detailed logging for debugging",
+          "Must handle market closures and connection failures",
+          "Must implement order status tracking",
+          "Must test all tools independently before integration"
+        ]
+      },
+      "project_name": "ultimate_trading_ai"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Risk Management and Position Sizing Tools",
+      "objective": {
+        "task": "Create comprehensive risk management tools using Agno @tool decorators with forex intelligence:\n\n**POSITION SIZING TOOLS:**\n```python\n@tool(description=\"Calculate optimal position size using Kelly Criterion\")\ndef calculate_optimal_position_size(account_balance: float, win_rate: float, avg_win: float, avg_loss: float, max_risk_percent: float = 0.02) -> dict:\n    \"\"\"Calculate optimal position size using Kelly Criterion and risk limits\n    \n    Args:\n        account_balance: Current account balance\n        win_rate: Historical win rate (0.0 to 1.0)\n        avg_win: Average winning trade amount\n        avg_loss: Average losing trade amount  \n        max_risk_percent: Maximum risk per trade (default 2%)\n    \n    Returns:\n        dict: Optimal position size with Kelly fraction and risk-adjusted size\n    \"\"\"\n    # Kelly % = (Win Rate * Avg Win - Loss Rate * Avg Loss) / Avg Win\n    # Cap at max_risk_percent for safety\n    pass\n\n@tool(description=\"Calculate position size based on ATR and volatility\")\ndef calculate_volatility_position_size(account_balance: float, pair: str, atr_value: float, risk_percent: float = 0.02, atr_multiplier: float = 1.5) -> dict:\n    \"\"\"Calculate position size based on ATR volatility\n    \n    Args:\n        account_balance: Current account balance\n        pair: Currency pair\n        atr_value: Current ATR value\n        risk_percent: Risk percentage per trade\n        atr_multiplier: ATR multiplier for stop loss\n    \n    Returns:\n        dict: Position size based on volatility with stop loss distance\n    \"\"\"\n    # Position Size = (Account Balance * Risk %) / (ATR * Multiplier * Pip Value)\n    pass\n```\n\nImplement comprehensive risk management with integration to forex intelligence risk rules.",
+        "constraints": [
+          "Must never exceed 2% risk per individual trade",
+          "Must implement dynamic position sizing based on volatility",
+          "Must include correlation analysis using forex intelligence",
+          "Must implement Kelly Criterion with safety caps",
+          "Must include drawdown monitoring and scaling",
+          "Must provide emergency risk controls",
+          "Must calculate VaR and stress test scenarios",
+          "Must implement regime-based risk adjustment",
+          "Must include detailed risk logging and reporting",
+          "Must support manual risk overrides with validation"
+        ]
+      },
+      "project_name": "ultimate_trading_ai"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Create Unified Trading Agent Team",
+      "objective": {
+        "task": "Create a sophisticated team of specialized Agno agents that work together to execute autonomous trading:\n\n**SPECIALIZED AGENT TEAM:**\n```python\nfrom agno.agent import Agent\nfrom agno.team import Team\nfrom agno.models.openai import OpenAIChat\nfrom agno.storage.sqlite import SqliteStorage\nfrom agno.memory.v2.memory import Memory\nfrom agno.memory.v2.db.sqlite import SqliteMemoryDb\n\n# Market Analysis Agent\nmarket_analyst = Agent(\n    name=\"MarketAnalyst\",\n    model=OpenAIChat(id=\"gpt-4o\"),\n    tools=[\n        get_forex_data,\n        calculate_technical_indicators,\n        calculate_rsi_with_divergence,\n        calculate_macd_signals,\n        detect_chart_patterns,\n        analyze_market_regime,\n        multi_timeframe_analysis\n    ],\n    description=\"Specialist in technical analysis and market structure evaluation\"\n)\n\n# Session Timing Agent\nsession_manager = Agent(\n    name=\"SessionManager\", \n    model=OpenAIChat(id=\"gpt-4o\"),\n    tools=[\n        get_current_session,\n        get_session_optimal_pairs,\n        check_session_overlaps,\n        is_optimal_trading_time,\n        assess_market_liquidity\n    ],\n    description=\"Expert in market timing and session-based trading decisions\"\n)\n\n# Risk Manager Agent\nrisk_manager = Agent(\n    name=\"RiskManager\",\n    model=OpenAIChat(id=\"gpt-4o\"),\n    tools=[\n        calculate_optimal_position_size,\n        calculate_volatility_position_size,\n        assess_portfolio_risk,\n        monitor_drawdown_risk,\n        calculate_dynamic_stops,\n        emergency_risk_controls\n    ],\n    description=\"Dedicated to risk assessment and position sizing decisions\"\n)\n\n# Execution Agent\ntrading_executor = Agent(\n    name=\"TradingExecutor\",\n    model=OpenAIChat(id=\"gpt-4o\"),\n    tools=[\n        connect_ib,\n        get_ib_forex_quote,\n        place_ib_forex_order,\n        get_ib_positions,\n        get_ib_account_info,\n        cancel_ib_order,\n        modify_ib_order\n    ],\n    description=\"Handles all trade execution and order management through Interactive Brokers\"\n)\n\n# Trading Team Coordination\ntrading_team = Team(\n    name=\"AutonomousTradingTeam\",\n    agents=[market_analyst, session_manager, risk_manager, trading_executor],\n    model=OpenAIChat(id=\"gpt-4o\"),\n    storage=SqliteStorage(table_name=\"trading_decisions\", db_file=\"trading_team.db\"),\n    memory=Memory(\n        model=OpenAIChat(id=\"gpt-4o-mini\"),\n        db=SqliteMemoryDb(table_name=\"trading_memory\", db_file=\"trading_team.db\")\n    ),\n    enable_agentic_memory=True,\n    description=\"\"\"\n        Autonomous trading team that coordinates market analysis, timing, risk management, \n        and execution. The team follows a systematic approach:\n        1. MarketAnalyst evaluates technical conditions and identifies opportunities\n        2. SessionManager confirms optimal timing and liquidity conditions  \n        3. RiskManager calculates appropriate position sizes and risk parameters\n        4. TradingExecutor handles order placement and management\n        \n        All decisions are logged and the team learns from outcomes to improve performance.\n    \"\"\"\n)\n```\n\n**TRADING WORKFLOW ORCHESTRATION:**\n```python\n# Example coordinated trading workflow\ndef execute_trading_workflow():\n    # Team analyzes market and makes coordinated decisions\n    analysis_result = trading_team.run(\n        \"Analyze current market conditions for EUR/USD, check timing, \"\n        \"assess risk, and execute trade if all conditions are favorable. \"\n        \"Account balance is $10,000. Follow strict 2% risk rule.\"\n    )\n    \n    return analysis_result\n\n# Continuous monitoring workflow\ndef continuous_monitoring():\n    monitoring_result = trading_team.run(\n        \"Monitor all open positions, check for any risk threshold breaches, \"\n        \"evaluate if any positions need adjustment, and update stop losses \"\n        \"based on current market volatility.\"\n    )\n    \n    return monitoring_result\n```\n\nCreate a cohesive system where agents collaborate seamlessly for autonomous trading decisions.",
+        "constraints": [
+          "Must create specialized agents for different trading functions",
+          "Must implement proper team coordination using Agno Team framework", 
+          "Must include comprehensive memory and learning capabilities",
+          "Must provide clear agent role separation and collaboration",
+          "Must implement systematic decision-making workflows",
+          "Must include continuous monitoring and position management",
+          "Must maintain detailed audit trails of all team decisions",
+          "Must implement proper error handling and fallback mechanisms",
+          "Must include testing scenarios for team coordination",
+          "Must demonstrate autonomous operation capabilities"
+        ]
+      },
+      "project_name": "ultimate_trading_ai"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Build Real-Time Trading Dashboard",
+      "objective": {
+        "task": "Create a sophisticated real-time trading dashboard with:\n\n**REAL-TIME MONITORING:**\n1) Live market data visualization with multiple timeframes\n2) Real-time P&L tracking and risk metrics\n3) Active positions and order status monitoring\n4) AI decision explanations and reasoning display\n5) Market session status and optimal trading windows\n\n**TRADING INTERFACE:**\n- Manual override capabilities for AI decisions\n- Emergency position closure buttons\n- Risk parameter adjustment controls\n- Strategy activation/deactivation toggles\n- Performance analytics dashboard\n\n**AI TRANSPARENCY:**\n- Real-time AI agent reasoning display\n- Confidence scores for all decisions\n- Technical analysis visualization\n- News impact assessment display\n- Risk assessment breakdown\n\nImplement using React frontend with WebSocket real-time updates.",
+        "constraints": [
+          "Must provide real-time data updates via WebSocket",
+          "Must include comprehensive risk monitoring",
+          "Must display AI reasoning and confidence scores",
+          "Must allow manual override of AI decisions",
+          "Must include emergency controls",
+          "Must be mobile-responsive",
+          "Must provide detailed performance analytics",
+          "Must include audit logging capabilities",
+          "Must support multiple user roles and permissions",
+          "Must include comprehensive alerting system"
+        ]
+      },
+      "project_name": "ultimate_trading_ai"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Implement Machine Learning Enhancement System",
+      "objective": {
+        "task": "Integrate advanced machine learning capabilities for continuous improvement:\n\n**PREDICTIVE MODELS:**\n1) LSTM networks for price prediction\n2) Random Forest for pattern recognition\n3) SVM for market regime classification\n4) Ensemble methods for robust predictions\n5) Reinforcement learning for strategy optimization\n\n**ADAPTIVE LEARNING:**\n- Online learning for model updates\n- Concept drift detection and adaptation\n- Performance-based model weighting\n- Automatic feature selection\n- Hyperparameter optimization\n\n**INTEGRATION WITH AI AGENTS:**\n- ML predictions as input to Agno agents\n- Agent decision enhancement with ML insights\n- Confidence scoring integration\n- Ensemble decision making\n- Continuous learning from agent performance\n\nEnsure all ML models integrate seamlessly with the Agno agent framework.",
+        "constraints": [
+          "Must implement proper time series validation",
+          "Must prevent overfitting with robust validation",
+          "Must include online learning capabilities",
+          "Must integrate with Agno agent decision making",
+          "Must provide model interpretability",
+          "Must include ensemble methods for robustness",
+          "Must implement automatic feature selection",
+          "Must support multiple ML algorithms",
+          "Must include concept drift detection",
+          "Must maintain model performance monitoring"
+        ]
+      },
+      "project_name": "ultimate_trading_ai"
+    },
+    {
+      "type": "agentic_evolution",
+      "name": "Create Production Deployment Configuration",
+      "objective": {
+        "task": "Create comprehensive deployment configuration to make the Ultimate Trading AI system fully runnable and production-ready:\n\n**DEPLOYMENT INFRASTRUCTURE:**\n```yaml\n# docker-compose.yml\nversion: '3.8'\nservices:\n  trading-backend:\n    build: \n      context: ./backend\n      dockerfile: Dockerfile\n    environment:\n      - DATABASE_URL=postgresql://user:pass@db:5432/trading_db\n      - REDIS_URL=redis://redis:6379\n      - IB_GATEWAY_HOST=ib-gateway\n      - OPENAI_API_KEY=${OPENAI_API_KEY}\n    volumes:\n      - ./data:/app/data\n      - ./logs:/app/logs\n    depends_on:\n      - db\n      - redis\n      - ib-gateway\n    \n  trading-frontend:\n    build:\n      context: ./frontend\n      dockerfile: Dockerfile\n    ports:\n      - \"3000:3000\"\n    environment:\n      - REACT_APP_API_URL=http://localhost:8000\n    depends_on:\n      - trading-backend\n      \n  db:\n    image: postgres:15\n    environment:\n      - POSTGRES_DB=trading_db\n      - POSTGRES_USER=trading_user\n      - POSTGRES_PASSWORD=secure_password\n    volumes:\n      - postgres_data:/var/lib/postgresql/data\n      \n  redis:\n    image: redis:7-alpine\n    volumes:\n      - redis_data:/data\n      \n  ib-gateway:\n    image: gnzsnz/ib-gateway:latest\n    environment:\n      - TWS_USERID=${IB_USERNAME}\n      - TWS_PASSWORD=${IB_PASSWORD}\n      - TRADING_MODE=paper\n    ports:\n      - \"4002:4002\"\n```\n\n**STARTUP SCRIPTS:**\n```bash\n#!/bin/bash\n# start.sh - One-command startup script\necho \"🚀 Starting Ultimate Trading AI System...\"\n\n# Check prerequisites\nif ! command -v docker-compose &> /dev/null; then\n    echo \"❌ Docker Compose is required\"\n    exit 1\nfi\n\n# Load environment variables\nsource .env.example\n\n# Start the complete system\ndocker-compose up -d\n\necho \"✅ System started successfully!\"\necho \"📊 Dashboard: http://localhost:3000\"\necho \"🔧 API: http://localhost:8000\"\necho \"📚 Docs: http://localhost:8000/docs\"\n```\n\n**CONFIGURATION FILES:**\n- Complete environment setup with .env.example\n- Database initialization scripts with sample data\n- Health check endpoints for monitoring\n- Backup and recovery procedures\n- Security configuration for production\n\n**MONITORING AND LOGGING:**\n- Comprehensive logging configuration\n- Performance metrics collection\n- Alert system for critical issues\n- Audit trail for all trading decisions\n- System health monitoring\n\nMake the system production-ready with one-command deployment.",
+        "constraints": [
+          "Must create Docker configuration with multi-stage builds",
+          "Must generate docker-compose.yml that orchestrates complete system",
+          "Must include one-command startup scripts for easy deployment",
+          "Must create comprehensive environment configuration files",
+          "Must include database initialization with sample trading data",
+          "Must add health check endpoints and system monitoring",
+          "Must generate detailed README with deployment instructions",
+          "Must include backup and recovery procedures",
+          "Must add security configuration for production deployment",
+          "Must include performance monitoring and alerting setup",
+          "Must create CI/CD pipeline configuration",
+          "Must include testing frameworks and validation scripts"
+        ]
+      },
+      "project_name": "ultimate_trading_ai"
+    },
+    {
+      "type": "narration",
+      "name": "System Integration and Testing Complete",
+      "message": "📊 Comprehensive trading system integration, testing, and validation completed successfully",
+      "pause": 2
+    },
+    {
+      "type": "narration", 
+      "name": "Production Deployment Ready",
+      "message": "🌐 Ultimate AI Trading System ready for production deployment with 24/7 autonomous operation capabilities",
+      "pause": 3
+    }
+  ]
+}

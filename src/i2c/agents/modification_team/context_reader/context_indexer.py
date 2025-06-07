@@ -28,18 +28,30 @@ import esprima
 
 def get_js_chunks(document: Document) -> List[Document]:
     """
-    1) Try treating it as JSX (regex-based).
-    2) If that yields more than one chunk, assume it had JSX and return.
+    1) Check if file contains JSX syntax (< and > patterns in JS context)
+    2) If JSX detected, use JSX chunker regardless of chunk count
     3) Otherwise try the normal JS parser (Esprima).
     4) If that fails, fallback to generic text chunking.
     """
-    # 1) Run through your JSX chunker first
-    jsx_chunks = JSXCodeChunkingStrategy().chunk(document)
-    if len(jsx_chunks) > 1:
-        canvas.info(f"JSX patterns matched, returning {len(jsx_chunks)} chunks")
+    content = document.content
+    
+    # 1) Detect JSX syntax - look for JSX patterns
+    jsx_indicators = [
+        '<div', '<span', '<button', '<input', '<form', '<img', '<a',
+        'className=', 'onClick=', 'onChange=', 'onSubmit=', 
+        '={', 'React.', 'useState', 'useEffect', 'jsx', 'tsx'
+    ]
+    
+    has_jsx = any(indicator in content for indicator in jsx_indicators)
+    
+    if has_jsx:
+        # Force JSX chunking for any file with JSX patterns
+        canvas.info(f"JSX syntax detected, using JSX chunker")
+        jsx_chunks = JSXCodeChunkingStrategy().chunk(document)
+        canvas.info(f"JSX chunked into {len(jsx_chunks)} blocks")
         return jsx_chunks
 
-    # 2) No JSX components detected?  Try pure-JS parser
+    # 2) No JSX detected? Try pure-JS parser
     try:
         js_chunks = JSCodeChunkingStrategy().chunk(document)
         canvas.info(f"Esprima JS parsed into {len(js_chunks)} chunks")

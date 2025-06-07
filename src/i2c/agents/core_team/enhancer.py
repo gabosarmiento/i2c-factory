@@ -217,11 +217,11 @@ class AgentKnowledgeEnhancer:
                 file_structure.append(sentence.strip())
         
         return {
-            "imports": imports[:8],
-            "file_structure": file_structure[:6],
-            "conventions": conventions[:10],
-            "architecture": architecture[:6],
-            "examples": examples[:10]
+            "imports": imports[:4],        # Balanced: Keep essential imports
+            "file_structure": file_structure[:4],  # Balanced: Keep key structure patterns
+            "conventions": conventions[:5],       # Balanced: Keep important conventions
+            "architecture": architecture[:4],      # Balanced: Keep core architecture
+            "examples": examples[:3]              # Balanced: Keep minimal examples
         }
 
     def _is_ai_ml_import_pattern(self, sentence: str, sentence_lower: str) -> bool:
@@ -401,11 +401,11 @@ class AgentKnowledgeEnhancer:
                 file_structure.append(sentence.strip())
         
         return {
-            "imports": imports[:10],
-            "file_structure": file_structure[:8],
-            "conventions": conventions[:12],
-            "architecture": architecture[:8],
-            "examples": examples[:12]
+            "imports": imports[:2],        # Reduced from 10 to 2 - top most relevant
+            "file_structure": file_structure[:2],  # Reduced from 8 to 2 - essential structure only
+            "conventions": conventions[:3],       # Reduced from 12 to 3 - core conventions
+            "architecture": architecture[:2],      # Reduced from 8 to 2 - key architecture patterns
+            "examples": examples[:2]              # Reduced from 12 to 2 - best examples
         }
 
     def _is_trading_import_pattern(self, sentence: str, sentence_lower: str) -> bool:
@@ -1314,11 +1314,11 @@ class AgentKnowledgeEnhancer:
                 architecture.append(sentence.strip())
         
         return {
-            "imports": imports[:6],
-            "file_structure": file_structure[:4],
-            "conventions": conventions[:8],
-            "architecture": architecture[:5],
-            "examples": examples[:8]
+            "imports": imports[:2],        # Reduced from 6 to 2 - top most relevant
+            "file_structure": file_structure[:2],  # Reduced from 4 to 2 - essential structure only
+            "conventions": conventions[:3],       # Reduced from 8 to 3 - core conventions
+            "architecture": architecture[:2],      # Reduced from 5 to 2 - key architecture patterns
+            "examples": examples[:2]              # Reduced from 8 to 2 - best examples
         }
     
     def enhance_agent_instructions(

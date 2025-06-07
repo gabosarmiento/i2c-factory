@@ -71,7 +71,7 @@ _PRECONFIGURED_CHUNKERS = {
 # Class-based chunkers (safe to instantiate)
 _CLASS_BASED_CHUNKERS = {
     '.ts': TSCodeChunkingStrategy,
-    '.tsx': TSCodeChunkingStrategy,
+    '.tsx': JSXCodeChunkingStrategy,
     '.js': JSCodeChunkingStrategy,
     '.jsx': JSXCodeChunkingStrategy,
     '.html': HTMLCodeChunkingStrategy,

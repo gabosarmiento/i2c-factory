@@ -33,19 +33,19 @@ class KnowledgeLeadAgent(Agent):
             ],
             **kwargs
         )
-        # Initialize team session state if needed
-        if self.team_session_state is None:
-            self.team_session_state = {}
-        
-        # Initialize embedding model and knowledge manager
+        # Use global session state instead of team_session_state
+        if self.session_state is None:
+            self.session_state = {}
+
+        # Initialize embedding model and knowledge manager using global keys
         self.embed_model = None
-        if self.team_session_state.get("embed_model") is not None:
-            self.embed_model = self.team_session_state.get("embed_model")
+        if self.session_state.get("embed_model") is not None:
+            self.embed_model = self.session_state.get("embed_model")
         else:
             try:
                 self.embed_model = get_embed_model()
-                if self.team_session_state is not None:
-                    self.team_session_state["embed_model"] = self.embed_model
+                if self.session_state is not None:
+                    self.session_state["embed_model"] = self.embed_model
             except Exception as e:
                 canvas.warning(f"Failed to initialize embedding model: {e}")
                 
@@ -54,7 +54,7 @@ class KnowledgeLeadAgent(Agent):
         self.enhanced_ingestor = None
         if self.embed_model:
             try:
-                db_path = self.team_session_state.get("db_path", "./data/lancedb")
+                db_path = self.session_state.get("db_path", "./data/lancedb")
                 self.knowledge_manager = ExternalKnowledgeManager(
                     embed_model=self.embed_model,
                     db_path=db_path
@@ -62,8 +62,8 @@ class KnowledgeLeadAgent(Agent):
                 
                 # Add enhanced ingestor with caching
                 from i2c.agents.budget_manager import BudgetManagerAgent
-                budget_manager = self.team_session_state.get("budget_manager") or BudgetManagerAgent()
-                knowledge_space = self.team_session_state.get("knowledge_space", "default")
+                budget_manager = self.session_state.get("budget_manager") or BudgetManagerAgent()
+                knowledge_space = self.session_state.get("knowledge_space", "default")
                 
                 self.enhanced_ingestor = EnhancedKnowledgeIngestorAgent(
                     budget_manager=budget_manager,
@@ -115,11 +115,13 @@ class KnowledgeLeadAgent(Agent):
                     "identified_targets": self._identify_target_files(project_path, task, code_context)
                 }
             }
-            
-            # Store in team session state
-            if self.team_session_state is not None:
-                self.team_session_state["project_context"] = context
-            
+
+            # Delegate context evolution to AGNO team
+            if self.session_state is not None:
+                evolved_context = await self._delegate_to_context_evolution_team(context, task)
+                self.session_state["retrieved_context"] = evolved_context
+                context = evolved_context
+
             return context
             
         except Exception as e:
@@ -134,8 +136,8 @@ class KnowledgeLeadAgent(Agent):
             }
             
             # Store error in the team session state
-            if self.team_session_state is not None:
-                self.team_session_state["project_context"] = error_info
+            if self.session_state is not None:
+                self.session_state["retrieved_context"] = error_info
                 
             return error_info
     
@@ -366,6 +368,104 @@ class KnowledgeLeadAgent(Agent):
         except Exception as e:
             canvas.error(f"Error ingesting documentation: {e}")
             return {"success": False, "error": str(e)}
+
+    def _apply_team_recommendations(self, context: Dict[str, Any], team_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply the team's recommendations to evolve context size and content"""
+        
+        strategy = team_analysis.get('context_evolution_strategy', {})
+        target_size = strategy.get('target_context_size', 9000)
+        
+        canvas.info(f"🧠 Applying team strategy to reduce context size")
+        
+        # Apply team recommendations:
+        # 1. Summarize historical information
+        # 2. Prioritize current project state  
+        # 3. Discard redundant information
+        
+        evolved_context = context.copy()
+        
+        # Reduce documentation references if they're too verbose
+        if "documentation" in evolved_context and "references" in evolved_context["documentation"]:
+            refs = evolved_context["documentation"]["references"]
+            if len(refs) > 3:  # Keep only most relevant
+                canvas.info(f"🧠 Reducing documentation references: {len(refs)} → 3")
+                evolved_context["documentation"]["references"] = refs[:3]
+        
+        # Summarize code context if too large
+        if "code_context" in evolved_context and "context" in evolved_context["code_context"]:
+            code_context = evolved_context["code_context"]["context"]
+            if len(code_context) > 2000:  # Summarize if too long
+                canvas.info(f"🧠 Summarizing code context: {len(code_context)} chars")
+                # Keep first 1000 and last 500 chars (current state)
+                evolved_context["code_context"]["context"] = code_context[:1000] + "...[summarized]..." + code_context[-500:]
+        
+        new_size = len(str(evolved_context))
+        canvas.success(f"🧠 Context evolved: {len(str(context))} → {new_size} chars")
+        
+        return evolved_context
+
+    async def _delegate_to_context_evolution_team(self, new_context: Dict[str, Any], task: str) -> Dict[str, Any]:
+        """Delegate context evolution to specialized AGNO team"""
+        
+        try:
+            from i2c.agents.knowledge.context_evolution_team import build_context_evolution_team
+            
+            # Use the workflow session_state instead of session_state
+        
+            evolution_team = build_context_evolution_team(session_state=self.session_state)
+            
+            evolution_request = f"""
+            Task: {task}
+            New context: {new_context}
+            Previous context: {self.session_state.get('retrieved_context', {})}
+            
+            Team: collaborate on evolving project context intelligently.
+            """
+            from agno.agent import Message
+            result = await evolution_team.arun(Message(role="user", content=evolution_request))
+            
+            # Extract JSON from team response using existing utility
+            if hasattr(result, 'content'):
+                try:
+                    from i2c.utils.json_extraction import extract_json_with_fallback
+                    
+                    content = result.content
+                    team_analysis = extract_json_with_fallback(content, fallback={})
+                    
+                    if team_analysis:
+                        canvas.info(f"🧠 Context evolved using team strategy")
+                        
+                        # Extract team recommendations
+                        strategy = team_analysis.get('context_evolution_strategy', {})
+                        target_size = strategy.get('target_context_size', 9000)
+                        
+                        canvas.info(f"🧠 Target size: {target_size}")
+                        canvas.info(f"🧠 Team consensus: {team_analysis.get('consensus_reached', False)}")
+                        
+                        # Apply team's recommendations to evolve context
+                        current_size = len(str(new_context))
+                        if current_size > target_size:
+                            canvas.info(f"🧠 Applying size reduction: {current_size} → {target_size} chars")
+                            evolved_context = self._apply_team_recommendations(new_context, team_analysis)
+                            return evolved_context
+                        else:
+                            canvas.info(f"🧠 Context size acceptable: {current_size} chars")
+                            return new_context
+                    else:
+                        canvas.warning("No valid JSON found in team response")
+                        return new_context
+                        
+                except Exception as e:
+                    canvas.warning(f"Failed to parse team response: {e}")
+                    return new_context
+            else:
+                canvas.warning("Team response has no content")
+                return new_context
+            
+        except Exception as e:
+            canvas.warning(f"Context evolution team failed: {e}")
+            return new_context
+        
 def build_knowledge_team(session_state=None) -> Team:
     """
     Build the knowledge team with a lead agent.
@@ -382,12 +482,12 @@ def build_knowledge_team(session_state=None) -> Team:
     # Use shared session if provided, else default
     if session_state is None:
         session_state = {
-            "project_context": None,
+            "retrieved_context": None,
             "db_path": "./data/lancedb",
         }
     else:
         # 2️⃣ Add only the keys this team needs (if they are missing)
-        session_state.setdefault("project_context", None)
+        session_state.setdefault("retrieved_context", None)
         session_state.setdefault("db_path", "./data/lancedb")
     
     return Team(

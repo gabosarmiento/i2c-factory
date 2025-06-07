@@ -207,6 +207,94 @@ ENSURE ALL FRONTEND COMPONENTS ARE FULLY CONNECTED TO REAL BACKEND ENDPOINTS."""
         
         return len(issues) == 0, issues
 
+def extract_routes_from_code(code_content: str, file_path: str) -> List[Dict]:
+    """Extract API routes from code content in memory (used during generation)"""
+    routes = []
+    
+    try:
+        # FastAPI/Python route patterns
+        fastapi_patterns = [
+            r'@app\.(get|post|put|delete|patch)\(["\']([^"\']+)["\'].*?\)',
+            r'@router\.(get|post|put|delete|patch)\(["\']([^"\']+)["\'].*?\)',
+            r'app\.(get|post|put|delete|patch)\(["\']([^"\']+)["\'].*?\)',
+            r'router\.(get|post|put|delete|patch)\(["\']([^"\']+)["\'].*?\)'
+        ]
+        
+        for pattern in fastapi_patterns:
+            matches = re.finditer(pattern, code_content, re.MULTILINE | re.DOTALL)
+            for match in matches:
+                method = match.group(1).upper()
+                path = match.group(2)
+                
+                # Find the function name that follows
+                func_name = _find_function_after_match(code_content, match.end())
+                
+                route_info = {
+                    'method': method,
+                    'path': path,
+                    'function': func_name,
+                    'file': file_path,
+                    'full_path': _normalize_api_path(path)
+                }
+                routes.append(route_info)
+        
+        # Express/Node.js route patterns
+        express_patterns = [
+            r'app\.(get|post|put|delete|patch)\(["\']([^"\']+)["\']',
+            r'router\.(get|post|put|delete|patch)\(["\']([^"\']+)["\']'
+        ]
+        
+        for pattern in express_patterns:
+            matches = re.finditer(pattern, code_content, re.MULTILINE)
+            for match in matches:
+                method = match.group(1).upper()
+                path = match.group(2)
+                
+                route_info = {
+                    'method': method,
+                    'path': path,
+                    'function': 'handler',
+                    'file': file_path,
+                    'full_path': _normalize_api_path(path)
+                }
+                routes.append(route_info)
+    
+    except Exception as e:
+        print(f"[WARNING] Error extracting routes from {file_path}: {e}")
+    
+    return routes
+
+def _find_function_after_match(code_content: str, match_end: int) -> str:
+    """Find the function name that follows a route decorator"""
+    try:
+        remaining_content = code_content[match_end:]
+        # Look for function definition
+        func_match = re.search(r'def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', remaining_content)
+        if func_match:
+            return func_match.group(1)
+        
+        # Look for async function definition
+        async_func_match = re.search(r'async\s+def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', remaining_content)
+        if async_func_match:
+            return async_func_match.group(1)
+            
+    except Exception:
+        pass
+    
+    return 'unknown'
+
+def _normalize_api_path(path: str) -> str:
+    """Normalize API path for frontend usage"""
+    # Ensure path starts with /
+    if not path.startswith('/'):
+        path = '/' + path
+    
+    # Don't add /api prefix if already present or if it's root
+    if not path.startswith('/api/') and path != '/' and not path.startswith('/health'):
+        path = '/api' + path if not path.startswith('/') else '/api' + path
+    
+    return path
+
 def inject_api_routes_into_session(project_path: Path, session_state: Dict) -> Dict:
     """Extract API routes using architectural understanding"""
     

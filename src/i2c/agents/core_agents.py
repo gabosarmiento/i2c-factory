@@ -22,6 +22,116 @@ except ImportError:
     canvas = DummyCanvas()
     
 _expertise_cache = {}
+
+def filter_session_state_for_agent(session_state: dict, agent_type: str) -> dict:
+    """
+    PHASE 2: Surgical context filtering - reduce bloat while preserving functionality
+    
+    Based on diagnostic data:
+    - knowledge_context is 9.6KB (70% of session state)
+    - Need to filter this per agent type
+    - Preserve all critical keys for functionality
+    """
+    if not session_state:
+        return session_state
+    
+    # Create filtered copy
+    filtered_state = session_state.copy()
+    
+    # Only filter for code_builder initially (safest to test)
+    if agent_type == "code_builder":
+        canvas.info(f"🔧 PHASE 2: Applying context filtering for {agent_type}")
+
+        # Define what each agent type actually needs
+        AGENT_CONTEXT_REQUIREMENTS = {
+            "code_builder": {
+                "required": [
+                    "project_path",
+                    "architectural_context", 
+                    "backend_api_routes",
+                    "api_route_summary",
+                    "knowledge_base"
+                ],
+                "optional": [
+                    "retrieved_context",
+                    "project_structure",
+                    "language_context"
+                ],
+                "skip": [
+                    "knowledge_context",  # This is the 9.6KB bloat
+                    "validation_results", 
+                    "generation_history",
+                    "previous_attempts"
+                ]
+            },
+            "input_processor": {
+                "required": ["project_path", "knowledge_base"],
+                "optional": ["architectural_context"],
+                "skip": ["knowledge_context", "retrieved_context", "backend_api_routes"]
+            },
+            "planner": {
+                "required": ["project_path", "architectural_context", "knowledge_base"],
+                "optional": ["project_structure"],
+                "skip": ["knowledge_context", "retrieved_context", "backend_api_routes"]
+            },
+            "project_context_analyzer": {
+                "required": ["project_path", "knowledge_base"],
+                "optional": ["project_structure"],
+                "skip": ["knowledge_context", "retrieved_context", "backend_api_routes", "architectural_context"]
+            }
+        }
+        
+        # Get requirements for this agent type
+        requirements = AGENT_CONTEXT_REQUIREMENTS.get(agent_type, {
+            "required": ["project_path", "knowledge_base"],
+            "optional": [],
+            "skip": ["knowledge_context"]
+        })
+        
+        # Build filtered context with only what's needed
+        filtered_state = {}
+        
+        # Always include required keys
+        for key in requirements["required"]:
+            if key in session_state:
+                filtered_state[key] = session_state[key]
+        
+        # Include optional keys if they exist and aren't too large
+        for key in requirements["optional"]:
+            if key in session_state:
+                value = session_state[key]
+                # Only skip optional keys if they're extremely large (>20KB)
+                if len(str(value)) < 20000:
+                    filtered_state[key] = value
+                else:
+                    canvas.info(f"🔧 Skipping large optional key {key} ({len(str(value)):,} chars)")
+        
+        # Log what we're doing
+        original_keys = set(session_state.keys())
+        filtered_keys = set(filtered_state.keys())
+        skipped_keys = original_keys - filtered_keys
+        
+        original_size = len(str(session_state))
+        filtered_size = len(str(filtered_state))
+        
+        canvas.info(f"🔧 PHASE 2 CORRECTED: Context selectivity for {agent_type}")
+        canvas.info(f"   Original keys: {len(original_keys)} ({original_size:,} chars)")
+        canvas.info(f"   Filtered keys: {len(filtered_keys)} ({filtered_size:,} chars)")
+        
+        if skipped_keys:
+            canvas.info(f"   Skipped keys: {', '.join(sorted(skipped_keys))}")
+        
+        if filtered_size < original_size:
+            reduction_pct = ((original_size-filtered_size)/original_size*100)
+            canvas.success(f"🔧 Context reduced: {original_size:,} → {filtered_size:,} chars ({reduction_pct:.1f}% reduction)")
+        else:
+            canvas.info(f"🔧 Context preserved: {filtered_size:,} chars")
+    else:
+        # For other agents, pass through unchanged (for now)
+        canvas.info(f"🔧 PHASE 2: No filtering for {agent_type} (preserving original behavior)")
+    
+    return filtered_state
+
 # Knowledge-enhanced agent instantiation
 # Create default instances to prevent import errors
 try:
@@ -46,17 +156,77 @@ except:
 
 # Set up factory functions for session state aware instantiation
 def get_rag_enabled_agent(agent_type, session_state=None):
-    """Get knowledge-enhanced agent with internalized expertise"""
+    """AGNO-native agent factory with dynamic knowledge access"""
     
-    # DEBUG: Track API route context
-    canvas.info(f"🔍 DEBUG: Creating {agent_type} agent")
+    # =================================================================
+    # DIAGNOSTIC LOGGING - PHASE 1: Measure session_state size
+    # =================================================================
+    canvas.info(f"📊 PROMPT ANALYSIS: Creating {agent_type} agent")
+    
     if session_state:
-        canvas.info(f"🔍 DEBUG: Session state keys: {list(session_state.keys())}")
+        # Count keys and measure content size
+        total_keys = len(session_state)
+        total_chars = 0
+        large_keys = []
+        
+        for key, value in session_state.items():
+            try:
+                if isinstance(value, str):
+                    size = len(value)
+                elif isinstance(value, (list, dict)):
+                    size = len(str(value))
+                else:
+                    size = len(str(value))
+                
+                total_chars += size
+                
+                # Track keys with substantial content
+                if size > 1000:
+                    large_keys.append(f"{key}({size:,}chars)")
+                    
+            except Exception as e:
+                canvas.warning(f"📊 Error measuring key {key}: {e}")
+        
+        # Log session state metrics
+        canvas.info(f"📊 SESSION STATE METRICS:")
+        canvas.info(f"   Total keys: {total_keys}")
+        canvas.info(f"   Total content: {total_chars:,} characters")
+        
+        if large_keys:
+            canvas.info(f"   Large keys: {', '.join(large_keys)}")
+        
+        # Categorize by size
+        if total_chars > 40000:
+            canvas.warning(f"📊 ⚠️  VERY LARGE SESSION STATE - May cause prompt issues")
+        elif total_chars > 20000:
+            canvas.warning(f"📊 ⚠️  LARGE SESSION STATE - Monitor for issues")
+        elif total_chars > 10000:
+            canvas.info(f"📊 MEDIUM SESSION STATE - Reasonable size")
+        else:
+            canvas.info(f"📊 ✅ SMALL SESSION STATE - Optimal size")
+            
+        # PHASE 2 DIAGNOSIS: Log all session state keys for system analysis
+        canvas.info(f"📊 FULL SESSION STATE KEYS for {agent_type}:")
+        for key, value in session_state.items():
+            value_type = type(value).__name__
+            value_size = len(str(value))
+            # Show preview for small values, size for large ones
+            if value_size < 100:
+                if isinstance(value, str):
+                    preview = f'"{value}"'
+                else:
+                    preview = str(value)
+                canvas.info(f"   {key}: {value_type} = {preview}")
+            else:
+                canvas.info(f"   {key}: {value_type} ({value_size:,} chars)")
+        # DEBUG: Track API route context (existing logic)
         if "backend_api_routes" in session_state:
             routes = session_state["backend_api_routes"]
             canvas.info(f"🔍 DEBUG: Found API routes: {routes}")
         else:
             canvas.info(f"🔍 DEBUG: No API routes in session state")
+    else:
+        canvas.info(f"📊 No session_state provided for {agent_type}")
     
     try:
         # Direct instantiation with error handling
@@ -87,9 +257,14 @@ def get_rag_enabled_agent(agent_type, session_state=None):
         # DEBUG: Check what's actually in session_state
         canvas.info(f"🔍 DEBUG: session_state keys for {agent_type}: {list(session_state.keys())}") 
         
+        # =================================================================
+        # PHASE 2: Apply surgical context filtering before agent creation
+        # =================================================================
+        filtered_session_state = filter_session_state_for_agent(session_state, agent_type)
+        
         try:
-            # Get knowledge base from session
-            knowledge_base = session_state.get("knowledge_base")
+            # Get knowledge base from filtered session
+            knowledge_base = filtered_session_state.get("knowledge_base")
             canvas.info(f"🔍 DEBUG: Knowledge base exists in session: {knowledge_base is not None}")
             
             # If no knowledge base, create basic agent
@@ -97,51 +272,61 @@ def get_rag_enabled_agent(agent_type, session_state=None):
                 canvas.warning(f"🔍 DEBUG: No knowledge_base in session_state for {agent_type}")
                 return agent_class()
             
-            # Create knowledge-enhanced agent
-            enhanced_agent = create_knowledge_enhanced_agent(
-                agent_class, 
-                knowledge_base, 
-                agent_type
-            )
+            # AGNO-NATIVE: Create agent with dynamic knowledge access
+            try:
+                # Try AGNO-native agent creation with session_state and add_context
+                enhanced_agent = agent_class(
+                    add_context=True,  # Enable AGNO's native knowledge access
+                    session_state=filtered_session_state  # Pass session_state with knowledge_base
+                )
+                canvas.success(f"✅ Created AGNO-native {agent_type} with dynamic knowledge access")
+            except TypeError:
+                # Fallback to legacy enhancement if agent doesn't support AGNO-native
+                enhanced_agent = create_knowledge_enhanced_agent(
+                    agent_class, 
+                    knowledge_base, 
+                    agent_type
+                )
+                canvas.warning(f"⚠️ Using legacy enhancement for {agent_type} (consider updating to AGNO-native)")
+            
             canvas.info(f"🔍 DEBUG: Enhanced agent created: {type(enhanced_agent).__name__}")
             # Log important session state keys only to reduce noise
             important_keys = ['knowledge_base', 'architectural_context', 'retrieved_context', 'backend_api_routes']
             
-            if session_state:
-                present_important = [key for key in important_keys if key in session_state]
+            if filtered_session_state:
+                present_important = [key for key in important_keys if key in filtered_session_state]
                 if present_important:
                     canvas.info(f"🔍 DEBUG: Important session keys present: {', '.join(present_important)}")
                 else:
-                    canvas.info(f"🔍 DEBUG: No important session keys found in {len(session_state)} total keys")
+                    canvas.info(f"🔍 DEBUG: No important session keys found in {len(filtered_session_state)} total keys")
             
-            # Additional enhancement if retrieved_context exists
-            if "retrieved_context" in session_state:
-                canvas.info(f"🔍 DEBUG: retrieved_context exists, length: {len(session_state['retrieved_context'])}")
-                canvas.info(f"🔍 DEBUG: retrieved_context preview: {session_state['retrieved_context'][:200]}...")
+            # SIMPLIFIED: Use retrieved_context for all agents
+            if "retrieved_context" in filtered_session_state:
                 try:
-                    from i2c.agents.core_team.enhancer import quick_enhance_agent
-                    enhanced_agent = quick_enhance_agent(
+                    from i2c.agents.core_team.enhancer import AgentKnowledgeEnhancer
+                    enhancer = AgentKnowledgeEnhancer()
+                    enhanced_agent = enhancer.enhance_agent_with_knowledge(
                         enhanced_agent, 
-                        session_state["retrieved_context"], 
+                        filtered_session_state["retrieved_context"], 
                         agent_type
                     )
-                    canvas.info(f"🧠 DEBUG: Agent further enhanced with retrieved context")
-                except ImportError:
-                    canvas.warning("Enhancer module not available - skipping additional enhancement")
+                    canvas.success(f"✅ Enhanced {agent_type} with retrieved_context")
                 except Exception as e:
-                    canvas.warning(f"Additional enhancement failed: {e}")
+                    canvas.warning(f"⚠️ Enhancement failed for {agent_type}: {e}")
+            else:
+                canvas.warning(f"⚠️ No retrieved_context available for {agent_type}")
 
             # Inject API context based on architectural understanding
             api_context = None
-            if session_state and agent_type == "code_builder":
-                arch_context = session_state.get("architectural_context", {})
+            if filtered_session_state and agent_type == "code_builder":
+                arch_context = filtered_session_state.get("architectural_context", {})
                 system_type = arch_context.get("system_type")
                 
                 # Only inject API context for systems that have APIs and UIs
                 if (system_type in ["fullstack_web_app", "microservices"] and 
-                    "backend_api_routes" in session_state):
+                    "backend_api_routes" in filtered_session_state):
                     
-                    api_context = session_state.get("api_route_summary", "")
+                    api_context = filtered_session_state.get("api_route_summary", "")
                     canvas.info(f"🔍 DEBUG: Injecting API context for {system_type}")              
             
                     
@@ -157,6 +342,47 @@ def get_rag_enabled_agent(agent_type, session_state=None):
                         canvas.success(f"✅ DEBUG: API instructions added to {agent_type}")
                     else:
                         canvas.warning(f"⚠️ DEBUG: {agent_type} has no instructions attribute")
+
+            # =================================================================
+            # DIAGNOSTIC LOGGING - PHASE 1: Measure final agent prompt size
+            # =================================================================
+            try:
+                if hasattr(enhanced_agent, 'instructions'):
+                    instructions = enhanced_agent.instructions
+                    
+                    if isinstance(instructions, list):
+                        instruction_count = len(instructions)
+                        total_instruction_chars = sum(len(str(inst)) for inst in instructions)
+                    elif isinstance(instructions, str):
+                        instruction_count = 1
+                        total_instruction_chars = len(instructions)
+                    else:
+                        instruction_count = 1
+                        total_instruction_chars = len(str(instructions))
+                    
+                    canvas.info(f"📊 FINAL AGENT METRICS for {agent_type}:")
+                    canvas.info(f"   Instruction count: {instruction_count}")
+                    canvas.info(f"   Total instruction chars: {total_instruction_chars:,}")
+                    
+                    # Categorize instruction size
+                    if total_instruction_chars > 10000:
+                        canvas.warning(f"📊 ⚠️  VERY LARGE INSTRUCTIONS - May overwhelm agent")
+                    elif total_instruction_chars > 5000:
+                        canvas.warning(f"📊 ⚠️  LARGE INSTRUCTIONS - Monitor performance")
+                    elif total_instruction_chars > 2000:
+                        canvas.info(f"📊 MEDIUM INSTRUCTIONS - Reasonable size")
+                    else:
+                        canvas.info(f"📊 ✅ COMPACT INSTRUCTIONS - Optimal size")
+                        
+                    # Check for specific bloat indicators
+                    if instruction_count > 20:
+                        canvas.warning(f"📊 ⚠️  HIGH INSTRUCTION COUNT - May cause confusion")
+                        
+                else:
+                    canvas.info(f"📊 Agent {agent_type} has no instructions attribute to measure")
+                    
+            except Exception as e:
+                canvas.warning(f"📊 Error measuring final agent instructions: {e}")
 
             return enhanced_agent
             

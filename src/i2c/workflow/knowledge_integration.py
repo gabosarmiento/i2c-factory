@@ -24,7 +24,7 @@ from i2c.agents.knowledge.enhanced_knowledge_ingestor import EnhancedKnowledgeIn
 def detect_framework(project_path: Path) -> Optional[str]:
     """Detect the framework used in a project by analyzing files."""
     framework_indicators = {
-        'react': ['package.json', 'src/App.js', 'src/App.tsx', 'src/index.js'],
+        'react': ['package.json', 'src/App.jsx', 'src/App.tsx', 'src/index.js'],
         'django': ['manage.py', 'settings.py', 'wsgi.py'],
         'flask': ['app.py', 'wsgi.py', 'requirements.txt'],
         'vue': ['vue.config.js', 'src/main.js', 'src/App.vue'],

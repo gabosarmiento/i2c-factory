@@ -74,16 +74,35 @@ class PlannerAgent(Agent):
                    - Apply the "one-concern-per-file" principle to avoid bloated main modules
                    - Prioritize vertical slice simplicity (feature-first structuring if applicable)
                    
-                4. **Quality Enforcement:**
+                4. **Technology Stack Adaptation:**
+                   - Use architectural_context and system_type from session state to determine appropriate tech stack
+                   - For fullstack_web_app systems, include infrastructure files for BOTH backend and frontend
+                   - Backend infrastructure based on detected language:
+                     * Python: main.py (FastAPI/Flask), requirements.txt, api/ structure
+                     * Node.js: server.js/app.js (Express), package.json, routes/ structure  
+                     * Go: main.go (Gin/Fiber), go.mod, handlers/ structure
+                     * Java: Main.java (Spring Boot), pom.xml, controller/ structure
+                   - Frontend infrastructure based on detected framework:
+                     * React + Vite: index.html, vite.config.js, src/main.jsx, src/App.jsx
+                     * React + Webpack: index.html, webpack.config.js, src/index.js, src/App.jsx
+                     * Vue + Vite: index.html, vite.config.js, src/main.js, src/App.vue
+                     * Angular: index.html, angular.json, src/main.ts, src/app/app.component.ts
+                   - Adapt file extensions and structure to match the architectural context
+
+                5. **Quality Enforcement:**
                    - Ensure tests do not have duplicate unittest.main() calls
                    - Use consistent data models across all files
                    - Avoid creating duplicate implementations of the same functionality
                    - If creating a CLI app, use a single approach for the interface
                    - Use consistent file naming for data storage (e.g., todos.json)
 
-                5. **Output Format:**
+                6. **Output Format:**
                    Given a project objective and programming language, output ONLY a minimal JSON array of essential file paths.
-                   Example output: ["main.py", "game.py", "player.py"].
+                   Adapt the structure based on architectural_context and system_type from session state.
+                   Examples:
+                   - CLI tool: ["main.py", "cli.py", "utils.py"]
+                   - Python+React fullstack: ["backend/main.py", "backend/api/endpoints.py", "frontend/index.html", "frontend/vite.config.js", "frontend/src/main.jsx", "frontend/src/App.jsx"]
+                   - Node.js+Vue fullstack: ["backend/server.js", "backend/routes/api.js", "frontend/index.html", "frontend/vite.config.js", "frontend/src/main.js", "frontend/src/App.vue"]
                    Do NOT include any commentary, folder hierarchies, or markdown formatting.
             """),
             **kwargs

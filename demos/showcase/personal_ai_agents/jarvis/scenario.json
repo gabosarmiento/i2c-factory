@@ -12,18 +12,7 @@
       "version": "latest",
       "project_name": "jarvis_emotional_advisor",
       "global": true,
-      "force_refresh": true
-    },
-    {
-      "type": "knowledge",
-      "name": "Load AGNO Working Examples",
-      "doc_path": "https://raw.githubusercontent.com/agno-agi/agno/main/cookbook/getting_started/01_basic_agent.py",
-      "doc_type": "AGNO Code Examples",
-      "framework": "AGNO",
-      "version": "latest", 
-      "project_name": "jarvis_emotional_advisor",
-      "global": true,
-      "force_refresh": true
+      "force_refresh": false
     },
     {
       "type": "knowledge", 
@@ -31,17 +20,6 @@
       "doc_path": "src/i2c/docs/agno_guide.pdf",
       "doc_type": "AGNO Advanced Guide",
       "framework": "AGNO",
-      "version": "latest", 
-      "project_name": "jarvis_emotional_advisor",
-      "global": true,
-      "force_refresh": false
-    },
-    {
-      "type": "knowledge",
-      "name": "Load FastAPI React Integration Guide",
-      "doc_path": "https://raw.githubusercontent.com/tiangolo/full-stack-fastapi-postgresql/master/{{cookiecutter.project_slug}}/backend/app/main.py",
-      "doc_type": "FastAPI Integration Examples",
-      "framework": "FastAPI+React",
       "version": "latest", 
       "project_name": "jarvis_emotional_advisor",
       "global": true,

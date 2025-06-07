@@ -147,7 +147,7 @@ class WorkflowController:
             
     def run_generation_cycle(self, structured_goal: dict, project_path: Path, session_state: dict = None) -> bool:
         """
-        Run the generation cycle workflow with recovery.
+        Run the generation cycle workflow with integration intelligence.
         
         Args:
             structured_goal: Dict with objective and language
@@ -157,6 +157,61 @@ class WorkflowController:
         Returns:
             bool: Success status
         """
+        # Check if we should use integration intelligence
+        use_integration_intelligence = structured_goal.get("use_integration_intelligence", True)
+        
+        if use_integration_intelligence:
+            canvas.info("🧠 Attempting Integration Intelligence Workflow")
+            try:
+                import asyncio
+                from i2c.workflow.integration_intelligence import execute_integration_intelligence_workflow
+                
+                # Prepare objective
+                objective = {
+                    "task": structured_goal.get("objective", "Generate software system"),
+                    "constraints": structured_goal.get("constraints", []),
+                    "language": structured_goal.get("language", "Python"),
+                    "system_type": session_state.get("system_type", "fullstack_web_app") if session_state else "fullstack_web_app"
+                }
+                
+                # Merge session state
+                merged_session_state = session_state.copy() if session_state else {}
+                merged_session_state.update({
+                    "project_path": str(project_path),
+                    "structured_goal": structured_goal
+                })
+                
+                # Execute integration intelligence workflow
+                if hasattr(asyncio, 'run'):
+                    result = asyncio.run(execute_integration_intelligence_workflow(objective, merged_session_state))
+                else:
+                    # Fallback for older Python versions
+                    loop = asyncio.get_event_loop()
+                    result = loop.run_until_complete(execute_integration_intelligence_workflow(objective, merged_session_state))
+                
+                if result.success:
+                    canvas.success("🎉 Integration Intelligence succeeded!")
+                    
+                    # Write files to disk
+                    from i2c.workflow.modification.file_operations import write_files_to_disk
+                    write_files_to_disk(result.files, project_path)
+                    
+                    canvas.success(f"✅ Generated {len(result.files)} files with integration intelligence")
+                    return True
+                else:
+                    canvas.warning("⚠️ Integration Intelligence failed, falling back to standard workflow")
+                    for error in result.errors:
+                        canvas.error(f"❌ {error}")
+                    # Fall through to standard workflow
+                    
+            except Exception as e:
+                canvas.error(f"❌ Integration Intelligence failed: {e}")
+                canvas.warning("⚠️ Falling back to standard generation workflow")
+                # Fall through to standard workflow
+        
+        # Standard generation workflow (fallback)
+        canvas.info("🔄 Using standard generation workflow")
+        
         # Update session state
         self.session_manager.update_state(
             action_type="generate",

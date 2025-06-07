@@ -167,18 +167,12 @@ class GenerationWorkflow(Workflow):
             self.session_state["knowledge_context"] = project_context
             self.session_state["knowledge_team"] = knowledge_team
             
-            # Extract and store retrieved context for the enhancer system
+            # AGNO-NATIVE: Enable dynamic knowledge access instead of content consumption
             if "documentation" in project_context:
                 docs = project_context["documentation"].get("references", [])
                 if docs:
-                    context_parts = []
-                    for doc in docs:
-                        context_parts.append(f"Source: {doc.get('source', 'Unknown')}")
-                        context_parts.append(doc.get('content', ''))
-                        context_parts.append("---")
-                    
-                    self.session_state["retrieved_context"] = "\n".join(context_parts)
-                    canvas.success(f"🧠 KnowledgeTeam provided context: {len(docs)} knowledge items")
+                    canvas.success(f"🧠 KnowledgeTeam found {len(docs)} knowledge items - enabling AGNO-native access")
+                    # Knowledge base already available in session_state for AGNO agents
             
             yield RunResponse(
                 content=f"🧠 Knowledge analysis completed: Found {len(project_context.get('documentation', {}).get('references', []))} knowledge items",
@@ -278,7 +272,7 @@ class GenerationWorkflow(Workflow):
             )
             
     def code_generation_phase(self) -> Iterator[RunResponse]:
-        """Generate code for planned files."""
+        """Generate code for planned files, separating backend and frontend for API route extraction."""
         canvas.step("Generating code files...")
 
         file_plan = self.session_state.get("file_plan", [])
@@ -297,54 +291,60 @@ class GenerationWorkflow(Workflow):
                 constraints_text += f"{i}. {constraint}\n"
             canvas.info(f"Added {len(constraints_source)} quality constraints to code generation prompt")
         
+        # Separate backend and frontend files for proper API route extraction
+        backend_files = []
+        frontend_files = []
+        other_files = []
+        
+        for file_path in file_plan:
+            if self._is_backend_file(file_path):
+                backend_files.append(file_path)
+            elif self._is_frontend_file(file_path):
+                frontend_files.append(file_path)
+            else:
+                other_files.append(file_path)
+        
+        canvas.info(f"🔍 File categorization: {len(backend_files)} backend, {len(frontend_files)} frontend, {len(other_files)} other")
+        
         try:
-            for file_path in file_plan:
-                build_prompt = (
-                    f"Objective: {objective}\nLanguage: {language}{constraints_text}\n"
-                    f"Generate complete, runnable code for the file '{file_path}'.\n\n"
-                    f"IMPORTANT: Use any specific frameworks, patterns, or imports mentioned in your instructions above. "
-                    f"Do not generate generic code if specific patterns are provided."
-                )
+            # PHASE 1: Generate backend files first
+            yield RunResponse(content=f"📦 Generating {len(backend_files)} backend files...")
+            for file_path in backend_files:
+                generated_code[file_path] = self._generate_single_file(file_path, objective, language, constraints_text, generated_code)
+                yield RunResponse(content=f"✅ Generated: {file_path}")
+            
+            # PHASE 2: Extract API routes from generated backend code (in memory)
+            if backend_files and frontend_files:
+                yield RunResponse(content="🔗 Extracting API routes from generated backend...")
+                self._extract_api_routes_from_memory(generated_code, backend_files)
+                routes = self.session_state.get("backend_api_routes", {})
+                total_routes = sum(len(endpoints) for endpoints in routes.values())
+                if total_routes > 0:
+                    yield RunResponse(content=f"✅ Extracted {total_routes} API routes for frontend integration")
+                else:
+                    yield RunResponse(content="⚠️ No API routes found in backend code")
+            
+            # PHASE 3: Generate frontend files with extracted API routes
+            yield RunResponse(content=f"🎨 Generating {len(frontend_files)} frontend files...")
+            for file_path in frontend_files:
+                generated_code[file_path] = self._generate_single_file(file_path, objective, language, constraints_text, generated_code, enhance_with_api=True)
+                yield RunResponse(content=f"✅ Generated: {file_path}")
+            
+            # PHASE 4: Generate other files
+            if other_files:
+                yield RunResponse(content=f"📄 Generating {len(other_files)} additional files...")
+                for file_path in other_files:
+                    generated_code[file_path] = self._generate_single_file(file_path, objective, language, constraints_text, generated_code)
+                    yield RunResponse(content=f"✅ Generated: {file_path}")
                 
-                # ENHANCE FRONTEND PROMPTS WITH API ROUTES
-                is_frontend_file = self._is_frontend_file(file_path)
-                if is_frontend_file and "backend_api_routes" in self.session_state:
-                    canvas.info(f"🔗 Enhancing frontend file {file_path} with API route integration")
-                    try:
-                        from i2c.utils.api_route_tracker import enhance_frontend_generation_with_apis
-                        build_prompt = enhance_frontend_generation_with_apis(
-                            build_prompt, self.session_state, self._get_component_type(file_path)
-                        )
-                        canvas.success(f"✅ Frontend prompt enhanced with {sum(len(routes) for routes in self.session_state['backend_api_routes'].values())} API routes")
-                    except Exception as e:
-                        canvas.warning(f"⚠️ Failed to enhance frontend prompt: {e}")
-                
-                # Get RAG-enabled code builder with session state
-                from i2c.agents.core_agents import get_rag_enabled_agent
-                builder = get_rag_enabled_agent("code_builder", session_state=self.session_state)
-
-                # Use the enhanced builder
-                response = builder.run(build_prompt)
-
-                raw = response.content if hasattr(response, 'content') else str(response)
-
-                # Clean code response and remove any "Applied patterns" documentation
-                from i2c.utils.markdown import strip_markdown_code_block
-                code = strip_markdown_code_block(raw)
-                # Remove any "Applied patterns" or similar documentation sections
-                import re
-                code = re.sub(r'(```\s*\n*)?Applied patterns:.*$', '', code, flags=re.DOTALL | re.MULTILINE)
-
-                generated_code[file_path] = code.strip()
-                canvas.success(f"Generated: {file_path}")
-                
-                yield RunResponse(
-                    content=f"🔧 Generated file: {file_path}",
-                    extra_data={"file": file_path, "length": len(code)}
-                )
-                
-            # Store in session state
+            # Store generated code in session state
+            self.session_state["code_map"] = generated_code
             self.session_state["generated_code"] = generated_code
+            
+            yield RunResponse(
+                content=f"✅ Code generation completed: {len(generated_code)} files",
+                extra_data={"total_files": len(generated_code)}
+            )
         except Exception as e:
             self.session_state["error"] = f"Code generation error: {str(e)}"
             canvas.error(f"Error generating code: {e}")
@@ -439,19 +439,28 @@ class GenerationWorkflow(Workflow):
                 extra_data={"files_written": len(code_map)}
             )
             
-            # NEW: Validate knowledge application after writing files
-            if self.session_state.get("retrieved_context") and code_map:
-                canvas.step("Validating knowledge application...")
+            # AGNO-NATIVE: Use knowledge base for validation instead of stored content
+            if self.session_state.get("knowledge_base") and code_map:
+                canvas.step("Validating knowledge application with AGNO-native access...")
                 
                 try:
                     from i2c.agents.knowledge.knowledge_validator import KnowledgeValidator
                     
                     validator = KnowledgeValidator()
-                    validation_result = validator.validate_generation_output(
+                    # Use AGNO-native validation with direct knowledge base access
+                    validation_result = validator.validate_generation_with_knowledge_base(
                         generated_files=code_map,
-                        retrieved_context=self.session_state["retrieved_context"],
+                        knowledge_base=self.session_state["knowledge_base"],
                         task_description=self.session_state.get("objective", "")
-                    )
+                    ) if hasattr(validator, 'validate_generation_with_knowledge_base') else None
+                    
+                    # Fallback to old method if AGNO-native not available
+                    if validation_result is None and self.session_state.get("retrieved_context"):
+                        validation_result = validator.validate_generation_output(
+                            generated_files=code_map,
+                            retrieved_context=self.session_state["retrieved_context"],
+                            task_description=self.session_state.get("objective", "")
+                        )
                     
                     # Store validation results
                     self.session_state["knowledge_validation"] = {
@@ -534,6 +543,131 @@ class GenerationWorkflow(Workflow):
                 content=f"❌ Code indexing failed: {e}",
                 extra_data={"error": str(e)}
             )
+    
+    def _generate_single_file(self, file_path: str, objective: str, language: str, constraints_text: str, generated_code: dict, enhance_with_api: bool = False) -> str:
+        """Generate code for a single file using the RAG-enabled code builder."""
+        try:
+            from i2c.agents.core_agents import get_rag_enabled_agent
+            
+            # Get the enhanced code builder
+            code_builder = get_rag_enabled_agent("code_builder", session_state=self.session_state)
+            
+            # Build context from already generated files
+            existing_context = ""
+            if generated_code:
+                existing_context = "\n\n# EXISTING GENERATED FILES:\n"
+                for existing_path, existing_code in generated_code.items():
+                    existing_context += f"\n## {existing_path}:\n{existing_code[:500]}...\n"
+
+            # Add API routes context and architectural rules
+            api_context = ""
+            architectural_rules = ""
+
+            # Add architectural context from session state
+            arch_context = self.session_state.get("architectural_context", {})
+            system_type = self.session_state.get("system_type", "unknown")
+
+            if arch_context and system_type != "unknown":
+                architectural_rules = f"\n\n# ARCHITECTURAL RULES FOR {system_type.upper().replace('_', ' ')}:\n"
+                
+                # Add existing API routes warning
+                if self.session_state.get("backend_api_routes"):
+                    routes = self.session_state["backend_api_routes"]
+                    existing_endpoints = []
+                    for file_routes in routes.values():
+                        for route in file_routes:
+                            existing_endpoints.append(f"{route['method']} {route['path']}")
+                    
+                    architectural_rules += "\n# EXISTING API ENDPOINTS - DO NOT DUPLICATE:\n"
+                    for endpoint in set(existing_endpoints):  # Remove duplicates
+                        architectural_rules += f"- {endpoint}\n"
+                    architectural_rules += "\n# CRITICAL: Do not create duplicate endpoints. Use existing routes or extend them.\n"
+                    
+                # Add module rules
+                modules = arch_context.get("modules", {})
+                if modules:
+                    architectural_rules += "\n# MODULE ORGANIZATION:\n"
+                    for module_name, module_info in modules.items():
+                        languages = module_info.get("languages", [])
+                        responsibilities = module_info.get("responsibilities", [])
+                        architectural_rules += f"- {module_name}: {', '.join(languages)} - {', '.join(responsibilities)}\n"
+
+            # Add API integration context for frontend files
+            if enhance_with_api and self.session_state.get("backend_api_routes"):
+                routes = self.session_state["backend_api_routes"]
+                unique_endpoints = set()
+                for file_routes in routes.values():
+                    for route in file_routes:
+                        unique_endpoints.add(f"{route['method']} {route['path']}")
+                
+                api_context = "\n\n# AVAILABLE API ENDPOINTS FOR INTEGRATION:\n"
+                for endpoint in sorted(unique_endpoints):
+                    api_context += f"- {endpoint}\n"
+                api_context += "\nPlease integrate these existing API endpoints into your frontend code.\n"
+            # Build the generation prompt
+            generation_prompt = f"""Generate code for: {file_path}
+
+Project Objective: {objective}
+Language: {language}{constraints_text}{architectural_rules}
+
+{existing_context}{api_context}
+
+IMPORTANT: Return ONLY the code content for this file. No explanations, no markdown blocks, no extra text.
+Use best practices and follow the AGNO framework patterns from your knowledge context."""
+
+            # Generate the code
+            response = code_builder.run(generation_prompt)
+            content = response.content if hasattr(response, 'content') else str(response)
+            
+            return content.strip()
+            
+        except Exception as e:
+            canvas.error(f"Error generating {file_path}: {e}")
+            return f"# Error generating {file_path}: {e}\n# Placeholder content\npass"
+    
+    def _is_backend_file(self, file_path: str) -> bool:
+        """Detect if a file is part of the backend/API layer."""
+        backend_indicators = [
+            # Python backend files
+            'main.py', 'app.py', 'server.py', 'api.py', 'routes.py',
+            # Backend directories
+            'backend/', 'api/', 'server/', 'src/api/', 'src/server/',
+            # Framework files
+            'fastapi', 'flask', 'django', 'uvicorn',
+            # Config files
+            'requirements.txt', 'Pipfile', 'pyproject.toml',
+            # Database/models
+            'models.py', 'database.py', 'db.py', 'schema.py'
+        ]
+        
+        file_path_lower = file_path.lower()
+        return any(indicator in file_path_lower for indicator in backend_indicators)
+    
+    def _extract_api_routes_from_memory(self, generated_code: dict, backend_files: list):
+        """Extract API routes from generated backend code in memory."""
+        try:
+            from i2c.utils.api_route_tracker import extract_routes_from_code
+            
+            all_routes = {}
+            
+            for file_path in backend_files:
+                if file_path in generated_code:
+                    code_content = generated_code[file_path]
+                    routes = extract_routes_from_code(code_content, file_path)
+                    if routes:
+                        all_routes[file_path] = routes
+                        canvas.info(f"🔍 Found {len(routes)} routes in {file_path}")
+            
+            # Store in session state for frontend generation
+            if all_routes:
+                self.session_state["backend_api_routes"] = all_routes
+                total_routes = sum(len(endpoints) for endpoints in all_routes.values())
+                canvas.success(f"✅ Extracted {total_routes} API routes for frontend integration")
+            else:
+                canvas.warning("⚠️ No API routes found in backend code")
+                
+        except Exception as e:
+            canvas.warning(f"⚠️ Failed to extract API routes: {e}")
     
     def _is_frontend_file(self, file_path: str) -> bool:
         """Detect if a file is part of the frontend"""

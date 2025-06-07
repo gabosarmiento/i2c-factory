@@ -69,13 +69,17 @@ class CodeBuilderAgent(Agent):
             - Incorporate **AI-aware patterns** for model integration, safety, and UX feedback loops.
             - Implement **security-first principles** (input validation, safe defaults, dependency management).
 
-            ## 4. Quality Engineering
+            ## 4. Quality Engineering & Testing
+            - Generate **comprehensive test coverage** (minimum 80% code coverage).
+            - Create **multiple test scenarios**: happy path, edge cases, error conditions.
             - Generate **property-based tests** and contract tests for APIs and agents.
+            - Include **integration tests** that test end-to-end functionality.
             - Add **real-time linting, safety scoring, and validation hooks** where appropriate.
             - Implement **observability patterns** (logging, health checks, monitoring).
             - Ensure code passes strict **linters, formatters, and type checkers**.
             - Use consistent data models across all files.
             - Avoid creating duplicate implementations of the same functionality.
+            - **EVERY FUNCTION NEEDS TESTS**: No function should be generated without corresponding tests.
 
             ## 5. API Integration (When Applicable)
             - **Frontend components**: Use ONLY the backend endpoints provided in context.
@@ -95,7 +99,14 @@ class CodeBuilderAgent(Agent):
             - Maintain cross-component consistency in naming and structure.
             - Ensure type safety and contract consistency across language boundaries.
 
-            ## 8. Output Format
+            ## 8. Implementation Requirements  
+            - **NO PLACEHOLDERS**: Never use placeholder implementations, mock functions, or TODO comments.
+            - **REAL BUSINESS LOGIC**: Implement actual functionality using appropriate libraries and algorithms.
+            - **NO "This is a placeholder"**: Every function must have working implementation.
+            - **USE REAL LIBRARIES**: Import and use actual libraries (sklearn, pandas, nltk, etc.) for functionality.
+            - **COMPLETE IMPLEMENTATIONS**: Every method and function must be fully implemented.
+
+            ## 9. Output Format
             - Output **ONLY raw executable code** ready for immediate use.
             - No markdown blocks, explanations, or comments about generation.
             - Output code that passes strict **linters and formatters** specific to the tech stack.
@@ -120,9 +131,16 @@ class CodeBuilderAgent(Agent):
         """
         # RAG Integration: Enhance prompt with knowledge context if available
         enhanced_prompt = self._enhance_prompt_with_context(prompt)
-        
+
         # Call the original run method with the enhanced prompt
-        return super().run(enhanced_prompt, **kwargs)
+        response = super().run(enhanced_prompt, **kwargs)
+        
+        # Strip markdown formatting as safety net
+        if hasattr(response, 'content'):
+            from i2c.utils.markdown import strip_markdown_code_block
+            response.content = strip_markdown_code_block(response.content)
+        # Call the original run method with the enhanced prompt
+        return response
         
     def _enhance_prompt_with_context(self, prompt: str) -> str:
         """

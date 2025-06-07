@@ -253,17 +253,18 @@ class DependencyVerifierAgent:
     def _generate_backend_requirements(self, dependencies: List[str], system_type: str) -> str:
         """Generate requirements.txt content with proper versions"""
         
-        # Default versions for common packages
+        # Default versions for common packages (updated for security)
         version_map = {
-            "fastapi": "0.104.1",
+            "fastapi": "0.109.1",  # Fixed PYSEC-2024-38
             "uvicorn[standard]": "0.24.0",
-            "python-multipart": "0.0.6",
+            "python-multipart": "0.0.18",  # Fixed GHSA-59g5-xgcq-4qw3 and GHSA-2jv5-9r88-3w3p
             "pydantic": "2.5.0",
             "sqlalchemy": "2.0.23",
             "python-jose[cryptography]": "3.3.0",
             "bcrypt": "4.1.2",
             "pytest": "7.4.3",
-            "httpx": "0.25.2"
+            "httpx": "0.25.2",
+            "starlette": "0.40.0"  # Fixed GHSA-f96h-pmfr-66vw
         }
         
         # Always include testing dependencies
